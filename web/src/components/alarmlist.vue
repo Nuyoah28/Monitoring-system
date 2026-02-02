@@ -7,7 +7,9 @@
             :style="itemlist1[getcolor(item.eventName)]"
             @click="showDetail(item)">
                 <div class="itemlist">
-                    <h3>{{ index + 1 }} {{ item.eventName }} -- {{ item.department }}</h3>
+                    <div class="text-content">
+                        <h3>{{ index + 1 }} {{ item.eventName }} -- {{ item.department }}</h3>
+                    </div>
                     <img :src="item.deal === '已处理' ? require('../../public/assets/checked.png') : require('../../public/assets/unchecked.png')" alt="">
                 </div>
             </div>
@@ -188,13 +190,21 @@ onUnmounted(() => {
     padding-top: 0.2rem;
     cursor: pointer;
     
-    h3 {
+    .text-content {
+        flex: 1; /* 占据剩余空间 */
+        min-width: 0; /* 关键：允许flex子项收缩到内容以下 */
         margin-left: 1.2rem;
-        font-size: 1.6rem;
-        display: inline-block;
-        white-space: nowrap; /* 不换行 */
-        overflow: hidden; /* 溢出隐藏 */
-        text-overflow: ellipsis; /* 溢出用省略号表示 */
+        display: flex; /* 让文字垂直居中 */
+        align-items: center;
+    }
+
+    h3 {
+        font-size: 1.4rem; /* 稍微调小字体 */
+        margin: 0;
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+        width: 100%; /* 确保在min-width:0的父容器内生效 */
     }
 
     img {
@@ -202,6 +212,7 @@ onUnmounted(() => {
         margin-right: 1rem;
         width: 2rem;
         height: 2rem;
+        flex-shrink: 0; /* 防止图片被压缩 */
     }
 }
 

@@ -49,45 +49,52 @@ const daypeople = ref<number>(134)
             display: flex;
             height: 50%;
             align-items: center;
+            justify-content: space-between; /* 两端对齐，避免挤压 */
+            padding: 0 1rem; /* 增加内边距防止贴边 */
 
             .digits {
-                width: 24rem;
+                flex: 1; /* 自适应宽度 */
                 height: 7rem;
                 font-size: 2rem;
                 font-weight: 600;
-                margin-left: 2.2rem;
+                margin-left: 1rem; /* 减小左边距 */
                 display: flex;
                 align-items: center;
+                justify-content: flex-end; /* 数字靠右显示 */
 
                 .digit {
-                    width: 4rem;
-                    height: 6rem;
+                    flex: 1; /* 数字块自适应 */
+                    max-width: 4rem; /* 限制最大宽度 */
+                    height: 5rem; /* 稍微减小高度 */
                     background-color: #07253F;
-                    margin-left: 0.5rem;
-                    margin-right: 1rem;
+                    margin-left: 0.2rem; /* 减小间距 */
+                    margin-right: 0.2rem;
                     border: 1px solid white;
 
                     /* 裁剪四个角 */
-                    border-radius: 10px;  /* 可以根据需要调整 */
-                    font-size: 4.5rem;
-                    line-height: 6rem;
+                    border-radius: 6px;  
+                    font-size: 3.5rem; /* 减小字号适配 */
+                    line-height: 5rem; /* 对应高度 */
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    
                     text-shadow: 
-                        0.2rem 0.4rem 1rem rgba(255, 255, 255, .4), /* 右下角阴影 */
-                        -0.2rem -0.4rem 1rem rgba(255, 255, 255, .4), /* 左上角阴影 */
-                        0.2rem -0.4rem 1rem rgba(255, 255, 255, .4), /* 右上角阴影 */
-                        -0.2rem 0.4rem 1rem rgba(255, 255, 255, .4); /* 左下角阴影 */
+                        0.2rem 0.4rem 1rem rgba(255, 255, 255, .4), 
+                        -0.2rem -0.4rem 1rem rgba(255, 255, 255, .4), 
+                        0.2rem -0.4rem 1rem rgba(255, 255, 255, .4), 
+                        -0.2rem 0.4rem 1rem rgba(255, 255, 255, .4); 
 
                 }
             }
         }
 
         .realpeople .content, .daypeople .content {
-            width: 6.5rem;
-            // height: 5.5rem;
-            font-size: 1.8rem;
+            width: 4rem; /* 减小文字区域固定宽度 */
+            font-size: 1.6rem; /* 稍微调小字号 */
             font-weight: 600;
-            // padding-right: 0.3rem;
-            // margin-left: 0.5rem;
+            flex-shrink: 0; /* 防止文字被压缩 */
+            text-align: center;
         }
     }
 </style>

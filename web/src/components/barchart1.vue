@@ -44,6 +44,12 @@ const initChart = (): void => {
                     type: 'cross',
                 },
             },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
             xAxis: {
                 type: 'category',
                 data: [],
@@ -55,6 +61,13 @@ const initChart = (): void => {
             },
             yAxis: {
                 type: 'value',
+                minInterval: 1, // 确保刻度为整数
+                name: '单位：次', // 添加单位
+                nameTextStyle: {
+                    color: 'white',
+                    fontSize: '1rem',
+                    padding: [0, 0, 0, 10] // name 的位置微调
+                },
                 axisLabel: {
                     color: 'white',
                     fontSize: '1rem',
