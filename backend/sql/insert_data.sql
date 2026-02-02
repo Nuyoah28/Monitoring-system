@@ -8,7 +8,7 @@ DELETE FROM case_type_info;
 INSERT INTO case_type_info (id, case_type_name) VALUES 
 (1, '进入危险区域'),
 (2, '烟雾'),
-(3, '区域停留'),
+(3, '打架斗殴'),
 (4, '摔倒'),
 (5, '明火'),
 (6, '吸烟');

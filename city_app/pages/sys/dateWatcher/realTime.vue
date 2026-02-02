@@ -27,53 +27,21 @@
           <view class="titleText">禁区</view>
         </view>
         <view class="text">
-          <span
-            >总事件数：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "禁区";
-                })
-              ].total
-            }}</span
-          >
-          <span
-            >今日新增：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "禁区";
-                })
-              ].todayNew
-            }}</span
-          >
+          <span>总事件数：{{ getData('进入危险区域').total }}</span>
+          <span>今日新增：{{ getData('进入危险区域').todayNew }}</span>
         </view>
       </view>
       <!--  -->
       <view class="fog">
         <view class="title">
           <view class="icon">
-            <image src="../../../static/fog.png" mode="aspectFit"></image>
+            <image src="../../../static/fist.png" mode="aspectFit"></image>
           </view>
-          <div class="titleText">打拳</div>
+          <div class="titleText">打架斗殴</div>
         </view>
         <view class="text">
-          <span
-            >总事件数：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "打拳";
-                })
-              ].total
-            }}</span
-          >
-          <span
-            >今日新增：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "打拳";
-                })
-              ].todayNew
-            }}</span
-          >
+          <span>总事件数：{{ getData('打架斗殴').total }}</span>
+          <span>今日新增：{{ getData('打架斗殴').todayNew }}</span>
         </view>
       </view>
       <!--  -->
@@ -82,27 +50,11 @@
           <view class="icon">
             <image src="../../../static/fuck.png" mode="aspectFit"></image>
           </view>
-          <div class="titleText">挥手</div>
+          <div class="titleText">烟雾</div>
         </view>
         <view class="text">
-          <span
-            >总事件数：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "挥手";
-                })
-              ].total
-            }}</span
-          >
-          <span
-            >今日新增：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "挥手";
-                })
-              ].todayNew
-            }}</span
-          >
+          <span>总事件数：{{ getData('烟雾').total }}</span>
+          <span>今日新增：{{ getData('烟雾').todayNew }}</span>
         </view>
       </view>
       <!--  -->
@@ -114,24 +66,8 @@
           <div class="titleText">摔倒</div>
         </view>
         <view class="text">
-          <span
-            >总事件数：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "摔倒";
-                })
-              ].total
-            }}</span
-          >
-          <span
-            >今日新增：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "摔倒";
-                })
-              ].todayNew
-            }}</span
-          >
+          <span>总事件数：{{ getData('摔倒').total }}</span>
+          <span>今日新增：{{ getData('摔倒').todayNew }}</span>
         </view>
       </view>
       <!--  -->
@@ -143,24 +79,8 @@
           <div class="titleText">明火</div>
         </view>
         <view class="text">
-          <span
-            >总事件数：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "明火";
-                })
-              ].total
-            }}</span
-          >
-          <span
-            >今日新增：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "明火";
-                })
-              ].todayNew
-            }}</span
-          >
+          <span>总事件数：{{ getData('明火').total }}</span>
+          <span>今日新增：{{ getData('明火').todayNew }}</span>
         </view>
       </view>
       <!--  -->
@@ -172,24 +92,8 @@
           <div class="titleText">吸烟</div>
         </view>
         <view class="text">
-          <span
-            >总事件数：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "吸烟";
-                })
-              ].total
-            }}</span
-          >
-          <span
-            >今日新增：{{
-              caseList[
-                caseList.findIndex((item) => {
-                  return item.caseTypeName === "吸烟";
-                })
-              ].todayNew
-            }}</span
-          >
+          <span>总事件数：{{ getData('吸烟').total }}</span>
+          <span>今日新增：{{ getData('吸烟').todayNew }}</span>
         </view>
       </view>
       <!--  -->
@@ -249,6 +153,11 @@ export default {
         }
       });
     },
+    getData(name) {
+      if (!this.caseList) return { total: 0, todayNew: 0 };
+      const item = this.caseList.find(item => item.caseTypeName === name);
+      return item ? item : { total: 0, todayNew: 0 };
+    }
   },
   mounted() {
     this.getInfo();

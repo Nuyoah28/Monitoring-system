@@ -83,8 +83,9 @@ import Vue from 'vue';
 		methods:{
 			createWs() {
 				let token = uni.getStorageSync('token')
-				this.websocket = new wsRequest(`ws://8.152.219.117:10215/api/v1/gpt/ws/${token}`,5000)
-				// this.websocket = new wsRequest(`ws://127.0.0.1:10115/api/v1/gpt/ws/${token}`,5000)
+				// 关于ai对话部分的，如果没有需求先不用管这一部分
+				// this.websocket = new wsRequest(`ws://8.152.219.117:10215/api/v1/gpt/ws/${token}`,5000) //服务器
+				// this.websocket = new wsRequest(`ws://127.0.0.1:10115/api/v1/gpt/ws/${token}`,5000) //本地
 				this.websocket.getMessage(res => {
 					// console.log('res=',res.data)
 					// console.log('textList=',this.textList[this.textList.length-1])

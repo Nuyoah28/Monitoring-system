@@ -87,16 +87,26 @@
             })
           }
           else {
-			  console.log('环形图',res.data.data)
-            const temp = [
-              {'name':res.data.data.alarmCaseTypeTotalList[0].caseTypeName,'value':res.data.data.alarmCaseTypeTotalList[0].total},
-              {'name':res.data.data.alarmCaseTypeTotalList[1].caseTypeName,'value':res.data.data.alarmCaseTypeTotalList[1].total},
-              {'name':res.data.data.alarmCaseTypeTotalList[2].caseTypeName,'value':res.data.data.alarmCaseTypeTotalList[2].total},
-              {'name':res.data.data.alarmCaseTypeTotalList[3].caseTypeName,'value':res.data.data.alarmCaseTypeTotalList[3].total},
-              {'name':res.data.data.alarmCaseTypeTotalList[4].caseTypeName,'value':res.data.data.alarmCaseTypeTotalList[4].total},
-              {'name':res.data.data.alarmCaseTypeTotalList[5].caseTypeName,'value':res.data.data.alarmCaseTypeTotalList[5].total},
-            ]
-            this.result = temp;
+            const list = res.data.data.alarmCaseTypeTotalList || [];
+            const getVal = (name) => {
+                const item = list.find(i => i.caseTypeName === name);
+                return item ? item.total : 0;
+            };
+
+            this.result = [
+              { name: '进入危险区域', value: getVal('进入危险区域') },
+              { name: '区域停留', value: getVal('区域停留') },
+              { name: '烟雾', value: getVal('烟雾') },
+              { name: '摔倒', value: getVal('摔倒') },
+              { name: '明火', value: getVal('明火') },
+              { name: '吸烟', value: getVal('吸烟') },
+              { name: '打架斗殴', value: getVal('打架斗殴') }
+            ].filter(item => item.value > 0); // 只显示有数据的项，或者保留全部
+            
+            const targetNames = ['进入危险区域', '烟雾', '打架斗殴', '摔倒', '明火', '吸烟'];
+            this.result = targetNames.map(name => {
+                return { name: name, value: getVal(name) };
+            });
           }
         })
       },

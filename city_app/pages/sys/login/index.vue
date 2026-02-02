@@ -25,7 +25,7 @@
             class="input"
             type="text"
             v-model="username"
-            placeholder="请输入手机号"
+            placeholder="请输入用户名"
             placeholder-style="color:#c5c5c5"
           />
         </view>
@@ -199,7 +199,7 @@ export default {
       }
 
       const data = {
-        phone: this.username,
+        userName: this.username,
         password: this.password,
       };
       uni.$http.post("/api/v1/user/login", data).then(({ data }) => {

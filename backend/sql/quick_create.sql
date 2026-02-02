@@ -65,7 +65,7 @@ CREATE TABLE `case_type_info` (
 
 LOCK TABLES `case_type_info` WRITE;
 /*!40000 ALTER TABLE `case_type_info` DISABLE KEYS */;
-INSERT INTO `case_type_info` VALUES (1,'进入危险区域'),(2,'烟雾'),(3,'区域停留'),(4,'摔倒'),(5,'明火'),(6,'吸烟');
+INSERT INTO `case_type_info` VALUES (1,'进入危险区域'),(2,'烟雾'),(3,'打架斗殴'),(4,'摔倒'),(5,'明火'),(6,'吸烟');
 /*!40000 ALTER TABLE `case_type_info` ENABLE KEYS */;
 UNLOCK TABLES;
 
