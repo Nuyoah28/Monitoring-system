@@ -9,6 +9,8 @@ import com.sipc.monitoringsystem.model.dto.res.Alarm.RealTimeAlarmRes;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
 import com.sipc.monitoringsystem.model.po.Alarm.Alarm;
 import com.sipc.monitoringsystem.model.po.Alarm.TimePeriod;
+import com.sipc.monitoringsystem.model.po.Monitor.Monitor;
+import com.sipc.monitoringsystem.model.po.User.User;
 import com.sipc.monitoringsystem.service.AlarmService;
 import com.sipc.monitoringsystem.service.MonitorService;
 import com.sipc.monitoringsystem.util.OssUtil;
@@ -22,6 +24,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -54,24 +57,49 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         return sqlGetAlarm;
     }
 
+    @Override
     public List<SqlGetAlarm> queryAlarmList(Integer pageNum, Integer pageSize, Integer caseType, Integer status,
             Integer warningLevel, String time1, String time2) {
-        /*
-         * List<SqlGetAlarm> alarms = this.baseMapper.selectByCondition((pageNum - 1) *
-         * pageSize,pageSize,caseType != null?caseType.toString():null, status !=
-         * null?status.toString():null, warningLevel!=null?warningLevel.toString():null,
-         */
-        List<SqlGetAlarm> alarms = this.baseMapper.selectAllTest(); // 特别注明：在dao层添加selectAllTest方法
+        List<SqlGetAlarm> alarms = this.baseMapper.selectAllTest();
         log.info("alarms size: " + alarms.size());
-        /*
-         * for (SqlGetAlarm alarm : alarms) {
-         * alarm.setClipLink(ossUtil.getClipLinkByUuid(alarm.getClipLink()));
-         * }
-         */
         for (SqlGetAlarm alarm : alarms) {
             alarm.setClipLink(ossUtil.getClipLinkByUuid(alarm.getClipLink()));
         }
-        // 根据warningLevel和时间进行降序排序
+        if (alarms.isEmpty())
+            return alarms;
+
+        return alarms;
+    }
+
+    /**
+     * 新增：根据用户权限获取报警列表
+     * role = 0 (管理员): 返回所有报警
+     * role = 1 (普通用户): 只返回自己负责的监控产生的报警
+     */
+    @Override
+    public List<SqlGetAlarm> queryAlarmList(Integer pageNum, Integer pageSize, Integer caseType, Integer status,
+            Integer warningLevel, String time1, String time2, User user) {
+        List<SqlGetAlarm> alarms = this.baseMapper.selectAllTest();
+        log.info("alarms size before filter: " + alarms.size());
+
+        // 如果是普通用户，过滤只显示自己负责的监控的报警
+        if (user.getRole() != 0) {
+            // 获取用户负责的监控ID列表
+            List<Monitor> userMonitors = monitorServiceImpl.getMonitorList(user);
+            Set<Integer> userMonitorIds = userMonitors.stream()
+                    .map(Monitor::getId)
+                    .collect(Collectors.toSet());
+
+            // 过滤报警：只保留属于用户负责的监控的报警（根据监控ID匹配）
+            alarms = alarms.stream()
+                    .filter(alarm -> userMonitorIds.contains(alarm.getMonitorId()))
+                    .collect(Collectors.toList());
+            log.info("alarms size after filter for user " + user.getUserName() + ": " + alarms.size());
+        }
+
+        for (SqlGetAlarm alarm : alarms) {
+            alarm.setClipLink(ossUtil.getClipLinkByUuid(alarm.getClipLink()));
+        }
         if (alarms.isEmpty())
             return alarms;
 

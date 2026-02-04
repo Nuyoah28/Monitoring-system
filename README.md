@@ -1,8 +1,10 @@
 algorithm：python模型训练的代码和python后端的代码
 
 backend：Java后端代码 jdk17 不然的话会报错，有个低版本的依赖
-后端配置：
+
+后端配置：（mysql和redis）
 Monitoring-system/backend/src/main/resources/application-dev.yml 这个里面有数据库，redis的配置 配置好自己的密码
+
 在后端backend打开，mvn clean install -DskipTests配置后端
 mvn spring-boot:run 启动
 

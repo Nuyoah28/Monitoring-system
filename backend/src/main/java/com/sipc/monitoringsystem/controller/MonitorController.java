@@ -10,6 +10,7 @@ import com.sipc.monitoringsystem.model.dto.res.Monitor.CreateMonitorRes;
 import com.sipc.monitoringsystem.model.dto.res.Monitor.GetMonitorsPosRes;
 import com.sipc.monitoringsystem.model.dto.res.Monitor.GetMonitorListRes;
 import com.sipc.monitoringsystem.model.po.Monitor.Monitor;
+import com.sipc.monitoringsystem.model.po.User.User;
 import com.sipc.monitoringsystem.service.MonitorService;
 import com.sipc.monitoringsystem.util.JwtUtils;
 import com.sipc.monitoringsystem.util.TokenThreadLocalUtil;
@@ -37,8 +38,11 @@ public class MonitorController {
 
     @GetMapping()
     public CommonResult<List<GetMonitorListRes>> getMonitorList() {
+        // 从 Token 获取当前用户信息
+        User user = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
 
-        List<Monitor> sqlMonitors = monitorService.getMonitorList();
+        // 根据用户权限获取监控列表
+        List<Monitor> sqlMonitors = monitorService.getMonitorList(user);
         if (sqlMonitors == null) {
             return CommonResult.fail("获取监控列表失败");
         }

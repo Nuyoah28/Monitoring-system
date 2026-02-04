@@ -146,7 +146,7 @@ CREATE TABLE `user_info` (
 
 LOCK TABLES `user_info` WRITE;
 /*!40000 ALTER TABLE `user_info` DISABLE KEYS */;
-INSERT INTO `user_info` VALUES (1,'root','42f641872ae4070ed059696b1df93394','',0),(2,'zbw','42f641872ae4070ed059696b1df93394','',1);
+INSERT INTO `user_info` VALUES (1,'root','42f641872ae4070ed059696b1df93394','000000',0),(2,'zbw','42f641872ae4070ed059696b1df93394','111111',1);
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -161,7 +161,7 @@ UNLOCK TABLES;
 -- Dump completed on 2024-04-03 11:22:23
 -- 用户表：仅添加新数据，保留现有数据
 INSERT INTO user_info (id, user_name, password, phone, role) VALUES 
-(3, 'aaa', '42f641872ae4070ed059696b1df93394', '13800138000', 0),
+(3, 'aaa', '42f641872ae4070ed059696b1df93394', '13800138000', 1),
 (4, 'bbb', '42f641872ae4070ed059696b1df93394', '13900139000', 1);
 
 -- 案例类型表：删除现有数据并重新插入

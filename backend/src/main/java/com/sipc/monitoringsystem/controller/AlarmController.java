@@ -10,8 +10,11 @@ import com.sipc.monitoringsystem.model.dto.param.alarm.UpdateAlarmParam;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.*;
 import com.sipc.monitoringsystem.model.dto.res.BlankRes;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
+import com.sipc.monitoringsystem.model.po.User.User;
 import com.sipc.monitoringsystem.service.AlarmService;
 import com.sipc.monitoringsystem.util.HttpUtils;
+import com.sipc.monitoringsystem.util.JwtUtils;
+import com.sipc.monitoringsystem.util.TokenThreadLocalUtil;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
@@ -33,52 +36,56 @@ import java.util.stream.Collectors;
 @CrossOrigin
 @RequestMapping("/api/v1/alarm")
 
-/* 
-TODO 
-报警记录假设有10000条才占4MB，不至于使用数据库分页查询
-而且实时性不高，这个报警推送采用的应该是前端轮询的方式，
-应该使用websocket的publish/subscribe模式
-这里除了receive之外全改
-*/
+/*
+ * TODO
+ * 报警记录假设有10000条才占4MB，不至于使用数据库分页查询
+ * 而且实时性不高，这个报警推送采用的应该是前端轮询的方式，
+ * 应该使用websocket的publish/subscribe模式
+ * 这里除了receive之外全改
+ */
 public class AlarmController {
 
     @Autowired
     AlarmService alarmService;
+
     @PostMapping("/receive")
     @ClearRedis
     @Pass
-    public CommonResult<BlankRes> receiveAlarm(@RequestParam(value = "cameraId",required = true) int cameraId,
-                                               @RequestParam(value = "caseType",required = true) int caseType,
-                                               @RequestParam(value = "clipId",required = true) String clipId) {
-        Map<String,String> paramMap = new HashMap<>();
-        paramMap.put("cid",""); //cid不填默认全发
-        paramMap.put("title","报警通知");
-        paramMap.put("content","您有一条新的报警信息，请及时处理"+ LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        Map<String,String> optMap = new HashMap<>();
-        Map<String,String> catMap = new HashMap<>();
-        catMap.put("/message/android/category","WORK");
+    public CommonResult<BlankRes> receiveAlarm(@RequestParam(value = "cameraId", required = true) int cameraId,
+            @RequestParam(value = "caseType", required = true) int caseType,
+            @RequestParam(value = "clipId", required = true) String clipId) {
+        Map<String, String> paramMap = new HashMap<>();
+        paramMap.put("cid", ""); // cid不填默认全发
+        paramMap.put("title", "报警通知");
+        paramMap.put("content",
+                "您有一条新的报警信息，请及时处理" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        Map<String, String> optMap = new HashMap<>();
+        Map<String, String> catMap = new HashMap<>();
+        catMap.put("/message/android/category", "WORK");
         optMap.put("HW", catMap.toString());
-        Map<String,Object> dateMap = new HashMap<>();
-        dateMap.put("date1",1);
-        dateMap.put("date2",1);
-        paramMap.put("options",optMap.toString());
-        paramMap.put("date",dateMap.toString());
+        Map<String, Object> dateMap = new HashMap<>();
+        dateMap.put("date1", 1);
+        dateMap.put("date2", 1);
+        paramMap.put("options", optMap.toString());
+        paramMap.put("date", dateMap.toString());
         Random random = new Random();
         String randomString = random.ints(10, 0, 10)
                 .mapToObj(Integer::toString)
                 .collect(Collectors.joining());
-        paramMap.put("request_id",randomString);
+        paramMap.put("request_id", randomString);
         try {
-            String resJson = HttpUtils.postJson("https://fc-mp-e0386718-0219-4138-80a9-902540e76f67.next.bspapp.com/notice", new ObjectMapper().writeValueAsString(paramMap));
-            if(resJson.contains("success")){
+            String resJson = HttpUtils.postJson(
+                    "https://fc-mp-e0386718-0219-4138-80a9-902540e76f67.next.bspapp.com/notice",
+                    new ObjectMapper().writeValueAsString(paramMap));
+            if (resJson.contains("success")) {
                 log.info("发送报警通知成功");
-            }else {
+            } else {
                 log.error("发送报警通知失败");
             }
         } catch (JsonProcessingException e) {
             log.error("发送报警通知失败");
         }
-        if (alarmService.receiveAlarm(cameraId, caseType,clipId))
+        if (alarmService.receiveAlarm(cameraId, caseType, clipId))
             return CommonResult.success("接收成功");
         else
             return CommonResult.fail("接收失败");
@@ -96,9 +103,9 @@ public class AlarmController {
 
     @GetMapping("/query/cnt")
     @Pass
-    public CommonResult<BlankRes> getAlarmCnt(@RequestParam(value = "caseType",required = false) Integer caseType,
-                                              @RequestParam(value = "time1",required = false) String time1,
-                                              @RequestParam(value = "time2",required = false) String time2) {
+    public CommonResult<BlankRes> getAlarmCnt(@RequestParam(value = "caseType", required = false) Integer caseType,
+            @RequestParam(value = "time1", required = false) String time1,
+            @RequestParam(value = "time2", required = false) String time2) {
         Long alarmCnt = alarmService.getAlarmCnt(caseType, time1, time2);
         if (alarmCnt == null)
             return CommonResult.fail("查询失败");
@@ -116,25 +123,29 @@ public class AlarmController {
             return CommonResult.success(getHistoryCntRes);
     }
 
-
     @GetMapping("/query")
-    @Pass
-    public CommonResult<QueryAlarmListRes> queryAlarmList(@RequestParam(value = "pageNum",required = true)  Integer pageNum,
-                                                          @RequestParam(value = "pageSize",required = true)  Integer pageSize,
-                                                          @RequestParam(value = "caseType",required = false) Integer caseType,
-                                                          @RequestParam(value = "status",required = false)  Integer status,
-                                                          @RequestParam(value = "warningLevel",required = false)  Integer warningLevel,
-                                                          @RequestParam(value = "time1",required = false) String time1,
-                                                          @RequestParam(value = "time2",required = false)  String time2) {
+    public CommonResult<QueryAlarmListRes> queryAlarmList(
+            @RequestParam(value = "pageNum", required = true) Integer pageNum,
+            @RequestParam(value = "pageSize", required = true) Integer pageSize,
+            @RequestParam(value = "caseType", required = false) Integer caseType,
+            @RequestParam(value = "status", required = false) Integer status,
+            @RequestParam(value = "warningLevel", required = false) Integer warningLevel,
+            @RequestParam(value = "time1", required = false) String time1,
+            @RequestParam(value = "time2", required = false) String time2) {
 
-        List<SqlGetAlarm> alarmList = alarmService.queryAlarmList(pageNum, pageSize, caseType, status, warningLevel, time1, time2);
+        // 从 Token 获取当前用户信息
+        User user = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
+
+        // 根据用户权限获取报警列表
+        List<SqlGetAlarm> alarmList = alarmService.queryAlarmList(pageNum, pageSize, caseType, status, warningLevel,
+                time1, time2, user);
 
         if (alarmList == null)
             return CommonResult.fail("查询失败");
 
         List<GetAlarmRes> res = new ArrayList<>();
 
-        for(SqlGetAlarm alarm : alarmList){
+        for (SqlGetAlarm alarm : alarmList) {
             res.add(new GetAlarmRes(alarm));
         }
         QueryAlarmListRes queryAlarmListRes = new QueryAlarmListRes();
@@ -147,7 +158,8 @@ public class AlarmController {
     @ClearRedis
     @Pass
     public CommonResult<BlankRes> updateAlarm(@Valid @RequestBody UpdateAlarmParam updateAlarmParam) {
-        if (alarmService.updateAlarm(updateAlarmParam.getId(), updateAlarmParam.getStatus(), updateAlarmParam.getProcessingContent()))
+        if (alarmService.updateAlarm(updateAlarmParam.getId(), updateAlarmParam.getStatus(),
+                updateAlarmParam.getProcessingContent()))
             return CommonResult.success("更新成功");
         else
             return CommonResult.fail("更新失败");
@@ -175,13 +187,13 @@ public class AlarmController {
 
     @GetMapping("/export")
     @Pass
-    public ResponseEntity<byte[]> exportAlarms(){
+    public ResponseEntity<byte[]> exportAlarms() {
         String Filename = "temp.xlsx";
         File file = new File(Filename);
         EasyExcel.write(Filename, GetAlarmRes.class)
                 .sheet("报警数据")
                 .doWrite(() -> {
-                    List<SqlGetAlarm> alarmRes =  alarmService.queryAlarmList(1, 5000, null, null, null, null, null);
+                    List<SqlGetAlarm> alarmRes = alarmService.queryAlarmList(1, 5000, null, null, null, null, null);
                     List<GetAlarmRes> res = new ArrayList<>();
                     for (SqlGetAlarm alarmRe : alarmRes) {
                         res.add(new GetAlarmRes(alarmRe));
@@ -191,11 +203,11 @@ public class AlarmController {
         byte[] bytes = null;
         try {
             bytes = Files.readAllBytes(file.toPath());
-        }catch (Exception e) {
+        } catch (Exception e) {
             log.error("文件读取失败");
             return null;
         }
         return ResponseEntity.ok().body(bytes);
-        }
+    }
 
 }

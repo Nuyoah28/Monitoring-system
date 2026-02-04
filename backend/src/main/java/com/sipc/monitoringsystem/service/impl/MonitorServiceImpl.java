@@ -1,11 +1,13 @@
 package com.sipc.monitoringsystem.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sipc.monitoringsystem.dao.MonitorDao;
 import com.sipc.monitoringsystem.model.dto.param.Monitor.CreateMonitorParam;
 import com.sipc.monitoringsystem.model.dto.param.Monitor.UpdateMonitorParam;
 import com.sipc.monitoringsystem.model.po.Monitor.Monitor;
+import com.sipc.monitoringsystem.model.po.User.User;
 import com.sipc.monitoringsystem.service.MonitorService;
 import com.sipc.monitoringsystem.service.RequestFlaskService;
 import lombok.extern.slf4j.Slf4j;
@@ -18,15 +20,33 @@ import java.util.List;
 
 @Slf4j
 @Service
-public class MonitorServiceImpl extends ServiceImpl<MonitorDao,Monitor> implements MonitorService {
+public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> implements MonitorService {
 
     @Autowired
     public RequestFlaskService requestFlaskService;
 
     @Override
-    @Cacheable(value = "cache",key="'getMonitorList'",unless = "#result==null")
+    @Cacheable(value = "cache", key = "'getMonitorList'", unless = "#result==null")
     public List<Monitor> getMonitorList() {
         return this.list();
+    }
+
+    /**
+     * 新增：根据用户权限获取监控列表
+     * role = 0 (管理员): 返回所有监控
+     * role = 1 (普通用户): 只返回 leader = userName 的监控
+     */
+    @Override
+    public List<Monitor> getMonitorList(User user) {
+        if (user.getRole() == 0) {
+            // 管理员：返回所有
+            return this.list();
+        } else {
+            // 普通用户：只返回自己负责的
+            QueryWrapper<Monitor> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("leader", user.getUserName());
+            return this.list(queryWrapper);
+        }
     }
 
     @Override
@@ -36,7 +56,7 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao,Monitor> implemen
 
     @Override
     public Integer createMonitor(CreateMonitorParam createMonitorParam) {
-        //TODO 改字段要改这里
+        // TODO 改字段要改这里
         Monitor monitor = new Monitor();
         monitor.setName(createMonitorParam.getName());
         monitor.setArea(createMonitorParam.getArea());
@@ -56,28 +76,29 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao,Monitor> implemen
         monitor.setLeftY(createMonitorParam.getLeftY());
         monitor.setRightX(createMonitorParam.getRightX());
         monitor.setRightY(createMonitorParam.getRightY());
-        try{
+        try {
             save(monitor);
             return monitor.getId();
 
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error("创建监控失败");
             return -1;
         }
     }
 
     @Override
-    public String getMonitorIPById(Integer id){
+    public String getMonitorIPById(Integer id) {
         Monitor monitor = this.getById(id);
         return monitor.getStreamLink();
     }
 
     @Override
-    public Boolean updateMonitor(UpdateMonitorParam updateMonitorParam){
-        //TODO 改字段要改这里
+    public Boolean updateMonitor(UpdateMonitorParam updateMonitorParam) {
+        // TODO 改字段要改这里
         Monitor monitor = new Monitor();
 
-        Boolean dangerArea = updateMonitorParam.getLeftX() != null && updateMonitorParam.getLeftY() != null && updateMonitorParam.getRightX() != null && updateMonitorParam.getRightY() != null;
+        Boolean dangerArea = updateMonitorParam.getLeftX() != null && updateMonitorParam.getLeftY() != null
+                && updateMonitorParam.getRightX() != null && updateMonitorParam.getRightY() != null;
         monitor.setId(updateMonitorParam.getId());
         monitor.setName(updateMonitorParam.getName());
         monitor.setArea(updateMonitorParam.getArea());
@@ -94,24 +115,25 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao,Monitor> implemen
         monitor.setLeftY(null);
         monitor.setRightX(null);
         monitor.setRightY(null);
-        try{
+        try {
             String IP = getMonitorIPById(updateMonitorParam.getId());
-            //更改Flask区域
+            // 更改Flask区域
             List<Integer> area = new ArrayList<>();
             area.add(updateMonitorParam.getLeftX());
             area.add(updateMonitorParam.getLeftY());
             area.add(updateMonitorParam.getRightX());
             area.add(updateMonitorParam.getRightY());
             List<Boolean> ability = new ArrayList<>();
-            //0 火，1 抽烟，2跌倒，3挥拳，4挥手，5危险区域
-            //TODO 改字段的时候要改这里
+            // 0 火，1 抽烟，2跌倒，3挥拳，4挥手，5危险区域
+            // TODO 改字段的时候要改这里
             ability.add(updateMonitorParam.getFlame());
             ability.add(updateMonitorParam.getSmoke());
             ability.add(updateMonitorParam.getFall());
             ability.add(updateMonitorParam.getPunch());
             ability.add(updateMonitorParam.getWave());
             ability.add(dangerArea);
-            if (!requestFlaskService.updateMonitorArea(IP,area) && !requestFlaskService.updateMonitorAbility(IP,ability)){
+            if (!requestFlaskService.updateMonitorArea(IP, area)
+                    && !requestFlaskService.updateMonitorAbility(IP, ability)) {
                 return false;
             }
             LambdaUpdateWrapper<Monitor> updateWrapper = new LambdaUpdateWrapper<>();
@@ -133,54 +155,54 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao,Monitor> implemen
                     .set(Monitor::getRightX, updateMonitorParam.getRightX())
                     .set(Monitor::getRightY, updateMonitorParam.getRightY());
             return update(updateWrapper);
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error("更新监控失败");
             return false;
         }
     }
 
     @Override
-    public Boolean deleteMonitor(Integer id){
-        try{
+    public Boolean deleteMonitor(Integer id) {
+        try {
             removeById(id);
             return true;
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error("删除监控失败");
             return false;
         }
     }
 
     @Override
-    public String getMonitorImg(Integer id){
+    public String getMonitorImg(Integer id) {
         String ip = getMonitorIPById(id);
         try {
             return requestFlaskService.getMonitorImg(ip);
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error(e.getMessage());
             return null;
         }
     }
 
     @Override
-    public Boolean switchMonitor(Integer id){
-        try{
+    public Boolean switchMonitor(Integer id) {
+        try {
             this.baseMapper.MonitorRunningSwitch(id);
             return true;
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error("切换监控失败");
             return false;
         }
     }
 
     @Override
-    public Boolean updateLeaders(String oldName,String newName){
+    public Boolean updateLeaders(String oldName, String newName) {
         LambdaUpdateWrapper<Monitor> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(Monitor::getLeader, oldName)
                 .set(Monitor::getLeader, newName);
-        try{
+        try {
             update(updateWrapper);
             return true;
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error("更新监控失败");
             return false;
         }

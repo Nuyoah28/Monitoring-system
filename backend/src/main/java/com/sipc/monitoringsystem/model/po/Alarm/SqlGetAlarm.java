@@ -6,12 +6,13 @@ import java.sql.Timestamp;
 
 /**
  * @author CZCZCZ
- * &#064;date 2023-09-13 17:53
+ *         &#064;date 2023-09-13 17:53
  */
 @Data
 public class SqlGetAlarm {
 
     private Integer id;
+    private Integer monitorId; // 新增：监控ID，用于权限过滤
     private String clipLink;
     private String name;
     private String caseTypeName;

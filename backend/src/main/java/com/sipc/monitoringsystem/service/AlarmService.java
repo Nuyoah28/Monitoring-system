@@ -4,13 +4,19 @@ import com.sipc.monitoringsystem.model.dto.res.Alarm.GetHistoryCntRes;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.RealTimeAlarmRes;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
 import com.sipc.monitoringsystem.model.po.Alarm.TimePeriod;
+import com.sipc.monitoringsystem.model.po.User.User;
 
 import java.util.List;
 
 public interface AlarmService {
-    Boolean receiveAlarm(Integer cameraId,Integer caseType,String clipLink);
+    Boolean receiveAlarm(Integer cameraId, Integer caseType, String clipLink);
 
-    List<SqlGetAlarm> queryAlarmList(Integer pageNum, Integer pageSize, Integer caseType, Integer status, Integer warningLevel, String time1, String time2);
+    List<SqlGetAlarm> queryAlarmList(Integer pageNum, Integer pageSize, Integer caseType, Integer status,
+            Integer warningLevel, String time1, String time2);
+
+    // 新增：根据用户权限获取报警列表
+    List<SqlGetAlarm> queryAlarmList(Integer pageNum, Integer pageSize, Integer caseType, Integer status,
+            Integer warningLevel, String time1, String time2, User user);
 
     SqlGetAlarm getAlarm(Integer alarmId);
 
@@ -34,9 +40,9 @@ public interface AlarmService {
 
     List<TimePeriod> SqlGetCaseTypesDayHistoryCnt(String date);
 
-    List<TimePeriod> SqlGetCaseTypesThreeDaysHistoryCnt( String date);
+    List<TimePeriod> SqlGetCaseTypesThreeDaysHistoryCnt(String date);
 
-    List<TimePeriod> SqlGetCaseTypesWeekHistoryCnt( String date);
+    List<TimePeriod> SqlGetCaseTypesWeekHistoryCnt(String date);
 
     RealTimeAlarmRes getRealTimeAlarmRes();
 

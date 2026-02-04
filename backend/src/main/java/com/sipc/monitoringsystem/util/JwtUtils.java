@@ -10,22 +10,23 @@ import com.sipc.monitoringsystem.model.po.User.User;
 import java.util.Date;
 
 public class JwtUtils {
-    //有效期为15天
+    // 有效期为15天
     public static final long EXPIRE_TIME = (long) 1000 * 60 * 60 * 24 * 15;
     public static final String SECRET = "SIPC115";
 
     public static String signUser(User user) {
         Date expireDate = new Date(System.currentTimeMillis() + EXPIRE_TIME);
         return JWT.create()
-                .withClaim("id",user.getId())
+                .withClaim("id", user.getId())
+                .withClaim("userName", user.getUserName()) // 新增：存储用户名
                 .withClaim("role", user.getRole())
                 .withExpiresAt(expireDate)
                 .sign(Algorithm.HMAC256(SECRET));
     }
 
-    public static String signMonitor(Integer id){
+    public static String signMonitor(Integer id) {
         return JWT.create()
-                .withClaim("id",id)
+                .withClaim("id", id)
                 .sign(Algorithm.HMAC256(SECRET));
     }
 
@@ -43,11 +44,12 @@ public class JwtUtils {
         DecodedJWT decodedJWT = JWT.decode(token);
         User user = new User();
         user.setId(decodedJWT.getClaim("id").asInt());
+        user.setUserName(decodedJWT.getClaim("userName").asString()); // 新增：读取用户名
         user.setRole(decodedJWT.getClaim("role").asInt());
         return user;
     }
 
-    public static Monitor getMonitorByToken(String token){
+    public static Monitor getMonitorByToken(String token) {
         DecodedJWT decodedJWT = JWT.decode(token);
         Monitor monitor = new Monitor();
         monitor.setId(decodedJWT.getClaim("id").asInt());
