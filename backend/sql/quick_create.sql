@@ -18,7 +18,6 @@
 --
 -- Table structure for table `alarm_info`
 --
-
 DROP TABLE IF EXISTS `alarm_info`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -196,3 +195,36 @@ INSERT INTO alarm_info (id, clip_link, monitor_id, case_type, warning_level, cre
 (8, 'dla6wJbiEF', 1, 2, 3, '2023-09-13 12:16:12', 0, NULL),
 (9, 'ECgrl1Sivu', 4, 5, 2, '2023-09-15 03:39:28', 0, NULL),
 (10, 'MeaDx5or3F', 4, 3, 2, '2023-09-25 23:06:03', 0, NULL);
+
+
+drop table if exists weather_info;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `weather_info` (
+    `id` int NOT NULL AUTO_INCREMENT COMMENT '天气记录ID',
+    `monitor_id` int NOT NULL COMMENT '关联监控设备ID',
+    `temperature` float NOT NULL COMMENT '温度(摄氏度)',
+    `humidity` float NOT NULL COMMENT '湿度(%)',
+    `weather` varchar(255) NOT NULL COMMENT '天气状况',
+    `create_time` datetime NOT NULL COMMENT '记录时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_monitor_id` (`monitor_id`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='天气信息表';
+
+insert into weather_info (monitor_id, temperature, humidity, weather, create_time)
+values (1, 25.5, 60.0, '多云', '2023-09-22 10:00:00'),
+(2, 26.0, 55.0, '多云', '2023-09-22 11:00:00'),
+(3, 24.8, 65.0, '小雨', '2023-09-22 12:00:00'),
+(4, 27.2, 50.0, '晴', '2023-09-22 13:00:00'),
+(5, 28.5, 45.0, '雷阵雨', '2023-09-22 14:00:00'),
+(1, 26.8, 58.0, '晴', '2023-09-22 15:00:00'),
+(2, 27.5, 52.0, '暴雨', '2023-09-22 16:00:00'),
+(3, 25.2, 62.0, '阴', '2023-09-22 17:00:00'),
+(4, 28.0, 48.0, '晴', '2023-09-22 18:00:00'),
+(5, 29.3, 43.0, '多云', '2023-09-22 19:00:00'),
+(1, 26.5, 56.0, '晴', '2023-09-22 20:00:00'),
+(2, 27.0, 51.0, '多云', '2023-09-22 21:00:00'),
+(3, 24.5, 63.0, '大雨', '2023-09-22 22:00:00'),
+(4, 28.5, 47.0, '晴', '2023-09-22 23:00:00'),
+(5, 29.8, 42.0, '中雨', '2023-09-23 00:00:00');

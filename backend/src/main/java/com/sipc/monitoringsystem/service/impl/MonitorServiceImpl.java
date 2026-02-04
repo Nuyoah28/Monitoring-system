@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
+
 @Slf4j
 @Service
 public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> implements MonitorService {
@@ -35,8 +36,10 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
      * 新增：根据用户权限获取监控列表
      * role = 0 (管理员): 返回所有监控
      * role = 1 (普通用户): 只返回 leader = userName 的监控
+     * 添加了缓存，key 为 "getMonitorListByUser_" + userName
      */
     @Override
+    @Cacheable(value = "cache", key = "'getMonitorListByUser_'+#user.userName", unless = "#result==null")
     public List<Monitor> getMonitorList(User user) {
         if (user.getRole() == 0) {
             // 管理员：返回所有

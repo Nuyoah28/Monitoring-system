@@ -1,6 +1,7 @@
 # name of config can only UpperCase
 class Config:
-    BACKEND_URL = "http://101.43.254.115:10115"#java后端
+    BACKEND_URL = ""# java后端
+    STREAM_URL = ""# 流地址
     TOKEN = None
     MONITOR_ID = -1
     LATITUDE = 0
@@ -10,6 +11,8 @@ class Config:
 
 
 class DevConfig(Config):
+    BACKEND_URL = "http://localhost:10115"
+    STREAM_URL = "rtsp://localhost:1935"
     TOKEN = None
     pass
 

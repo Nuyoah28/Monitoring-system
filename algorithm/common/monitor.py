@@ -1,9 +1,9 @@
 from queue import Queue
-
+from config import DevConfig as Config
 cacheQueue = Queue()
-cacheMax = 250#摄像头推直播服务器1地址
-#STREAM_URL = ''#前端拉直播服务器2地址
-STREAM_URL = 'rtmp://101.43.254.115:1985/live/test1'
+cacheMax = 250
+STREAM_RAW_URL = Config.STREAM_URL+'/live/raw' # python后端拉原始流的地址
+STREAM_PROCESSED_URL = Config.STREAM_URL+'/live/ai' # python后端推处理之后的流的地址
 # 0 火，1 抽烟，2 跌倒，3 挥拳，4挥手，5 危险区域
 TYPE_LIST = [True, False, True, True, True, False]
 #TYPE_LIST = [False, True, False, False, False, True]

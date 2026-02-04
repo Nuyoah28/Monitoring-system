@@ -4,12 +4,12 @@
           <div class="temperature">
               <div class="inhouse">
                   <img src="../../public/assets/weather/inweather.png" alt="室内温度">
-                  <span>室内温度</span>
-                  <h3>23 °C</h3>
+                  <span>湿度</span>
+                  <h3>{{ humidity }} %</h3>
               </div>
               <div class="outhouse">
                   <img src="../../public/assets/weather/outerweather.png" alt="室外温度">
-                  <span>室外温度</span>
+                  <span>温度</span>
                   <h3>{{ temperature }} °C</h3>
               </div>
           </div>
@@ -28,9 +28,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import axios from 'axios';
 import { useAlarmStore } from '@/stores/alarm';
+import { useAppStore } from '@/stores/app';
+import { useUserStore } from '@/stores/user';
 import { storeToRefs } from 'pinia';
 
 // 定义天气数据接口
@@ -41,18 +43,30 @@ interface WeatherDay {
   nighttemp: string;
 }
 
-interface RealWeatherData {
+// 定义后端返回的天气数据接口
+interface WeatherData {
+  id: number;
+  monitorId: number;
   temperature: number;
+  humidity: number;
   weather: string;
+  createTime: string;
 }
 
 const alarmStore = useAlarmStore();
-const { getFutureWeather, getRealTimeWeather } = storeToRefs(alarmStore);
+const appStore = useAppStore();
+const userStore = useUserStore();
+const { getFutureWeather } = storeToRefs(alarmStore);
 
+// 当前摄像头的天气数据
+const currentWeather = ref<WeatherData | null>(null);
+
+// 湿度
+const humidity = computed(() => currentWeather.value?.humidity ?? '--');
 // 温度
-const temperature = computed(() => getRealTimeWeather.value.temperature);
-// 实时天气情况
-const weather = computed(() => getRealTimeWeather.value.weather);
+const temperature = computed(() => currentWeather.value?.temperature ?? '--');
+// 天气情况
+const weather = computed(() => currentWeather.value?.weather ?? '--');
 // 预测三天的数据
 const day = computed(() => getFutureWeather.value);
 
@@ -78,29 +92,44 @@ const getimg = (state: string): string => {
     }
 };
 
-// 从Pinia获取天气数据
+// 从后端获取最新的天气数据
 const fetchWeatherData = (): void => {
-  // 直接从Pinia获取数据，不需要API调用
-  // 数据已经通过其他地方存储在store中
+    const monitorId = appStore.getMonitorId;
+    const token = userStore.token;
+
+    if (monitorId === 0) {
+        console.log('monitorId为0，跳过天气数据获取');
+        return;
+    }
+
+    axios.get(`/api/v1/weather/newest/${monitorId}`, {
+        headers: {
+            'Authorization': token
+        }
+    })
+    .then((response: any) => {
+        console.log('收到天气数据:', response.data);
+        if (response.data.code === '00000' && response.data.data) {
+            currentWeather.value = response.data.data;
+        }
+    })
+    .catch((error: any) => {
+        console.log('天气数据获取失败:', error);
+    });
 };
 
 let intervalId: number | null = null;
 
-// 每分钟获取一次天气数据
+// 每2分钟获取一次天气数据
 const startFetching = (): void => {
     intervalId = window.setInterval(() => {
         fetchWeatherData();
-    }, 60000); // 每60000ms（1分钟）请求一次数据
+    }, 120000); // 每120000ms（2分钟）请求一次数据
 };
 
 onMounted(() => {
-    fetchWeatherData(); // 从Pinia获取数据
+    fetchWeatherData(); // 初始获取天气数据
     startFetching(); // 开始定时获取数据
-    
-    // 监听天气数据变化
-    watch([getFutureWeather, getRealTimeWeather], ([newFuture, newReal]) => {
-        // 数据变化时自动更新，由于使用了computed，视图会自动响应
-    }, { deep: true });
 });
 
 // 清理定时器

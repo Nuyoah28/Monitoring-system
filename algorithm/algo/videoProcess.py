@@ -20,8 +20,7 @@ import copy
 
 
 def stream_video():
-    #cap = cv2.VideoCapture("rtmp://198673.push.tlivecloud.com/live/text?txSecret=773d275657a0dad988227d92899b6cf4&txTime=662F5A42")
-    cap = cv2.VideoCapture('algo/image/wave.mp4')
+    cap = cv2.VideoCapture(monitorCommon.STREAM_RAW_URL)
     # 设置摄像头分辨率
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -50,8 +49,7 @@ def stream_video():
                   '-f', 'flv',
                   '-r', '25',
                   #'-b:v', '500k',
-                  #monitorCommon.STREAM_URL
-                   'rtmp://101.43.254.115:1985/live/test'
+                  monitorCommon.STREAM_PROCESSED_URL
                   ]
     # 启动Ffmpeg进程
     ffmepg_process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
@@ -73,8 +71,7 @@ def stream_video():
         while (not ret or not cap.isOpened()):
             print("读取帧失败或流未打开，正在重试...")
             cap.release()
-            cap = cv2.VideoCapture('algo/image/wave.mp4')
-            #cap = cv2.VideoCapture("rtmp://198673.push.tlivecloud.com/live/text?txSecret=773d275657a0dad988227d92899b6cf4&txTime=662F5A42")
+            cap = cv2.VideoCapture(monitorCommon.STREAM_RAW_URL)
             ret,frame = cap.read()
         if ret:
             print('帧读取成功，开始处理')

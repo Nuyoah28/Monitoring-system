@@ -22,15 +22,19 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import dialog1 from './dialog1.vue';
 import axios from 'axios';
 import { useAlarmStore } from '@/stores/alarm';
+import { useUserStore } from '@/stores/user';
 import { storeToRefs } from 'pinia';
 import { ElMessage } from 'element-plus';
 import { baseUrl } from '@/config/config';
 // 无需重新定义AlarmItem接口，使用store中定义的
 
+const router = useRouter();
 const alarmStore = useAlarmStore();
+const userStore = useUserStore();
 const { getAlarmList } = storeToRefs(alarmStore);
 
 const dialogVisible1 = ref<boolean>(false);
@@ -109,7 +113,13 @@ const fetchAlarmList = (): void => {
         status: 0,
     };
     
-    axios.get('/api/v1/alarm/query', {params: data})
+    const token = userStore.token;
+    axios.get('/api/v1/alarm/query', {
+        params: data,
+        headers: {
+            'Authorization': token
+        }
+    })
         .then((response: any) => {
             // console.log('收到报警查询数据',response.data.data);
             console.log('response:', response);
@@ -140,6 +150,14 @@ const fetchAlarmList = (): void => {
             console.log('报警数据查询失败');
             
             console.log('Error fetching alarm list:', error);
+            if (error.response && (error.response.status === 401 || error.response.data.code === 'D0400')) {
+                // Token过期或无效，跳转到登录页
+                ElMessage({
+                    message: 'token过期，请重新登录',
+                    type: 'warning'
+                });
+                router.push('/login');
+            }
         });
 };
 
