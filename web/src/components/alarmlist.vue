@@ -30,6 +30,7 @@ import { useUserStore } from '@/stores/user';
 import { storeToRefs } from 'pinia';
 import { ElMessage } from 'element-plus';
 import { baseUrl } from '@/config/config';
+import { webSocketBaseUrl } from '@/config/config';
 // 无需重新定义AlarmItem接口，使用store中定义的
 
 const router = useRouter();
@@ -42,6 +43,12 @@ const item = ref<any>('');
 const alarmlist = computed(() => getAlarmList.value);
 const pageNum = ref<number>(1);
 const pageSize = ref<number>(30);
+
+// WebSocket相关变量
+let websocket: WebSocket | null = null;
+let reconnectTimer: number | null = null;
+const reconnectInterval = 3000; // 重连间隔时间（毫秒）
+const wsUrl = ref<string>(''); // WebSocket连接地址
 
 const itemlist1 = [
     {
@@ -105,14 +112,14 @@ const handleDialogVisibility = (res: boolean): void => {
     dialogVisible1.value = res;
 };
 
-// 获取报警列表
+// 一次性获取所有报警消息
 const fetchAlarmList = (): void => {
     const data = {
         pageNum: pageNum.value,
         pageSize: pageSize.value,
         status: 0,
     };
-    
+
     const token = userStore.token;
     axios.get('/api/v1/alarm/query', {
         params: data,
@@ -128,27 +135,27 @@ const fetchAlarmList = (): void => {
             if (newAlarmList.length > 0) {
                 // 将数据存储到Pinia中
                 alarmStore.setAlarmList(newAlarmList);
-                
+
                 // 根据报警列表更新统计数据
                 alarmStore.updateStatisticsFromAlarms();
-                
+
                 // 检查是否有新数据变化，如果有则触发报警事件
                 if(alarmStore.getAlarmList.length > 0){
                     const bus = (window as any).$bus;
                     if(bus) {
                         bus.$emit('alarm');  // 触发事件总线'alarm'事件
                     }
-                    
+
                     ElMessage({
                         message: '您有报警新消息',
                         type: 'warning'
                     });
-                } 
+                }
             }
         })
         .catch((error: any) => {
             console.log('报警数据查询失败');
-            
+
             console.log('Error fetching alarm list:', error);
             if (error.response && (error.response.status === 401 || error.response.data.code === 'D0400')) {
                 // Token过期或无效，跳转到登录页
@@ -161,22 +168,133 @@ const fetchAlarmList = (): void => {
         });
 };
 
+// 初始化WebSocket连接
+const initWebSocket = (): void => {
+    // 从userStore获取userId
+    const userId = userStore.userId; 
+
+    if (!userId) {
+        console.warn('userId不存在，无法建立WebSocket连接');
+        return;
+    }
+
+    // 构建WebSocket连接地址
+    wsUrl.value = `${webSocketBaseUrl}/ws/alarm/${userId}`;
+
+    console.log('正在连接WebSocket:', wsUrl.value);
+
+    try {
+        websocket = new WebSocket(wsUrl.value);
+
+        websocket.onopen = () => {
+            console.log('WebSocket连接成功');
+            // 清除重连定时器
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+        };
+
+        websocket.onmessage = (event: MessageEvent) => {
+            console.log('收到WebSocket消息:', event.data);
+
+            try {
+                const message = JSON.parse(event.data);
+
+                // 处理报警消息
+                if (message && message.alarmList) {
+                    // 将新的报警消息添加到store中
+                    alarmStore.setAlarmList(message.alarmList);
+
+                    // 更新统计数据
+                    alarmStore.updateStatisticsFromAlarms();
+
+                    // 触发报警事件
+                    const bus = (window as any).$bus;
+                    if (bus) {
+                        bus.$emit('alarm');
+                    }
+
+                    // 显示提示消息
+                    ElMessage({
+                        message: '收到新的报警消息',
+                        type: 'warning'
+                    });
+                }
+            } catch (error) {
+                console.error('解析WebSocket消息失败:', error);
+            }
+        };
+
+        websocket.onerror = (error: Event) => {
+            console.error('WebSocket连接错误:', error);
+            // 尝试重新连接
+            attemptReconnect();
+        };
+
+        websocket.onclose = (event: CloseEvent) => {
+            console.log('WebSocket连接关闭:', event.code, event.reason);
+            // 如果不是正常关闭，尝试重新连接
+            if (event.code !== 1000) {
+                attemptReconnect();
+            }
+        };
+    } catch (error) {
+        console.error('创建WebSocket连接失败:', error);
+        attemptReconnect();
+    }
+};
+
+// 尝试重新连接
+const attemptReconnect = (): void => {
+    if (reconnectTimer) {
+        return; // 已经有重连定时器在运行
+    }
+
+    console.log(`将在 ${reconnectInterval / 1000} 秒后尝试重新连接WebSocket...`);
+
+    reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        initWebSocket();
+    }, reconnectInterval);
+};
+
+// 关闭WebSocket连接
+const closeWebSocket = (): void => {
+    if (websocket) {
+        // 移除事件监听器，防止重复触发
+        websocket.onopen = null;
+        websocket.onmessage = null;
+        websocket.onerror = null;
+        websocket.onclose = null;
+
+        // 关闭连接
+        websocket.close();
+        websocket = null;
+        console.log('WebSocket连接已关闭');
+    }
+
+    // 清除重连定时器
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+};
+
 
 //let intervalId: number | null = null;
 
 onMounted(() => {
-    fetchAlarmList();  // 初始获取报警列表
-    //暂时只获取一次报警列表，后续这里改成websocket请求数据,目前定时器相关的都删了
-    /*intervalId = window.setInterval(() => {
-        fetchAlarmList();  // 每秒更新报警列表
-    }, 1000);*/
+    // 初始获取报警列表（可选，如果需要初始数据）
+    fetchAlarmList();
+
+    // 初始化WebSocket连接
+    initWebSocket();
 });
 
-// 清理定时器
+// 清理WebSocket连接
 onUnmounted(() => {
-    /*if(intervalId) {
-        clearInterval(intervalId);
-    }*/
+    closeWebSocket();
 });
 </script>
 

@@ -37,17 +37,27 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
     OssUtil ossUtil;
 
     @Override
-    public Boolean receiveAlarm(Integer cameraID, Integer caseType, String clipLink) {
-        log.info("receive alarm from camera: " + cameraID + " caseType: " + caseType);
-        monitorServiceImpl.getBaseMapper().MonitorAlarmCntPlusOne(cameraID);
+    public SqlGetAlarm receiveAlarm(Integer cameraId, Integer caseType, String clipLink) {
+        log.info("receive alarm from camera: " + cameraId + " caseType: " + caseType);
+        monitorServiceImpl.getBaseMapper().MonitorAlarmCntPlusOne(cameraId);
         Alarm alarm = new Alarm();
         alarm.setClipLink(clipLink);
         alarm.setCaseType(caseType);
-        alarm.setMonitorId(cameraID);
+        alarm.setMonitorId(cameraId);
         alarm.setWarningLevel(1);
         alarm.setStatus(false);
         this.save(alarm);
-        return true;
+        // 获取数据库中的sqlalarm,找id最大且监控id对的上的
+        Alarm latestAlarm = this.baseMapper.selectOne(
+                new QueryWrapper<Alarm>()
+                        .eq("monitor_id", cameraId)
+                        .orderByDesc("id")
+                        .last("LIMIT 1"));
+        if (latestAlarm == null) {
+            throw new RuntimeException("Failed to retrieve the saved alarm record");
+        }
+        SqlGetAlarm sqlAlarm = this.baseMapper.SqlGetAlarm(latestAlarm.getId());
+        return sqlAlarm;
     }
 
     @Override

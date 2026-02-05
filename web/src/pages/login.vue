@@ -69,7 +69,7 @@ const login = (): void => {
                 type: 'success'
             });
             // 使用 Pinia store 存储用户信息
-            userStore.setUserInfo(username.value, res.data.data.name, res.data.data.token)
+            userStore.setUserInfo(username.value, res.data.data.name, res.data.data.id, res.data.data.token)
             // 同步到 sessionStorage 以实现持久化
             userStore.syncToSessionStorage()
             router.push('/visual');
