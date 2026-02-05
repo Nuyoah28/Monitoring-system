@@ -15,6 +15,7 @@ import com.sipc.monitoringsystem.service.AlarmService;
 import com.sipc.monitoringsystem.util.HttpUtils;
 import com.sipc.monitoringsystem.util.JwtUtils;
 import com.sipc.monitoringsystem.util.TokenThreadLocalUtil;
+import com.sipc.monitoringsystem.websocket.AlarmWebSocketServer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +55,36 @@ public class AlarmController {
     public CommonResult<BlankRes> receiveAlarm(@RequestParam(value = "cameraId", required = true) int cameraId,
             @RequestParam(value = "caseType", required = true) int caseType,
             @RequestParam(value = "clipId", required = true) String clipId) {
+
+        // 1. 保存报警到数据库
+        boolean saved = alarmService.receiveAlarm(cameraId, caseType, clipId);
+
+        if (saved) {
+            // 2. 通过 WebSocket 广播报警通知给所有在线用户
+            Map<String, Object> alarmMessage = new HashMap<>();
+            alarmMessage.put("type", "NEW_ALARM");
+            alarmMessage.put("cameraId", cameraId);
+            alarmMessage.put("caseType", caseType);
+            alarmMessage.put("clipId", clipId);
+            alarmMessage.put("time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            alarmMessage.put("message", "您有一条新的报警信息，请及时处理");
+
+            AlarmWebSocketServer.sendToAll(alarmMessage);
+            log.info("WebSocket 广播报警: cameraId={}, caseType={}", cameraId, caseType);
+
+            // 3. 同时发送 UniPush 手机推送通知（保留原有功能）
+            sendUniPushNotification();
+
+            return CommonResult.success("接收成功");
+        } else {
+            return CommonResult.fail("接收失败");
+        }
+    }
+
+    /**
+     * 发送 UniPush 手机推送通知（原有逻辑抽取）
+     */
+    private void sendUniPushNotification() {
         Map<String, String> paramMap = new HashMap<>();
         paramMap.put("cid", ""); // cid不填默认全发
         paramMap.put("title", "报警通知");
@@ -78,17 +109,13 @@ public class AlarmController {
                     "https://fc-mp-e0386718-0219-4138-80a9-902540e76f67.next.bspapp.com/notice",
                     new ObjectMapper().writeValueAsString(paramMap));
             if (resJson.contains("success")) {
-                log.info("发送报警通知成功");
+                log.info("发送 UniPush 报警通知成功");
             } else {
-                log.error("发送报警通知失败");
+                log.error("发送 UniPush 报警通知失败");
             }
         } catch (JsonProcessingException e) {
-            log.error("发送报警通知失败");
+            log.error("发送 UniPush 报警通知失败", e);
         }
-        if (alarmService.receiveAlarm(cameraId, caseType, clipId))
-            return CommonResult.success("接收成功");
-        else
-            return CommonResult.fail("接收失败");
     }
 
     @GetMapping("/{alarmId}")

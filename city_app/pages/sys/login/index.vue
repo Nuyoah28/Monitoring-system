@@ -172,6 +172,8 @@
 </template>
 
 <script>
+import websocket from '@/common/websocket.js';
+
 export default {
   data() {
     return {
@@ -217,10 +219,15 @@ export default {
               // console.log("hi");
               uni.setStorageSync("phone", this.username);
               uni.setStorageSync("username", data.data.name);
+              // 保存用户ID用于WebSocket连接
+              uni.setStorageSync("userId", data.data.id);
               uni.setStorage({
                 key: "token",
                 data: data.data.token,
                 success: () => {
+                  // 登录成功后连接WebSocket接收实时报警
+                  websocket.connect(data.data.id);
+                  
                   uni.switchTab({
                     url: "/pages/sys/dateWatcher/dateWatcher",
                   });

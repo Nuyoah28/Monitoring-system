@@ -275,7 +275,19 @@ export default {
         .exec();
       this.scrollHeight = boxHeight - scrollTop + boxTop;
     });
-	// this.startDataFetch(); // 启动数据获取函数
+	
+	// 监听 WebSocket 发送的新报警事件
+	uni.$on('newAlarm', () => {
+		// 只有在查看实时警报时自动刷新
+		if (this.choosen === 0) {
+			this.pageNum = 1;
+			this.warnIsAll = false;
+			this.getRealList();
+		}
+	});
+  },
+  onUnload() {
+  	uni.$off('newAlarm');
   },
   onShow() {
     // console.log("realShow");

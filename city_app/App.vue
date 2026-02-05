@@ -1,4 +1,6 @@
 <script>
+import websocket from '@/common/websocket.js';
+
 export default {
   onLaunch: function () {
     // console.log("App Launch");
@@ -50,7 +52,17 @@ export default {
         });
     }
     // #endif
-    if (uni.getStorageSync("token")) {
+    
+    // 检查用户是否已登录
+    const token = uni.getStorageSync("token");
+    const userId = uni.getStorageSync("userId");
+    
+    if (token) {
+      // 已登录：自动连接 WebSocket
+      if (userId) {
+        websocket.connect(userId);
+      }
+      
       setTimeout(() => {
         // console.log('hi')
         uni.switchTab({
@@ -67,6 +79,12 @@ export default {
   },
   onShow: function () {
     // console.log("App Show");
+    // App 从后台切回前台时，检查 WebSocket 连接状态
+    const token = uni.getStorageSync("token");
+    const userId = uni.getStorageSync("userId");
+    if (token && userId && !websocket.getStatus()) {
+      websocket.connect(userId);
+    }
   },
   onHide: function () {
     // console.log("App Hide");
