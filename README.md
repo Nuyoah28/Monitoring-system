@@ -20,7 +20,6 @@ city_app：安卓端前端代码
 web：网页端前端代码
 在前端web下打开，npm i 安装依赖
 npm run serve 启动
-提交前务必把前端的node_modules删掉！！！！！！！
 
 iot：嵌入式代码
 
