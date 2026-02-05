@@ -7,6 +7,7 @@ import copy
 import time
 import threading
 from util import UploadCos
+from config import DevConfig as Config
 
 logger = setup_logger()
 
@@ -32,11 +33,10 @@ def postAlarm(warningList):
             caseType = 1
 
         if element: #java后端
-            param = "http://101.43.254.115:10115/api/v1/alarm/receive?clipId=" + clipId + "&caseType=" + str(
+            param = Config.BACKEND_URL+"/api/v1/alarm/receive?clipId=" + clipId + "&caseType=" + str(
                 caseType) + "&cameraId=1"
             print(param)
-            requests.post(param,
-                          headers={'Authorization': "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MX0.R_k2IX4uTJsXuk6cq73Y6cEy96_FMlrebaq-7TpKBUk"}).json()
+            requests.post(param).json()
             print("post alarm success")
     # todo: upload video clip to cos
     print(clipId)
