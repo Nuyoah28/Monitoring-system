@@ -26,7 +26,7 @@ const routes = [
     name:'home',
     component:home,
     meta: { requiresAuth: true }
-  }
+  },
 ]
 
 const router = createRouter({

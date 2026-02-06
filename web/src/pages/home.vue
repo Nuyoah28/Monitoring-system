@@ -5,6 +5,9 @@
       <span>&#8592;</span>
        返回
       </el-button>
+      <el-button type="success" round class="btn-agent" @click="goAgent">
+        智能助手
+      </el-button>
     </div>
     
 
@@ -31,6 +34,10 @@ const router = useRouter()
 const goBack = (): void => {
     router.push('/visual')
 }
+
+const goAgent = (): void => {
+    router.push('/agent')
+}
 </script>
 
 <style scoped>
@@ -44,6 +51,12 @@ const goBack = (): void => {
 .btn2 {
   position: absolute;
   left: 0;
+  top: 0;
+}
+
+.btn-agent {
+  position: absolute;
+  right: 0;
   top: 0;
 }
 

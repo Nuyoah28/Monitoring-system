@@ -3,12 +3,15 @@ Agent API 服务 - 提供HTTP接口供前端或其他服务调用
 可以集成到Spring Boot后端，或作为独立服务运行
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from intelligent_agent import IntelligentAgent
+import json
 import os
 import time
 import traceback
+import threading
+from queue import SimpleQueue
 
 app = Flask(__name__)
 # 允许跨域请求
@@ -16,6 +19,16 @@ CORS(app)
 
 # 全局Agent实例
 agent = None
+
+def _get_user_token(req, data: dict):
+    """从Header或Body获取用户token（前端用户JWT）"""
+    user_token = None
+    auth_header = req.headers.get('Authorization')
+    if auth_header:
+        user_token = auth_header.replace('Bearer ', '').strip()
+    if not user_token and isinstance(data, dict):
+        user_token = data.get('token')
+    return user_token
 
 def init_agent():
     """初始化Agent"""
@@ -93,12 +106,7 @@ def chat():
         start_time = time.time()
         
         # 从Header或Body获取用户token（前端用户JWT）
-        user_token = None
-        auth_header = request.headers.get('Authorization')
-        if auth_header:
-            user_token = auth_header.replace('Bearer ', '').strip()
-        if not user_token:
-            user_token = data.get('token')
+        user_token = _get_user_token(request, data)
 
         response = agent.process_question(question, user_token=user_token)
         
@@ -128,11 +136,86 @@ def chat():
 @app.route('/chat/stream', methods=['POST'])
 def chat_stream():
     """
-    流式对话接口（SSE）
-    注意：当前实现不支持流式，返回完整响应
+    流式对话接口（SSE - Server-Sent Events）
+    实时返回AI回答的片段，提升用户体验
     """
-    # TODO: 实现Server-Sent Events流式响应
-    return chat()  # 暂时使用普通接口
+    if agent is None:
+        return jsonify({
+            "code": "A1000",
+            "message": "Agent未初始化",
+            "data": None
+        }), 500
+
+    def generate():
+        try:
+            if not request.json:
+                yield f"data: {json.dumps({'type': 'error', 'message': '请求体不能为空'})}\n\n"
+                return
+
+            data = request.json
+            question = data.get('question', '').strip()
+
+            if not question:
+                yield f"data: {json.dumps({'type': 'error', 'message': '问题不能为空'})}\n\n"
+                return
+
+            user_token = _get_user_token(request, data)
+
+            # 发送开始信号
+            yield f"data: {json.dumps({'type': 'start', 'question': question})}\n\n"
+
+            print(f"\n📥 收到流式请求: {question}")
+            start_time = time.time()
+
+            q: SimpleQueue = SimpleQueue()
+            done_flag = threading.Event()
+            error_flag = threading.Event()
+            full_answer_parts = []
+
+            def run_agent():
+                try:
+                    agent.process_question(
+                        question,
+                        on_chunk=lambda c: q.put(c),
+                        user_token=user_token
+                    )
+                except Exception as e:
+                    error_flag.set()
+                    q.put(json.dumps({'type': 'error', 'message': str(e)}))
+                finally:
+                    q.put(None)  # 结束标记
+                    done_flag.set()
+
+            threading.Thread(target=run_agent, daemon=True).start()
+
+            # 逐条发送chunk
+            while True:
+                chunk = q.get()
+                if chunk is None:
+                    break
+                if isinstance(chunk, str) and chunk.startswith('{') and '"type":"error"' in chunk:
+                    yield f"data: {chunk}\n\n"
+                    break
+                full_answer_parts.append(chunk)
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+            # 发送完成信号
+            elapsed = time.time() - start_time
+            yield f"data: {json.dumps({'type': 'done', 'elapsed_time': round(elapsed, 2)})}\n\n"
+
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ 流式处理失败: {error_msg}")
+            yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
 @app.route('/api/info', methods=['GET'])
 def api_info():
@@ -146,6 +229,7 @@ def api_info():
             "endpoints": {
                 "health": "GET /health - 健康检查",
                 "chat": "POST /chat - 对话接口",
+                "chat_stream": "POST /chat/stream - 对话接口（流式SSE）",
                 "info": "GET /api/info - API信息"
             },
             "features": [
@@ -153,7 +237,8 @@ def api_info():
                 "告警信息查询",
                 "监控点信息查询",
                 "实时统计查询",
-                "安全知识问答"
+                "安全知识问答",
+                "流式输出支持"
             ]
         }
     })

@@ -7,6 +7,7 @@
       <body2></body2>
       <body3></body3>
     </div>
+    <chat-panel></chat-panel>
     <!-- <router-link to=""></router-link>
     <router-view/> -->
   </div>
@@ -17,6 +18,7 @@ import header1 from '../components/header.vue';
 import body1 from '../components/body1.vue';
 import body2 from '../components/body2.vue';
 import body3 from '../components/body3.vue';
+import chatPanel from '../components/chat_panel.vue';
 </script>
   
 <style>

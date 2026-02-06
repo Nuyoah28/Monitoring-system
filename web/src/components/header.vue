@@ -12,9 +12,11 @@
   <script setup lang="ts">
   import { ref, onMounted, onUnmounted } from 'vue'
   import { useRouter } from 'vue-router'
-  
   const nowtime = ref<string>('')
   const router = useRouter()
+  const goHome = (): void => {
+    router.push('/home')
+  }
   let timer: ReturnType<typeof setInterval> | null = null // 定时器
   
   const updateTime = (): void => {
@@ -40,10 +42,6 @@
           "分" +
           s +
           "秒";
-  }
-  
-  const goHome = (): void => {
-    router.push('/home')
   }
   
   onMounted(() => {
@@ -99,5 +97,6 @@
           color: rgba(255, 255, 255, 0.7);
           font-size: 1.1875rem;
       }
+
   </style>
   
