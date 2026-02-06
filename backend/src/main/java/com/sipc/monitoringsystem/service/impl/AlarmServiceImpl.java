@@ -37,7 +37,7 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
     OssUtil ossUtil;
 
     @Override
-    public Boolean receiveAlarm(Integer cameraID, Integer caseType, String clipLink) {
+    public SqlGetAlarm receiveAlarm(Integer cameraID, Integer caseType, String clipLink) {
         log.info("receive alarm from camera: " + cameraID + " caseType: " + caseType);
         monitorServiceImpl.getBaseMapper().MonitorAlarmCntPlusOne(cameraID);
         Alarm alarm = new Alarm();
@@ -47,7 +47,16 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         alarm.setWarningLevel(1);
         alarm.setStatus(false);
         this.save(alarm);
-        return true;
+        // 获取数据库中的sqlalarm,找id最大且监控id对的上的
+        Alarm latestAlarm = this.baseMapper.selectOne(
+                new QueryWrapper<Alarm>()
+                        .eq("monitor_id", cameraID)
+                        .orderByDesc("id")
+                        .last("LIMIT 1"));
+        if (latestAlarm == null) {
+            throw new RuntimeException("Failed to retrieve the saved alarm record");
+        }
+        return this.baseMapper.SqlGetAlarm(latestAlarm.getId());
     }
 
     @Override

@@ -52,28 +52,29 @@ public class AlarmController {
     @PostMapping("/receive")
     @ClearRedis
     @Pass
-    public CommonResult<BlankRes> receiveAlarm(@RequestParam(value = "cameraId", required = true) int cameraId,
-            @RequestParam(value = "caseType", required = true) int caseType,
+    public CommonResult<BlankRes> receiveAlarm(@RequestParam(value = "cameraId", required = true) Integer cameraId,
+            @RequestParam(value = "caseType", required = true) Integer caseType,
             @RequestParam(value = "clipId", required = true) String clipId) {
 
         // 1. 保存报警到数据库
-        boolean saved = alarmService.receiveAlarm(cameraId, caseType, clipId);
+        SqlGetAlarm alarm = alarmService.receiveAlarm(cameraId, caseType, clipId);
 
-        if (saved) {
+        if (alarm != null) {
             // 2. 通过 WebSocket 广播报警通知给所有在线用户
-            Map<String, Object> alarmMessage = new HashMap<>();
+            /*Map<String, Object> alarmMessage = new HashMap<>();
             alarmMessage.put("type", "NEW_ALARM");
             alarmMessage.put("cameraId", cameraId);
             alarmMessage.put("caseType", caseType);
             alarmMessage.put("clipId", clipId);
             alarmMessage.put("time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            alarmMessage.put("message", "您有一条新的报警信息，请及时处理");
+            alarmMessage.put("message", "您有一条新的报警信息，请及时处理");*/
 
-            AlarmWebSocketServer.sendToAll(alarmMessage);
+            GetAlarmRes alarmRes = new GetAlarmRes(alarm);
+            AlarmWebSocketServer.sendToAll(alarmRes);
             log.info("WebSocket 广播报警: cameraId={}, caseType={}", cameraId, caseType);
 
-            // 3. 同时发送 UniPush 手机推送通知（保留原有功能）
-            sendUniPushNotification();
+            // 3. 同时发送 UniPush 手机推送通知
+            //sendUniPushNotification();
 
             return CommonResult.success("接收成功");
         } else {
