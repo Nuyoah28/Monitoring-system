@@ -11,7 +11,7 @@ import com.sipc.monitoringsystem.model.po.User.User;
 import java.util.List;
 
 public interface AlarmService extends IService<Alarm> {
-        SqlGetAlarm receiveAlarm(Integer cameraId, Integer caseType, String clipLink);
+        Boolean receiveAlarm(Integer cameraId, Integer caseType, String clipLink);
 
         List<SqlGetAlarm> queryAlarmList(Integer pageNum, Integer pageSize, Integer caseType, Integer status,
                         Integer warningLevel, String time1, String time2);

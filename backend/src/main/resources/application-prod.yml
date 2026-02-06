@@ -58,3 +58,8 @@ oss:
 #    - sk-xxx
 #    - sk-xxxx
 
+## AI Agent配置
+agent:
+  api:
+    url: http://localhost:5000  # Python Agent API地址（生产环境请修改为实际地址）
+

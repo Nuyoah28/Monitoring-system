@@ -82,5 +82,53 @@ public class UserController {
         return CommonResult.fail("修改失败");
     }
 
+    /**
+     * Token刷新接口
+     * 如果token即将过期（剩余时间少于7天），可以调用此接口获取新token
+     */
+    @Pass
+    @PostMapping("/refresh")
+    public CommonResult<LoginRes> refreshToken(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        // 从Header中提取token（格式：Bearer xxx）
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
+        
+        if (token == null || token.isEmpty()) {
+            return CommonResult.fail("Token不能为空");
+        }
+        
+        // 验证token是否有效（即使快过期也可以刷新）
+        if (!JwtUtils.verify(token)) {
+            return CommonResult.fail("Token无效或已过期，请重新登录");
+        }
+        
+        try {
+            // 从token中获取用户信息
+            User user = JwtUtils.getUserByToken(token);
+            // 从数据库获取最新用户信息
+            user = userService.getById(user.getId());
+            if (user == null) {
+                return CommonResult.fail("用户不存在");
+            }
+            
+            // 生成新token
+            String newToken = JwtUtils.signUser(user);
+            
+            // 构建响应
+            LoginRes loginRes = new LoginRes();
+            loginRes.setName(user.getUserName());
+            loginRes.setPhone(user.getPhone());
+            loginRes.setRole(user.getRole());
+            loginRes.setToken(newToken);
+            loginRes.setId(user.getId());
+            
+            return CommonResult.success(loginRes);
+        } catch (Exception e) {
+            return CommonResult.fail("Token刷新失败: " + e.getMessage());
+        }
+    }
+
 
 }
