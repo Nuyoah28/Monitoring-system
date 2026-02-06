@@ -1,6 +1,11 @@
 <template>
-  <div class="panel chat-panel" :style="panelStyle">
-    <div class="chat-header" @mousedown="onDragStart">智能助手</div>
+  <div class="panel chat-panel" :class="{ expanded: isExpanded }" :style="panelStyle">
+    <div class="chat-header" @mousedown="onDragStart">
+      <span>智能助手</span>
+      <button class="toggle-btn" type="button" @click.stop="toggleExpand">
+        {{ isExpanded ? '收起' : '展开' }}
+      </button>
+    </div>
     <div ref="messageBox" class="chat-messages">
       <div v-for="(msg, idx) in messages" :key="idx" :class="['chat-message', msg.role]">
         <div class="chat-role">{{ msg.role === 'user' ? '我' : '助手' }}</div>
@@ -48,6 +53,7 @@ const isStreaming = ref<boolean>(false);
 const messageBox = ref<HTMLElement | null>(null);
 let abortController: AbortController | null = null;
 const position = ref<{ x: number; y: number }>({ x: 0, y: 0 });
+const isExpanded = ref<boolean>(false);
 const isDragging = ref<boolean>(false);
 const dragOffset = ref<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -182,6 +188,19 @@ onMounted(() => {
   scrollToBottom();
 });
 
+const toggleExpand = (): void => {
+  isExpanded.value = !isExpanded.value;
+  nextTick(() => {
+    const panel = document.querySelector('.chat-panel') as HTMLElement | null;
+    const width = panel?.offsetWidth || 416;
+    const height = panel?.offsetHeight || 288;
+    position.value = {
+      x: Math.min(position.value.x, Math.max(16, window.innerWidth - width - 16)),
+      y: Math.min(position.value.y, Math.max(16, window.innerHeight - height - 16))
+    };
+  });
+};
+
 const onDragStart = (event: MouseEvent): void => {
   const panel = document.querySelector('.chat-panel') as HTMLElement | null;
   if (!panel) return;
@@ -224,6 +243,17 @@ const onDragEnd = (): void => {
   display: flex;
   flex-direction: column;
   color: #fff;
+  resize: both;
+  overflow: hidden;
+  min-width: 20rem;
+  min-height: 14rem;
+  max-width: 70vw;
+  max-height: 80vh;
+}
+
+.chat-panel.expanded {
+  width: 38rem;
+  height: 70vh;
 }
 
 .chat-header {
@@ -232,12 +262,28 @@ const onDragEnd = (): void => {
   margin: 0.5rem 0;
   cursor: move;
   user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  font-size: 0.9rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 0.8rem;
+  cursor: pointer;
+}
+
+.toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .chat-messages {
   flex: 1;
   min-height: 8rem;
-  max-height: 11rem;
   overflow-y: auto;
   padding-right: 0.5rem;
   text-align: left;
@@ -257,6 +303,7 @@ const onDragEnd = (): void => {
 .chat-content {
   white-space: pre-wrap;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .chat-message.user .chat-content {
