@@ -1,14 +1,7 @@
-"""
-智能监控系统 AI Agent
-功能：
-1. 理解用户问题，判断是否需要调用后端接口
-2. 调用后端接口获取数据
-3. 使用AI分析数据并给出建议
-4. 回答安全知识问题
-"""
+"""智能监控系统 AI Agent（Tool-Calling）- 大模型决定调用接口并分析数据"""
 
-import os
 import json
+import re
 import time
 import hmac
 import base64
@@ -16,12 +9,10 @@ import hashlib
 import requests
 import ssl
 from datetime import datetime
-from urllib.parse import urlencode, urlparse
+from time import mktime
+from urllib.parse import urlparse, quote
 from typing import Dict, List, Optional, Tuple
-import locale
 
-# 修复websocket包名冲突问题
-# 按照官方示例，使用 websocket 包
 try:
     import websocket
     WebSocketApp = websocket.WebSocketApp
@@ -37,21 +28,13 @@ except ImportError:
             "2. 安装正确的包: pip install websocket-client"
         )
 
-# ==================== 配置（硬编码）====================
-# 后端配置
 BACKEND_BASE_URL = "http://localhost:10215/api/v1"
 BACKEND_USERNAME = "root"
 BACKEND_PASSWORD = "123456"
-
-# 科大讯飞配置（硬编码）
 XF_APPID = "12fcd57c"
 XF_API_SECRET = "NmIwODUzZmY0OGNlMzg0ZTZmNzM3NzI1"
 XF_API_KEY = "46054bfc1b0d5da22981bb1af2896c63"
-# 接口地址：根据控制台显示的服务接口地址配置
-# 控制台显示：wss://spark-api.xf-yun.com/v1/x1 (X1.5深度推理接口)
-XF_HOST_URL = "https://spark-api.xf-yun.com/v1/x1"  # X1.5深度推理接口
-# 如果使用通用对话接口，可切换为：
-# XF_HOST_URL = "https://spark-api.xf-yun.com/v3.5/chat"  # 通用对话接口
+XF_HOST_URL = "https://spark-api.xf-yun.com/v1/x1"
 
 
 class SparkDeskClient:
@@ -64,84 +47,28 @@ class SparkDeskClient:
         self.host_url = XF_HOST_URL
     
     def _build_auth_url(self) -> str:
-        """
-        构建鉴权URL - 按照讯飞官方文档实现
-        参考：https://www.xfyun.cn/doc/spark/general_url_authentication.html
-        """
-        # 解析URL
-        parsed = urlparse(self.host_url)
-        host = parsed.netloc
-        path = parsed.path
-        
-        # 生成RFC1123格式的时间戳（使用官方推荐的方法）
-        # 参考官方文档：使用 wsgiref.handlers.format_date_time
-        from datetime import datetime
-        from time import mktime
         from wsgiref.handlers import format_date_time
-        
-        cur_time = datetime.now()
-        date = format_date_time(mktime(cur_time.timetuple()))
-        # 生成的date格式：Fri, 05 May 2023 10:43:39 GMT
-        
-        # 拼接签名字符串（严格按照官方文档格式）
-        tmp = f"host: {host}\n"
-        tmp += f"date: {date}\n"
-        tmp += f"GET {path} HTTP/1.1"
-        
-        # 利用hmac-sha256算法结合APISecret对tmp签名
-        tmp_sha = hmac.new(
-            self.api_secret.encode('utf-8'),
-            tmp.encode('utf-8'),
-            digestmod=hashlib.sha256
-        ).digest()
-        
-        # 将tmp_sha进行base64编码生成signature
-        signature = base64.b64encode(tmp_sha).decode(encoding='utf-8')
-        
-        # 拼接authorization_origin字符串
-        authorization_origin = f'api_key="{self.api_key}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature}"'
-        
-        # 将authorization_origin进行base64编码，生成最终的authorization
-        authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode(encoding='utf-8')
-        
-        # 构建WebSocket URL（对参数进行URL编码）
-        from urllib.parse import quote
-        auth_encoded = quote(authorization, safe='')
-        date_encoded = quote(date, safe='')
-        host_encoded = quote(host, safe='')
-        
-        # 构建查询字符串
-        query_string = f"authorization={auth_encoded}&date={date_encoded}&host={host_encoded}"
-        ws_url = f"wss://{host}{path}?{query_string}"
-        
-        return ws_url
+        parsed = urlparse(self.host_url)
+        host, path = parsed.netloc, parsed.path
+        date = format_date_time(mktime(datetime.now().timetuple()))
+        tmp = f"host: {host}\ndate: {date}\nGET {path} HTTP/1.1"
+        sig = base64.b64encode(hmac.new(
+            self.api_secret.encode(), tmp.encode(), hashlib.sha256
+        ).digest()).decode()
+        auth = base64.b64encode(f'api_key="{self.api_key}", algorithm="hmac-sha256", headers="host date request-line", signature="{sig}"'.encode()).decode()
+        qs = f"authorization={quote(auth, safe='')}&date={quote(date, safe='')}&host={quote(host, safe='')}"
+        return f"wss://{host}{path}?{qs}"
     
     def chat(self, question: str, context: List[Dict] = None, max_retries: int = 3,
              on_chunk: Optional[callable] = None) -> str:
-        """
-        调用讯飞Spark API进行对话
-        
-        Args:
-            question: 用户问题
-            context: 对话历史上下文，格式: [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
-            max_retries: 最大重试次数
-        
-        Returns:
-            AI回复内容
-        """
-        if context is None:
-            context = []
-        
-        # 重试机制
+        context = context or []
         for attempt in range(max_retries):
             try:
                 return self._chat_once(question, context, on_chunk=on_chunk)
             except Exception as e:
                 error_msg = str(e)
                 if attempt < max_retries - 1:
-                    print(f"第 {attempt + 1} 次尝试失败: {error_msg}")
-                    print(f"等待 {2 ** attempt} 秒后重试...")
-                    time.sleep(2 ** attempt)  # 指数退避
+                    time.sleep(2 ** attempt)
                 else:
                     raise Exception(f"经过 {max_retries} 次重试后仍然失败: {error_msg}")
         
@@ -159,107 +86,31 @@ class SparkDeskClient:
                 code = data.get('header', {}).get('code', -1)
                 
                 if code != 0:
-                    error_msg = data.get('header', {}).get('message', '')
-                    print(f"❌ 错误码: {code}, 错误信息: {error_msg}")
-                    # 如果是AppId认证错误，提供诊断信息
-                    if code == 11200:
-                        print("\n🔍 AppId认证失败诊断：")
-                        print(f"   使用的AppId: {self.appid}")
-                        print(f"   使用的APIKey: {self.api_key[:10]}...{self.api_key[-10:]}")
-                        print(f"   使用的APISecret: {self.api_secret[:10]}...{self.api_secret[-10:]}")
-                        print(f"   接口地址: {self.host_url}")
-                        print("\n💡 请检查：")
-                        print("   1. 在讯飞控制台确认AppId是否正确")
-                        print("   2. 确认AppId、APIKey、APISecret来自同一个应用")
-                        print("   3. 检查应用状态是否正常")
-                        print("   4. 确认接口地址与AppId匹配（v1/x1接口需要X1.5应用）")
                     ws.close()
-                    return
+                    raise Exception(f"Spark API 错误 {code}: {data.get('header', {}).get('message', '')}")
                 
-                # 按照官方示例解析返回内容
                 choices = data.get('payload', {}).get('choices', {})
-                status = choices.get('status', 0)
-                
-                # 获取文本内容（实时输出，提升用户体验）
-                text_list = choices.get('text', [])
-                for text_item in text_list:
-                    content = text_item.get('content', '')
-                    if content:  # 有内容时才添加
-                        result_text.append(content)
-                        if on_chunk:
-                            try:
-                                on_chunk(content)
-                            except Exception as cb_err:
-                                print(f"on_chunk回调错误: {cb_err}")
-                        # 实时打印，让用户看到进度
-                        print(content, end='', flush=True)
-                
-                # 判断是否结束（按照官方示例，status=2表示结束）
-                if status == 2:
-                    print()  # 换行
-                    print("#### 关闭会话")
+                for t in choices.get('text', []):
+                    c = t.get('content', '')
+                    if c:
+                        result_text.append(c)
+                        on_chunk and on_chunk(c)
+                if choices.get('status') == 2:
                     ws_close_flag = True
                     ws.close()
-            except Exception as e:
-                print(f"\n解析消息错误: {e}")
+            except Exception:
                 ws_close_flag = True
         
         def on_error(ws, error):
-            error_msg = str(error)
-            print(f"WebSocket错误: {error_msg}")
-            # 如果是SSL错误，提供更详细的提示
-            if "SSL" in error_msg or "EOF" in error_msg or "protocol" in error_msg:
-                print("提示: 这可能是SSL连接问题，正在尝试修复...")
             nonlocal ws_close_flag
             ws_close_flag = True
         
-        def on_close(ws, close_status_code, close_msg):
-            pass
-        
         def on_open(ws):
-            # 构建请求数据（按照官方示例格式）
-            # 调试：打印使用的AppId
-            print(f"🔑 使用AppId: {self.appid}")
-            
-            # 构建消息文本数组
-            text_messages = []
-            
-            # 添加历史上下文
-            for item in context:
-                text_messages.append({
-                    "role": item["role"],
-                    "content": item["content"]
-                })
-            
-            # 添加当前问题
-            text_messages.append({
-                "role": "user",
-                "content": question
-            })
-            
-            # 按照官方示例构建请求参数
+            text_messages = [{"role": i["role"], "content": i["content"]} for i in context]
+            text_messages.append({"role": "user", "content": question})
             request_data = {
-                "header": {
-                    "app_id": self.appid
-                    # 注意：官方示例中没有 uid 字段
-                },
-                "parameter": {
-                    "chat": {
-                        "domain": "x1",  # X1.5接口必须使用 "x1"
-                        "max_tokens": 32768,  # 官方示例使用32768
-                        "top_k": 6,  # 官方示例包含此字段
-                        "temperature": 1.2,  # 官方示例使用1.2
-                        "tools": [  # 官方示例包含tools字段
-                            {
-                                "web_search": {
-                                    "search_mode": "normal",
-                                    "enable": False
-                                },
-                                "type": "web_search"
-                            }
-                        ]
-                    }
-                },
+                "header": {"app_id": self.appid},
+                "parameter": {"chat": {"domain": "x1", "max_tokens": 32768, "top_k": 6, "temperature": 1.2, "tools": [{"web_search": {"search_mode": "normal", "enable": False}, "type": "web_search"}]}},
                 "payload": {
                     "message": {
                         "text": text_messages
@@ -267,55 +118,15 @@ class SparkDeskClient:
                 }
             }
             
-            # 发送请求
             ws.send(json.dumps(request_data))
         
-        # 建立WebSocket连接
-        auth_url = self._build_auth_url()
-        
-        # 配置SSL选项，解决SSL连接问题
-        ssl_options = {
-            "cert_reqs": ssl.CERT_NONE,  # 不验证证书
-            "check_hostname": False,     # 不检查主机名
-            "ssl_version": ssl.PROTOCOL_TLS,  # 使用TLS协议
-        }
-        
-        # 按照官方示例，禁用trace
         websocket.enableTrace(False)
         
-        ws = WebSocketApp(
-            auth_url,
-            on_message=on_message,
-            on_error=on_error,
-            on_close=on_close,
-            on_open=on_open
-        )
-        
-        # 运行WebSocket，按照官方示例使用简单的SSL配置
+        ws = WebSocketApp(self._build_auth_url(), on_message=on_message, on_error=on_error, on_close=lambda *a: None, on_open=on_open)
         try:
             ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
         except Exception as e:
-            error_msg = str(e)
-            print(f"WebSocket运行错误: {error_msg}")
-            if "EOF" in error_msg or "protocol" in error_msg:
-                raise Exception(f"SSL连接失败: {error_msg}。请检查网络连接和SSL配置。")
-            ws_close_flag = True
-            raise
-        
-        # 等待响应完成（优化超时时间）
-        timeout = 60  # 增加到60秒，因为AI响应可能需要更长时间
-        start_time = time.time()
-        last_print_time = start_time
-        
-        while not ws_close_flag and (time.time() - start_time) < timeout:
-            current_time = time.time()
-            # 每2秒打印一次进度提示
-            if current_time - last_print_time >= 2:
-                elapsed = int(current_time - start_time)
-                print(f"⏳ AI正在思考中... ({elapsed}秒)")
-                last_print_time = current_time
-            time.sleep(0.1)
-        
+            raise Exception(f"WebSocket 连接失败: {e}")
         if not result_text:
             raise Exception("未收到AI响应，可能是连接超时或网络问题")
         
@@ -323,18 +134,15 @@ class SparkDeskClient:
 
 
 class BackendClient:
-    """后端API客户端"""
-    
     def __init__(self, base_url: str, username: str, password: str):
         self.base_url = base_url
         self.username = username
         self.password = password
         self.session = requests.Session()
         self.token = None
-        self.external_token_mode = False  # True 表示使用前端传入的用户token
+        self.external_token_mode = False
 
     def set_token(self, token: Optional[str], external: bool = False):
-        """设置token；external=True 表示来自前端用户，不自动重登"""
         self.token = token
         self.external_token_mode = external
         self.session.headers.update({"Authorization": f"Bearer {self.token}"} if token else {})
@@ -345,9 +153,6 @@ class BackendClient:
         return {}
 
     def _request(self, method: str, url: str, **kwargs):
-        """
-        统一请求入口：自动携带token，遇到401自动重登并重试一次
-        """
         headers = kwargs.pop("headers", {})
         headers.update(self._authorized_headers())
         kwargs["headers"] = headers
@@ -363,12 +168,9 @@ class BackendClient:
             except Exception:
                 return r.status_code == 401
 
-        # 如果token过期，尝试重登一次
         if need_relogin(resp):
             if self.external_token_mode:
-                # 前端用户token过期，直接提示
                 raise Exception("用户登录已过期，请重新登录")
-            print("🔄 token过期/失效，尝试重新登录(内置账号)...")
             if self.login():
                 headers = kwargs.pop("headers", {})
                 headers.update(self._authorized_headers())
@@ -381,26 +183,21 @@ class BackendClient:
         return resp
     
     def login(self) -> bool:
-        """登录获取Token"""
         try:
             response = self.session.post(
                 f"{self.base_url}/user/login",
                 json={"userName": self.username, "password": self.password},
-                timeout=5  # 减少超时时间，加快响应
+                timeout=5
             )
             response.raise_for_status()
             data = response.json()
             
             if data.get("code") != "00000":
-                print(f"登录失败: {data.get('message')}")
                 return False
-            
             self.token = data["data"]["token"]
             self.session.headers.update({"Authorization": f"Bearer {self.token}"})
-            print("✅ 后端登录成功")
             return True
-        except Exception as e:
-            print(f"❌ 登录失败: {e}")
+        except Exception:
             return False
     
     def get_alarm_list(self, page_num: int = 1, page_size: int = 10, 
@@ -432,8 +229,7 @@ class BackendClient:
                 return None
             
             return data.get("data")
-        except Exception as e:
-            print(f"获取告警列表失败: {e}")
+        except Exception:
             return None
     
     def get_realtime_alarm(self) -> Optional[Dict]:
@@ -450,110 +246,202 @@ class BackendClient:
                 return None
             
             return data.get("data")
-        except Exception as e:
-            print(f"获取实时告警失败: {e}")
+        except Exception:
             return None
     
     def get_monitor_list(self) -> Optional[List[Dict]]:
-        """获取监控点列表"""
         try:
-            response = self._request(
-                "GET",
-                f"{self.base_url}/monitor",
-                timeout=5  # 减少超时时间，加快响应
-            )
+            response = self._request("GET", f"{self.base_url}/monitor", timeout=5)
             data = response.json()
             
             if data.get("code") != "00000":
                 return None
             
             return data.get("data")
-        except Exception as e:
-            print(f"获取监控点列表失败: {e}")
+        except Exception:
             return None
     
     def get_alarm_by_id(self, alarm_id: int) -> Optional[Dict]:
-        """根据ID获取告警详情"""
         try:
-            response = self.session.get(
-                f"{self.base_url}/alarm/{alarm_id}",
-                timeout=10
-            )
-            response.raise_for_status()
+            response = self._request("GET", f"{self.base_url}/alarm/{alarm_id}", timeout=10)
             data = response.json()
-            
             if data.get("code") != "00000":
                 return None
-            
             return data.get("data")
-        except Exception as e:
-            print(f"获取告警详情失败: {e}")
+        except Exception:
+            return None
+
+    def get_weather_newest(self, monitor_id: int) -> Optional[Dict]:
+        try:
+            response = self._request("GET", f"{self.base_url}/weather/newest/{monitor_id}", timeout=10)
+            data = response.json()
+            if data.get("code") != "00000":
+                return None
+            return data.get("data")
+        except Exception:
+            return None
+
+    def get_weather_history(self, monitor_id: int) -> Optional[Dict]:
+        try:
+            response = self._request("GET", f"{self.base_url}/weather/all/{monitor_id}", timeout=10)
+            data = response.json()
+            if data.get("code") != "00000":
+                return None
+            return data.get("data")
+        except Exception:
             return None
 
 
+TOOLS_SCHEMA = {
+    "tools": [
+        {
+            "name": "get_alarm_list",
+            "description": "获取告警列表。当用户询问告警、报警、警报、未处理告警、已处理告警、告警列表、告警统计、告警数量等信息时调用。",
+            "parameters": {
+                "status": "int|null，0=未处理，1=已处理，null=不筛选",
+                "warning_level": "int|null，4=高级/严重，null=不筛选",
+                "page_num": "int，页码，默认1",
+                "page_size": "int，每页数量，默认10"
+            }
+        },
+        {
+            "name": "get_realtime_alarm",
+            "description": "获取实时告警统计。当用户询问当前、今日、今天、实时、统计、概览、大屏、整体情况时调用。",
+            "parameters": {}
+        },
+        {
+            "name": "get_monitor_list",
+            "description": "获取监控点列表。当用户询问监控点、摄像头、监控设备、有哪些监控、监控列表时调用。",
+            "parameters": {}
+        },
+        {
+            "name": "get_alarm_detail",
+            "description": "根据告警ID获取详情。当用户明确提到某个告警的ID或编号（如：ID为123的告警、告警123详情）时调用。",
+            "parameters": {
+                "alarm_id": "int，告警ID"
+            }
+        },
+        {
+            "name": "get_weather_newest",
+            "description": "获取指定监控点的最新天气。当用户询问某监控点的天气、气温、湿度、当前天气、最新天气时调用。",
+            "parameters": {
+                "monitor_id": "int，监控点ID"
+            }
+        },
+        {
+            "name": "get_weather_history",
+            "description": "获取指定监控点的天气历史。当用户询问某监控点的天气记录、历史天气、天气变化趋势时调用。",
+            "parameters": {
+                "monitor_id": "int，监控点ID"
+            }
+        }
+    ]
+}
+
+TOOL_SELECTION_PROMPT = """你是医院安全监控助手。根据用户问题，输出 JSON（仅 JSON）：
+- 需调接口：{{"tool":"工具名","params":{{...}}}}
+- 不需调：{{"tool":"none","params":{{}}}}
+
+工具：{tools_desc}
+
+用户：{question}
+
+输出："""
+
+
 class IntelligentAgent:
-    """智能Agent - 能够理解问题、调用接口、AI分析"""
-    
     def __init__(self):
         self.backend = BackendClient(BACKEND_BASE_URL, BACKEND_USERNAME, BACKEND_PASSWORD)
         self.ai_client = SparkDeskClient(XF_APPID, XF_API_KEY, XF_API_SECRET)
-        self.conversation_history = []  # 对话历史
-        
-        # 初始化：使用内置账号登录（供后台调用时使用）。如果失败不抛异常，后续可用前端token。
-        try:
-            self.backend.login()
-        except Exception as e:
-            print(f"⚠️ 内置账号登录失败，将等待前端token：{e}")
+        self.conversation_history = []
+        self.backend.login()
     
-    def _detect_intent(self, question: str) -> Tuple[str, Dict]:
+    def _get_tools_desc(self) -> str:
+        lines = []
+        for t in TOOLS_SCHEMA["tools"]:
+            lines.append(f"- **{t['name']}**: {t['description']}")
+            if t.get("parameters"):
+                for k, v in t["parameters"].items():
+                    lines.append(f"    - {k}: {v}")
+        return "\n".join(lines)
+    
+    def _parse_tool_call(self, llm_output: str) -> Tuple[str, Dict]:
+        llm_output = llm_output.strip()
+        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', llm_output)
+        if json_match:
+            llm_output = json_match.group(1).strip()
+        
+        obj_match = re.search(r'\{[\s\S]*\}|\[[\s\S]*\]', llm_output)
+        if obj_match:
+            try:
+                obj = json.loads(obj_match.group())
+                if isinstance(obj, list) and obj:
+                    obj = obj[0]
+                if isinstance(obj, dict):
+                    tool = obj.get("tool", "none")
+                    params = obj.get("params", {})
+                    if tool and tool != "none":
+                        return tool, params if isinstance(params, dict) else {}
+                    return "none", {}
+            except json.JSONDecodeError:
+                pass
+        
+        return "none", {}
+    
+    def _execute_tool(self, tool_name: str, params: Dict) -> Optional[str]:
         """
-        检测用户意图，判断是否需要调用后端接口
-        
-        Returns:
-            (intent_type, params)
-            intent_type: "query_alarm", "query_monitor", "query_realtime", "knowledge", "general"
+        执行指定工具，返回格式化后的数据文本
         """
-        question_lower = question.lower()
+        if tool_name == "get_alarm_list":
+            backend_data = self.backend.get_alarm_list(
+                page_num=params.get("page_num", 1),
+                page_size=params.get("page_size", 10),
+                status=params.get("status") if "status" in params else None,
+                warning_level=params.get("warning_level") if "warning_level" in params else None
+            )
+            return self._format_alarm_data(backend_data) if backend_data else "暂无告警数据"
         
-        # 告警相关关键词
-        alarm_keywords = ["告警", "报警", "警报", "告警列表", "有哪些告警", "告警信息", "告警详情", 
-                         "未处理告警", "已处理告警", "告警统计", "告警数量"]
+        elif tool_name == "get_realtime_alarm":
+            backend_data = self.backend.get_realtime_alarm()
+            return self._format_realtime_data(backend_data) if backend_data else "暂无实时数据"
         
-        # 监控点相关关键词
-        monitor_keywords = ["监控", "监控点", "摄像头", "监控列表", "有哪些监控", "监控设备"]
+        elif tool_name == "get_monitor_list":
+            backend_data = self.backend.get_monitor_list()
+            return self._format_monitor_data(backend_data) if backend_data else "暂无监控点数据"
         
-        # 实时统计相关关键词
-        realtime_keywords = ["实时", "当前", "现在", "今日", "今天", "统计", "概览", "大屏"]
-        
-        # 安全知识相关关键词
-        knowledge_keywords = ["如何", "怎么", "什么是", "为什么", "安全", "知识", "方法", "建议", 
-                             "注意事项", "预防", "处理", "应对"]
-        
-        # 判断意图
-        if any(keyword in question_lower for keyword in alarm_keywords):
-            params = {}
-            # 提取具体参数
-            if "未处理" in question_lower or "未处理" in question:
-                params["status"] = 0
-            elif "已处理" in question_lower or "已处理" in question:
-                params["status"] = 1
-            
-            if "高级" in question_lower or "级别" in question_lower or "严重" in question_lower:
-                params["warning_level"] = 4
-            
-            return "query_alarm", params
-        
-        elif any(keyword in question_lower for keyword in monitor_keywords):
-            return "query_monitor", {}
-        
-        elif any(keyword in question_lower for keyword in realtime_keywords):
-            return "query_realtime", {}
-        
-        elif any(keyword in question_lower for keyword in knowledge_keywords):
-            return "knowledge", {}
-        
-        else:
-            return "general", {}
+        elif tool_name == "get_alarm_detail":
+            alarm_id = params.get("alarm_id")
+            if alarm_id is None:
+                return "缺少告警ID参数"
+            try:
+                alarm_id = int(alarm_id)
+            except (TypeError, ValueError):
+                return "告警ID必须为数字"
+            backend_data = self.backend.get_alarm_by_id(alarm_id)
+            if backend_data:
+                return self._format_alarm_data({"alarmList": [backend_data], "count": 1})
+            return f"未找到ID为 {alarm_id} 的告警"
+        elif tool_name == "get_weather_newest":
+            mid = params.get("monitor_id")
+            if mid is None:
+                return "缺少监控点ID参数"
+            try:
+                mid = int(mid)
+            except (TypeError, ValueError):
+                return "监控点ID必须为数字"
+            data = self.backend.get_weather_newest(mid)
+            return self._format_weather_data(data, single=True) if data else f"监控点 {mid} 暂无天气数据"
+        elif tool_name == "get_weather_history":
+            mid = params.get("monitor_id")
+            if mid is None:
+                return "缺少监控点ID参数"
+            try:
+                mid = int(mid)
+            except (TypeError, ValueError):
+                return "监控点ID必须为数字"
+            data = self.backend.get_weather_history(mid)
+            return self._format_weather_data(data, single=False) if data else f"监控点 {mid} 暂无天气历史"
+        return None
     
     def _format_alarm_data(self, alarm_data: Dict) -> str:
         """格式化告警数据为文本"""
@@ -607,6 +495,23 @@ class IntelligentAgent:
         
         return result
     
+    def _format_weather_data(self, data, single: bool = True) -> str:
+        if single:
+            items = [data] if isinstance(data, dict) else []
+        else:
+            items = data if isinstance(data, list) else (data.get("list") or data.get("records") or []) if isinstance(data, dict) else []
+        if not items:
+            return "暂无天气数据"
+        result = "最新天气：\n\n" if single else f"共 {len(items)} 条天气记录：\n\n"
+        for i, w in enumerate(items[:15], 1):
+            result += f"{i}. 温度 {w.get('temperature', '未知')}℃ 湿度 {w.get('humidity', '未知')}% 天气 {w.get('weather', '未知')}"
+            if w.get("createTime") or w.get("date") or w.get("time"):
+                result += f" 时间 {w.get('createTime') or w.get('date') or w.get('time', '未知')}"
+            result += "\n"
+        if len(items) > 15:
+            result += f"... 还有 {len(items) - 15} 条未显示\n"
+        return result
+
     def _format_monitor_data(self, monitor_list: List[Dict]) -> str:
         """格式化监控点数据为文本"""
         if not monitor_list:
@@ -628,7 +533,7 @@ class IntelligentAgent:
     
     def process_question(self, question: str, on_chunk: Optional[callable] = None, user_token: Optional[str] = None) -> str:
         """
-        处理用户问题的主方法
+        处理用户问题的主方法（Tool-Calling 流程）
         
         Args:
             question: 用户问题
@@ -638,44 +543,42 @@ class IntelligentAgent:
         """
         print(f"\n🤔 用户问题: {question}")
         
-        # 1. 检测意图
-        intent, params = self._detect_intent(question)
-        print(f"📋 检测到意图: {intent}")
-        
-        # 2. 如果前端提供token，则切换为用户token模式（只对本次请求生效）
+        # 1. 如果前端提供token，则切换为用户token模式
         if user_token:
             self.backend.set_token(user_token, external=True)
         else:
-            # 若未提供，确保仍使用内置登录态
             if not self.backend.token:
                 self.backend.login()
 
-        # 3. 根据意图调用后端接口
-        backend_data = None
+        # 2. 由大模型决定调用哪个工具（Tool-Calling 第一步）
+        tools_desc = self._get_tools_desc()
+        tool_prompt = TOOL_SELECTION_PROMPT.format(tools_desc=tools_desc, question=question)
+        
+        print("🔍 大模型分析意图中...")
+        try:
+            tool_selection_response = self.ai_client.chat(
+                tool_prompt,
+                context=[],
+                on_chunk=None
+            )
+        except Exception as e:
+            print(f"❌ 意图分析失败: {e}，将直接回答（不调用接口）")
+            tool_selection_response = '{"tool": "none", "params": {}}'
+        
+        tool_name, tool_params = self._parse_tool_call(tool_selection_response)
+        print(f"📋 大模型决策: tool={tool_name}, params={tool_params}")
+
+        # 3. 执行工具
         data_summary = ""
+        backend_data = None
         
-        if intent == "query_alarm":
-            print("📞 调用后端接口: 获取告警列表")
-            backend_data = self.backend.get_alarm_list(**params)
-            if backend_data:
-                data_summary = self._format_alarm_data(backend_data)
-                print(f"✅ 获取到 {backend_data.get('count', 0)} 条告警")
+        if tool_name != "none":
+            print(f"📞 调用工具: {tool_name}")
+            data_summary = self._execute_tool(tool_name, tool_params)
+            if data_summary:
+                print(f"✅ 工具返回数据成功")
         
-        elif intent == "query_realtime":
-            print("📞 调用后端接口: 获取实时告警统计")
-            backend_data = self.backend.get_realtime_alarm()
-            if backend_data:
-                data_summary = self._format_realtime_data(backend_data)
-                print("✅ 获取到实时统计数据")
-        
-        elif intent == "query_monitor":
-            print("📞 调用后端接口: 获取监控点列表")
-            backend_data = self.backend.get_monitor_list()
-            if backend_data:
-                data_summary = self._format_monitor_data(backend_data)
-                print(f"✅ 获取到 {len(backend_data)} 个监控点")
-        
-        # 4. 构建AI提示词
+        # 4. 构建AI提示词（Tool-Calling 第二步：根据数据生成回答）
         system_prompt = """你是医院安全监控系统的智能助手"小智"。你的职责是：
 1. 帮助用户理解监控数据和告警信息
 2. 提供专业的安全知识建议
@@ -684,7 +587,7 @@ class IntelligentAgent:
 
 请用中文回答，回答要专业、准确、易懂。"""
         
-        if backend_data and data_summary:
+        if data_summary:
             # 有后端数据，需要AI分析
             ai_prompt = f"""{system_prompt}
 
@@ -718,7 +621,7 @@ class IntelligentAgent:
         except Exception as e:
             print(f"❌ AI调用失败: {e}")
             # 如果AI调用失败，返回基础回答
-            if backend_data:
+            if data_summary:
                 return f"根据系统数据：\n{data_summary}\n\n（AI分析服务暂时不可用，请查看上述数据）"
             else:
                 return "抱歉，AI服务暂时不可用，请稍后再试。"
@@ -733,7 +636,7 @@ def main():
     print("=" * 60)
     print("🏥 智能监控系统 AI Agent")
     print("=" * 60)
-    print("\n功能说明：")
+    print("\n功能说明（Tool-Calling：由大模型自动判断调用哪些接口）：")
     print("1. 可以询问告警信息（如：有哪些告警？未处理的告警有哪些？）")
     print("2. 可以询问监控点信息（如：有哪些监控点？）")
     print("3. 可以询问实时统计（如：当前告警统计如何？）")

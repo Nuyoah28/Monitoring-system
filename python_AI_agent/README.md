@@ -10,3 +10,7 @@
 python agent_api.py
 ```
 
+LLM 驱动的 Tool-Calling agent
+# 运行流程
+AI先识别问题选择所需的tools和参数，向后端发送请求获取数据，之后根据数据和用户问题给出答案与建议
+
