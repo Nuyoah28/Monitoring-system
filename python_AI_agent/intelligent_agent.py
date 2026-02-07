@@ -339,8 +339,11 @@ TOOLS_SCHEMA = {
 }
 
 TOOL_SELECTION_PROMPT = """你是医院安全监控助手。根据用户问题，输出 JSON（仅 JSON）：
-- 需调接口：{{"tool":"工具名","params":{{...}}}}
+- 需调多个接口：[{{"tool":"工具名","params":{{...}}}}, {{"tool":"工具名2","params":{{...}}}}]
+- 只需一个：{{"tool":"工具名","params":{{...}}}}
 - 不需调：{{"tool":"none","params":{{}}}}
+
+用户可能一次问多个问题，需调用多个接口。例如："告警数量和1号监控温度" 需调用 get_alarm_list 和 get_weather_newest。
 
 工具：{tools_desc}
 
@@ -365,28 +368,30 @@ class IntelligentAgent:
                     lines.append(f"    - {k}: {v}")
         return "\n".join(lines)
     
-    def _parse_tool_call(self, llm_output: str) -> Tuple[str, Dict]:
+    def _parse_tool_calls(self, llm_output: str) -> List[Tuple[str, Dict]]:
+        """解析 LLM 输出，返回 [(tool_name, params), ...]，支持多工具"""
         llm_output = llm_output.strip()
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', llm_output)
         if json_match:
             llm_output = json_match.group(1).strip()
-        
         obj_match = re.search(r'\{[\s\S]*\}|\[[\s\S]*\]', llm_output)
         if obj_match:
             try:
                 obj = json.loads(obj_match.group())
-                if isinstance(obj, list) and obj:
-                    obj = obj[0]
-                if isinstance(obj, dict):
-                    tool = obj.get("tool", "none")
-                    params = obj.get("params", {})
+                result = []
+                items = obj if isinstance(obj, list) else [obj]
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    tool = item.get("tool", "none")
+                    params = item.get("params", {}) or {}
                     if tool and tool != "none":
-                        return tool, params if isinstance(params, dict) else {}
-                    return "none", {}
+                        result.append((tool, params if isinstance(params, dict) else {}))
+                if result:
+                    return result
             except json.JSONDecodeError:
                 pass
-        
-        return "none", {}
+        return []
     
     def _execute_tool(self, tool_name: str, params: Dict) -> Optional[str]:
         """
@@ -565,18 +570,13 @@ class IntelligentAgent:
             print(f"❌ 意图分析失败: {e}，将直接回答（不调用接口）")
             tool_selection_response = '{"tool": "none", "params": {}}'
         
-        tool_name, tool_params = self._parse_tool_call(tool_selection_response)
-        print(f"📋 大模型决策: tool={tool_name}, params={tool_params}")
-
-        # 3. 执行工具
-        data_summary = ""
-        backend_data = None
-        
-        if tool_name != "none":
-            print(f"📞 调用工具: {tool_name}")
-            data_summary = self._execute_tool(tool_name, tool_params)
-            if data_summary:
-                print(f"✅ 工具返回数据成功")
+        tool_calls = self._parse_tool_calls(tool_selection_response)
+        parts = []
+        for tool_name, tool_params in tool_calls:
+            r = self._execute_tool(tool_name, tool_params)
+            if r:
+                parts.append(f"【{tool_name}】\n{r}")
+        data_summary = "\n\n".join(parts) if parts else ""
         
         # 4. 构建AI提示词（Tool-Calling 第二步：根据数据生成回答）
         system_prompt = """你是医院安全监控系统的智能助手"小智"。你的职责是：
