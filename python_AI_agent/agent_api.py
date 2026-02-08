@@ -5,6 +5,7 @@ Agent API 服务 - 提供HTTP接口供前端或其他服务调用
 
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
+from flask_sock import Sock
 from intelligent_agent import IntelligentAgent
 import json
 import os
@@ -12,8 +13,8 @@ import time
 import traceback
 import threading
 from queue import SimpleQueue
-
 app = Flask(__name__)
+sock = Sock(app)
 # 允许跨域请求
 CORS(app)
 
@@ -217,6 +218,61 @@ def chat_stream():
         }
     )
 
+@sock.route('/api/v1/gpt/ws/<token>')
+def gpt_ws(ws, token):
+    """
+    WebSocket对话接口 (适配Uniapp端)
+    """
+    print(f"🔗 WebSocket连接建立 (Token: {token})")
+    
+    try:
+        while True:
+            # 接收消息
+            message = ws.receive()
+            if not message:
+                break
+                
+            print(f"📥 收到WebSocket消息: {message}")
+            
+            try:
+                # 尝试解析JSON
+                # Uniapp端发送的是 JSON.stringify(ask) -> "\"问题\""
+                data = json.loads(message)
+                if isinstance(data, dict):
+                    question = data.get('question', '') or data.get('content', '')
+                else:
+                    question = str(data)
+            except:
+                question = message
+            
+            question = question.strip()
+            if not question:
+                continue
+                
+            print(f"❓ 处理问题: {question}")
+            
+            try:
+                if agent:
+                    # 使用Agent处理，并通过回调发送chunk
+                    agent.process_question(
+                        question, 
+                        on_chunk=lambda c: ws.send(c)
+                    )
+                else:
+                    ws.send("⚠️ Agent未初始化")
+            except Exception as e:
+                error_msg = f"❌ 处理出错: {str(e)}"
+                print(error_msg)
+                ws.send(error_msg)
+            
+            # 发送结束标记 (Home.vue line 94: if(res.data !== "[DONE]"))
+            ws.send("[DONE]")
+            
+    except Exception as e:
+        print(f"❌ WebSocket异常: {e}")
+    finally:
+        print("🔗 WebSocket连接关闭")
+
 @app.route('/api/info', methods=['GET'])
 def api_info():
     """API信息"""
@@ -253,10 +309,10 @@ if __name__ == '__main__':
         print("  - GET  /health      - 健康检查")
         print("  - POST /chat        - 对话接口")
         print("  - GET  /api/info    - API信息")
-        print("\n🌐 服务地址: http://0.0.0.0:5000")
+        print("\n🌐 服务地址: http://0.0.0.0:5050")
         print("=" * 60)
         print("\n启动服务...\n")
-        app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+        app.run(host='0.0.0.0', port=5050, debug=False, threaded=True)
     else:
         print("❌ Agent初始化失败，请检查配置")
         print("   请确保：")

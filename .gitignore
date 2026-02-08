@@ -75,3 +75,6 @@ Makefile
 # UniApp / HBuilderX
 unpackage/
 .hbuilderx/
+
+my_docs/
+backend/src/main/resources/application-dev-my.yml
