@@ -132,3 +132,12 @@ void draw_box(cv::Mat &cv_mat, std::vector<BoxInfo> &boxes, MatInfo &mmat_object
     cv::imwrite("result.jpg", cv_mat);
 #endif
 }
+
+void checkAndAlert(std::vector<BoxInfo> &boxes) {
+    for (auto &box : boxes) {
+        // 检查是否检测到需要报警的目标（如陌生人、危险物品等）
+        if (box.label == PERSON_LABEL && box.score > THRESHOLD) {
+            triggerAlarm();  // 触发报警
+        }
+    }
+}

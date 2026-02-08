@@ -13,10 +13,25 @@ def test():
 
 
 # just for test
-@monitor.route('/alarm')
-def alarm():
+@monitor.route('/testalarm')
+def test_alarm():
     postAlarm([True, False, False, False, False, True])
     return 'ok'
+
+@monitor.route('/alarm',methods=['POST'])  # 接受物联网端发来的报警并重新确认
+def alarm():
+    if request.headers.get('Authorization') != 'sipc115':
+        return jsonify({
+            "code": 'A0401',
+            "msg": "Unauthorized"
+        })
+    data = request.get_json()
+    print(data)
+    return jsonify({
+        "code": "00000",
+        "msg": "success"
+    })
+
 
 
 @monitor.route("/image", methods=["GET"])

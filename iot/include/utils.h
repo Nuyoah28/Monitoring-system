@@ -27,3 +27,4 @@ void copyMakeBorderNeon(cv::Mat& img, cv::Mat& output, int top, int bottom, int 
 void convertToNeon(cv::Mat& img);
 void nmsNeon(std::vector<BoxInfo>& input_boxes, float NMS_THRESH);
 void draw_box(cv::Mat &cv_mat, std::vector<BoxInfo> &boxes, MatInfo &mmat_objection);
+void checkAndAlert(std::vector<BoxInfo> &boxes);

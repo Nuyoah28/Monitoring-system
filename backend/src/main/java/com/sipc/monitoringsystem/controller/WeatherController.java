@@ -1,5 +1,6 @@
 package com.sipc.monitoringsystem.controller;
 
+import com.sipc.monitoringsystem.aop.Pass;
 import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.param.weather.CreateWeatherParam;
 import com.sipc.monitoringsystem.model.dto.res.Weather.CreateWeatherRes;
@@ -24,10 +25,11 @@ public class WeatherController {
     private WeatherService weatherService;
 
     @GetMapping("/newest/{monitorId}")
+    @Pass
     public CommonResult<GetWeatherRes> getWeather(@PathVariable Integer monitorId) {
         Weather weather = weatherService.getNewestWeatherByMonitorId(monitorId);
         if (weather == null) {
-            return CommonResult.fail("获取监控列表失败");
+            return CommonResult.fail("获取最新天气失败");
         }
         GetWeatherRes getWeatherRes = new GetWeatherRes(weather);
         return CommonResult.success(getWeatherRes);
@@ -37,7 +39,7 @@ public class WeatherController {
     public CommonResult<List<GetWeatherRes>> getWeatherHistory(@PathVariable Integer monitorId) {
         List<Weather> weatherList = weatherService.getWeatherListByMonitorId(monitorId);
         if (weatherList == null) {
-            return CommonResult.fail("获取监控列表失败");
+            return CommonResult.fail("获取天气列表失败");
         }
         List<GetWeatherRes> getWeatherResList = new ArrayList<>();
         for (Weather weather : weatherList) {

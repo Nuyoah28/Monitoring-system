@@ -61,7 +61,7 @@ oss:
 ## chatgpt的apikey
 #keys:
 #  list:
-#    - sk-xxx
+#    - sk-xxx10
 #    - sk-xxxx
 
 ## AI Agent配置

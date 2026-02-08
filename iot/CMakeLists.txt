@@ -25,6 +25,6 @@ MESSAGE(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
 include_directories(${PROJECT_SOURCE_DIR}/include/)
 LINK_DIRECTORIES(${PROJECT_SOURCE_DIR}/lib)
 
-add_executable(main src/main.cpp src/utils.cpp)
+add_executable(main src/main.cpp src/utils.cpp src/network.cpp)
 
-target_link_libraries (main ${OpenCV_LIBS} libMNN.so libMNN_Express.so libMNNOpenCV.so -lpthread)
+target_link_libraries (main ${OpenCV_LIBS} libMNN.so libMNN_Express.so libMNNOpenCV.so -lpthread curl)

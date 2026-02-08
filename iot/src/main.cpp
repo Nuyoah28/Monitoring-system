@@ -10,6 +10,7 @@
 #include <MNN/Interpreter.hpp>
 
 #include "utils.h"
+#include "network.h"
 #define use_camera 0  //use_camera：是否使用摄像头（当前设为0，不使用）
 #define mnnd 1        //mnnd：是否使用mnnd模型（当前设为1，使用mnnd模型）
 
@@ -112,12 +113,16 @@ std::vector<BoxInfo> decode(cv::Mat &cv_mat, std::shared_ptr<MNN::Interpreter> &
 
 int main(int argc, char const *argv[])
 {
+    // 启动天气监测，初始温度25度，湿度50%
+    startWeatherMonitoring(25, 50);
+
     // 加载模型
     std::string model_name = "../models/v5lite-e-mnnd_fp16.mnn";
 
     std::shared_ptr<MNN::Interpreter> net = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(model_name.c_str()));
     if (nullptr == net)
     {
+        stopWeatherMonitoring();
         return 0;
     }
 
@@ -160,6 +165,17 @@ int main(int argc, char const *argv[])
         cv::Mat pimg = preprocess(raw_image, mmat_objection);
         bbox_collection = decode(pimg, net, session, mmat_objection.inpSize);// 模型推理
         nms(bbox_collection, 0.50);// 非极大值抑制去重
+        
+        // 检查是否检测到需要报警的对象（例如：人、车等）
+        for (const auto& box : bbox_collection) {
+            // 示例：当检测到person且置信度大于0.7时触发报警
+            // 这里可以根据实际需求修改检测条件
+            if (box.label == 0 && box.score > 0.7f) {  // 0通常代表person
+                triggerAlarm();
+                break; // 防止重复触发
+            }
+        }
+        
         //draw_box(raw_image, bbox_collection, mmat_objection);
 
         // 性能计时
@@ -168,5 +184,7 @@ int main(int argc, char const *argv[])
         if(time > 0) printf(">> Time : %lf ms\n", (double)time / 1000000);
     }
 
+    // 程序退出前停止天气监测
+    stopWeatherMonitoring();
     return 0;
 }
