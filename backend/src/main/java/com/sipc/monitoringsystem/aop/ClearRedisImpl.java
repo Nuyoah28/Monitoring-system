@@ -11,6 +11,6 @@ import org.springframework.stereotype.Service;
 public class ClearRedisImpl
 {
     @CacheEvict(value = "cache",allEntries = true)
-    public void deleteCache(){
+    public void deleteCache(){ // 空方法，目的只有触发CacheEvict注解
     }
 }
