@@ -139,6 +139,7 @@ class BackendClient:
         self.username = username
         self.password = password
         self.session = requests.Session()
+        self.session.trust_env = False  # 禁用系统代理，防止 502 错误
         self.token = None
         self.external_token_mode = False
 
@@ -229,7 +230,8 @@ class BackendClient:
                 return None
             
             return data.get("data")
-        except Exception:
+        except Exception as e:
+            print(f"❌ 后端请求异常: {e}")
             return None
     
     def get_realtime_alarm(self) -> Optional[Dict]:

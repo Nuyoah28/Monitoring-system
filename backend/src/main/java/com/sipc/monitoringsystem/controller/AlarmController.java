@@ -61,20 +61,31 @@ public class AlarmController {
 
         if (alarm != null) {
             // 2. 通过 WebSocket 广播报警通知给所有在线用户
-            /*Map<String, Object> alarmMessage = new HashMap<>();
-            alarmMessage.put("type", "NEW_ALARM");
-            alarmMessage.put("cameraId", cameraId);
-            alarmMessage.put("caseType", caseType);
-            alarmMessage.put("clipId", clipId);
-            alarmMessage.put("time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            alarmMessage.put("message", "您有一条新的报警信息，请及时处理");*/
+            /*
+             * Map<String, Object> alarmMessage = new HashMap<>();
+             * alarmMessage.put("type", "NEW_ALARM");
+             * alarmMessage.put("cameraId", cameraId);
+             * alarmMessage.put("caseType", caseType);
+             * alarmMessage.put("clipId", clipId);
+             * alarmMessage.put("time",
+             * LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+             * ));
+             * alarmMessage.put("message", "您有一条新的报警信息，请及时处理");
+             */
 
             GetAlarmRes alarmRes = new GetAlarmRes(alarm);
-            AlarmWebSocketServer.sendToAll(alarmRes);
+
+            // Fix: Wrap in a Map to include "type" and "message" for frontend compatibility
+            Map<String, Object> socketMessage = new HashMap<>();
+            socketMessage.put("type", "NEW_ALARM");
+            socketMessage.put("message", "您有一条新的报警信息，请及时处理");
+            socketMessage.put("data", alarmRes); // Include detailed data
+
+            AlarmWebSocketServer.sendToAll(socketMessage);
             log.info("WebSocket 广播报警: cameraId={}, caseType={}", cameraId, caseType);
 
             // 3. 同时发送 UniPush 手机推送通知
-            //sendUniPushNotification();
+            // sendUniPushNotification();
 
             return CommonResult.success("接收成功");
         } else {
