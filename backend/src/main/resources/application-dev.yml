@@ -8,9 +8,9 @@ spring:
     url: jdbc:mysql://localhost:3306/SweatPear?serverTimezone=GMT%2B8&rewriteBatchedStatements=true&tinyInt1isBit=false
     username: root
     # 数据库密码 自己改成自己电脑的密码，后面建议写上是谁的别搞混了
-#    password: '050130' # 赵博文
+    password: '050130' # 赵博文
     #password: fast2005 # 冯博轩
-    password: 'root' # 刘少帅
+    #password: 'root' # 刘少帅
     druid:
       initial-size: 5
       min-idle: 10
@@ -46,8 +46,8 @@ spring:
           # 连接超时时间（毫秒）默认是2000ms
           timeout: 10000ms
       # redis密码 自己改成自己电脑的密码，后面建议写上是谁的别搞混了
-#      password: 123456  # 赵博文
-      password: # 冯博轩
+      password: 123456  # 赵博文
+      #password: # 冯博轩
   cache:
     type: redis
     redis:

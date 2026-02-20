@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
-
 @Slf4j
 @Service
 public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> implements MonitorService {
@@ -66,12 +65,14 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
         monitor.setLeader(createMonitorParam.getLeader());
         monitor.setRunning(true);
         monitor.setAlarmCnt(0);
-        monitor.setLatitude(createMonitorParam.getLatitude());
-        monitor.setLongitude(createMonitorParam.getLongitude());
         monitor.setFall(false);
         monitor.setFlame(false);
         monitor.setSmoke(false);
         monitor.setPunch(false);
+        monitor.setRubbish(false);
+        monitor.setIce(false);
+        monitor.setEbike(false);
+        monitor.setVehicle(false);
         monitor.setWave(false);
         monitor.setDangerArea(false);
         monitor.setStreamLink(createMonitorParam.getIp());
@@ -106,18 +107,22 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
         monitor.setName(updateMonitorParam.getName());
         monitor.setArea(updateMonitorParam.getArea());
         monitor.setLeader(updateMonitorParam.getLeader());
-        monitor.setLatitude(updateMonitorParam.getLatitude());
-        monitor.setLongitude(updateMonitorParam.getLongitude());
+        monitor.setRunning(updateMonitorParam.getRunning());
         monitor.setFall(updateMonitorParam.getFall());
         monitor.setFlame(updateMonitorParam.getFlame());
         monitor.setSmoke(updateMonitorParam.getSmoke());
         monitor.setPunch(updateMonitorParam.getPunch());
+        monitor.setRubbish(updateMonitorParam.getRubbish());
+        monitor.setIce(updateMonitorParam.getIce());
+        monitor.setEbike(updateMonitorParam.getEbike());
+        monitor.setVehicle(updateMonitorParam.getVehicle());
         monitor.setWave(updateMonitorParam.getWave());
         monitor.setDangerArea(dangerArea);
         monitor.setLeftX(null);
         monitor.setLeftY(null);
         monitor.setRightX(null);
         monitor.setRightY(null);
+        // 更改Flask区域和能力
         try {
             String IP = getMonitorIPById(updateMonitorParam.getId());
             // 更改Flask区域
@@ -127,14 +132,21 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
             area.add(updateMonitorParam.getRightX());
             area.add(updateMonitorParam.getRightY());
             List<Boolean> ability = new ArrayList<>();
-            // 0 火，1 抽烟，2跌倒，3挥拳，4挥手，5危险区域
+            // 按照casetype表中的顺序添加：1危险区域，2烟雾/吸烟，3区域停留(暂无字段)，4摔倒，5明火，6吸烟(同烟雾)，7打架，8垃圾乱放，9冰面，10电动车进楼，11载具占用车道，12挥手
+            // Flask服务已按照SQL表(case_type_info)的顺序修改，需要提供12个布尔值
             // TODO 改字段的时候要改这里
-            ability.add(updateMonitorParam.getFlame());
-            ability.add(updateMonitorParam.getSmoke());
-            ability.add(updateMonitorParam.getFall());
-            ability.add(updateMonitorParam.getPunch());
-            ability.add(updateMonitorParam.getWave());
-            ability.add(dangerArea);
+            ability.add(dangerArea); // 0: 危险区域 (caseType=1)
+            ability.add(false); // 1: 烟雾 (caseType=2)
+            ability.add(false); // 2: 区域停留 (caseType=3，暂无字段，设为false)
+            ability.add(updateMonitorParam.getFall()); // 3: 摔倒 (caseType=4)
+            ability.add(updateMonitorParam.getFlame()); // 4: 明火 (caseType=5)
+            ability.add(updateMonitorParam.getSmoke()); // 5: 吸烟 (caseType=6)
+            ability.add(updateMonitorParam.getPunch()); // 6: 打架 (caseType=7)
+            ability.add(updateMonitorParam.getRubbish()); // 7: 垃圾乱放 (caseType=8)
+            ability.add(updateMonitorParam.getIce()); // 8: 冰面 (caseType=9)
+            ability.add(updateMonitorParam.getEbike()); // 9: 电动车进楼 (caseType=10)
+            ability.add(updateMonitorParam.getVehicle()); // 10: 载具占用车道 (caseType=11)
+            ability.add(updateMonitorParam.getWave()); // 11: 挥手 (caseType=12)
             if (!requestFlaskService.updateMonitorArea(IP, area)
                     && !requestFlaskService.updateMonitorAbility(IP, ability)) {
                 return false;
@@ -145,13 +157,14 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
                     .set(Monitor::getName, updateMonitorParam.getName())
                     .set(Monitor::getArea, updateMonitorParam.getArea())
                     .set(Monitor::getLeader, updateMonitorParam.getLeader())
-                    .set(Monitor::getLatitude, updateMonitorParam.getLatitude())
-                    .set(Monitor::getLongitude, updateMonitorParam.getLongitude())
                     .set(Monitor::getFall, updateMonitorParam.getFall())
                     .set(Monitor::getFlame, updateMonitorParam.getFlame())
                     .set(Monitor::getSmoke, updateMonitorParam.getSmoke())
                     .set(Monitor::getPunch, updateMonitorParam.getPunch())
-                    .set(Monitor::getWave, updateMonitorParam.getWave())
+                    .set(Monitor::getRubbish, updateMonitorParam.getRubbish())
+                    .set(Monitor::getIce, updateMonitorParam.getIce())
+                    .set(Monitor::getEbike, updateMonitorParam.getEbike())
+                    .set(Monitor::getVehicle, updateMonitorParam.getVehicle())
                     .set(Monitor::getDangerArea, dangerArea)
                     .set(Monitor::getLeftX, updateMonitorParam.getLeftX())
                     .set(Monitor::getLeftY, updateMonitorParam.getLeftY())

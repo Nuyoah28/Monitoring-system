@@ -14,8 +14,6 @@ public class CreateMonitorParam
     private String area;
     private String leader;
     private String ip;
-    private Double longitude;
-    private Double latitude;
     private Integer leftX;
     private Integer leftY;
     private Integer rightX;

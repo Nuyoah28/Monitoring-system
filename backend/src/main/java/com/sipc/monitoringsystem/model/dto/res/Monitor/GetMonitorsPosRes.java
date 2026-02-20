@@ -11,13 +11,11 @@ import java.util.List;
  */
 @Data
 public class GetMonitorsPosRes {
-
+    
     @Data
     public static class MonitorPos{
         public MonitorPos(Monitor monitor){
             this.id = monitor.getId();
-            this.latitude = monitor.getLatitude();
-            this.longitude = monitor.getLongitude();
             this.name = monitor.getName();
             this.leader = monitor.getLeader();
             this.alarmCnt = monitor.getAlarmCnt();
@@ -29,8 +27,6 @@ public class GetMonitorsPosRes {
         private String area;
         private String leader;
         private Integer alarmCnt;
-        private Double latitude;
-        private Double longitude;
         private Boolean running;
     }
 

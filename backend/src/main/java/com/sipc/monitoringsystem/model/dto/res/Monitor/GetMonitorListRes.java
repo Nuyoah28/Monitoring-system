@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * @author CZCZCZ
- * &#064;date 2023-10-01 21:02
+ *         &#064;date 2023-10-01 21:02
  */
 
 @Data
@@ -34,8 +34,20 @@ public class GetMonitorListRes {
     @Data
     public static class MonitorAbility {
         public MonitorAbility(Integer caseType, Boolean checked) {
-            this.name = caseType == 2 ? "挥手"
-                    : caseType == 3 ? "摔倒" : caseType == 4 ? "明火" : caseType == 5 ? "吸烟" : "打拳";
+            this.name = caseType == 1 ? "进入危险区域"
+                    : caseType == 2 ? "烟雾"
+                            : caseType == 3 ? "区域停留"
+                                    : caseType == 4 ? "摔倒"
+                                            : caseType == 5 ? "明火"
+                                                    : caseType == 6 ? "吸烟"
+                                                            : caseType == 7 ? "打架"
+                                                                    : caseType == 8 ? "垃圾乱放"
+                                                                            : caseType == 9 ? "冰面"
+                                                                                    : caseType == 10 ? "电动车进楼"
+                                                                                            : caseType == 11 ? "载具占用车道"
+                                                                                                    : caseType == 12
+                                                                                                            ? "挥手呼救"
+                                                                                                            : "未知功能";
             this.value = caseType;
             this.checked = checked;
         }
@@ -61,7 +73,6 @@ public class GetMonitorListRes {
         }
         this.ability = new ArrayList<>();
         // this.ability.add(new MonitorAbility(1,monitor.getDangerArea()));
-        this.ability.add(new MonitorAbility(2, monitor.getWave()));
         this.ability.add(new MonitorAbility(3, monitor.getFall()));
         this.ability.add(new MonitorAbility(4, monitor.getFlame()));
         this.ability.add(new MonitorAbility(5, monitor.getSmoke()));

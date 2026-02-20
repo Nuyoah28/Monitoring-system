@@ -34,16 +34,47 @@
             <div class="t2">
               <div class="t21">
                 <h4>摄像头编号：{{ item.number }}</h4>
-                <h4>监控区域：{{ item.dapartment }}</h4>
                 <h4>区域负责人：{{ item.leader }}</h4>
               </div>
               <div class="t22">
-                <el-button type="primary" icon="el-icon-edit" class="t22btn">编辑</el-button>
+                <el-button type="primary" icon="el-icon-edit" @click.stop="openEditForm(item, index)" class="t22btn">编辑</el-button>
               </div>
             </div>
           </div>
         </div>
       </el-drawer>
+      
+      <!-- 编辑监控信息的对话框 -->
+      <el-dialog
+        v-model="editDialogVisible"
+        title="编辑监控信息"
+        width="500px"
+        :before-close="closeEditForm">
+        <el-form :model="currentMonitor" :rules="formRules" ref="editFormRef" label-width="100px">
+          <el-form-item label="监控名称" prop="name">
+            <el-input v-model="currentMonitor.name" placeholder="请输入监控名称"></el-input>
+          </el-form-item>
+          <el-form-item label="摄像头编号" prop="number">
+            <el-input v-model="currentMonitor.number" placeholder="请输入摄像头编号"></el-input>
+          </el-form-item>
+          <el-form-item label="区域负责人" prop="leader">
+            <el-input v-model="currentMonitor.leader" placeholder="请输入区域负责人"></el-input>
+          </el-form-item>
+          <el-form-item label="运行状态" prop="running">
+            <el-switch
+              v-model="currentMonitor.running"
+              active-text="运行中"
+              inactive-text="已停用">
+            </el-switch>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="closeEditForm">取消</el-button>
+            <el-button type="primary" @click="submitEditForm">确定</el-button>
+          </span>
+        </template>
+      </el-dialog>
     </div>
     <div class="panel-footer"></div>
   </div>
@@ -66,9 +97,9 @@ import { baseUrl } from '@/config/config';
 
 // 定义监控项接口
 interface MonitorItem {
+  id?: number; // 监控项ID，用于API调用
   name: string;
   number: string;
-  dapartment: string;
   leader: string;
   running: boolean;
   video: string | null;
@@ -77,40 +108,34 @@ interface MonitorItem {
 const flvPlayer = ref<any>(null); // 更改为 flvPlayer
 const drawer = ref<boolean>(false);
 const direction = ref<string>('rtl');
-const monitorLists = ref<MonitorItem[]>([//示例数据，会被后端传来的数据覆盖
-  {
-    name: '1号摄像头',
-    number: '001',
-    dapartment: '2号楼',
-    leader: '小警',
-    running: true,
-    video: 'http://your-flv-url1.flv',
-  },
-  {
-    name: '2号摄像头',
-    number: '002',
-    dapartment: '3号楼',
-    leader: '小明',
-    running: true,
-    video: 'http://your-flv-url2.flv',
-  },
-  {
-    name: '3号摄像头',
-    number: '003',
-    dapartment: '大厅',
-    leader: '小红',
-    running: true,
-    video: 'http://your-flv-url3.flv',
-  },
-  {
-    name: '4号摄像头',
-    number: '004',
-    dapartment: '28号楼',
-    leader: '小白',
-    running: false,
-    video: null,
-  },
-]);
+const editDialogVisible = ref<boolean>(false);
+const currentMonitor = ref<MonitorItem>({
+  name: '',
+  number: '',
+  leader: '',
+  running: true,
+  video: null,
+});
+const currentMonitorIndex = ref<number>(-1);
+const editFormRef = ref();
+
+const monitorLists = ref<MonitorItem[]>([]);
+
+// 表单验证规则
+const formRules = {
+  name: [
+    { required: true, message: '请输入监控名称', trigger: 'blur' },
+    { min: 1, max: 50, message: '长度在 1 到 50 个字符', trigger: 'blur' }
+  ],
+  number: [
+    { required: true, message: '请输入摄像头编号', trigger: 'blur' },
+    { min: 1, max: 20, message: '长度在 1 到 20 个字符', trigger: 'blur' }
+  ],
+  leader: [
+    { required: true, message: '请输入区域负责人', trigger: 'blur' },
+    { min: 1, max: 20, message: '长度在 1 到 20 个字符', trigger: 'blur' }
+  ]
+};
 
 const fontStyle = reactive<{color: string}[]>([
   { color: '#06BFA1' },
@@ -229,6 +254,98 @@ const checkmonitor = (index: number): void => {
   playFlvVideo(selectedVideoUrl);
   // 关闭 el-drawer
   drawer.value = false;
+};
+
+// 打开编辑表单
+const openEditForm = (item: any, index: number): void => {
+  // 复制当前监控项到临时对象，排除不需要编辑的字段
+  currentMonitor.value = {
+    name: item.name,
+    number: item.number,
+    leader: item.leader,
+    running: item.running,
+    video: item.video,
+    id: item.id
+  };
+  currentMonitorIndex.value = index;
+  editDialogVisible.value = true;
+};
+
+// 关闭编辑表单
+const closeEditForm = (): void => {
+  editDialogVisible.value = false;
+  // 重置表单验证
+  if (editFormRef.value) {
+    editFormRef.value.clearValidate();
+  }
+};
+
+// 提交编辑表单
+const submitEditForm = async () => {
+  if (editFormRef.value) {
+    // 验证表单
+    await editFormRef.value.validate(async (valid: boolean) => {
+      if (valid) {
+        try {
+          // 调用后端API更新监控信息
+          const userStore = useUserStore();
+          const token = userStore.token;
+          
+          // 准备更新数据，保留原始的不可编辑字段值
+          const originalItem = monitorLists.value[currentMonitorIndex.value];
+          const updateData = {
+            name: currentMonitor.value.name,
+            leader: currentMonitor.value.leader,
+            running: currentMonitor.value.running,
+          };
+          console.log('updateData',updateData);
+          // 尝试使用后端API更新监控信息
+          let response = await axios.post('/api/v1/monitor/update', updateData, {
+            headers: {
+              'Authorization': token,
+              'Content-Type': 'application/json'
+            }
+          });
+        
+          if (response.data.code === '00000') {
+            // 更新本地监控列表中的对应项，保留原始的不可编辑字段
+            monitorLists.value[currentMonitorIndex.value] = {
+              ...currentMonitor.value,
+              video: originalItem.video
+            };
+            
+            // 显示成功消息
+            ElMessage({
+              message: '监控信息更新成功',
+              type: 'success',
+            });
+            
+            // 关闭对话框
+            closeEditForm();
+          } else if (response.data.code === 'D0400') {
+            ElMessage({
+              message: 'token过期，请重新登录',
+              type: 'warning',
+            });   
+            router.push('/login');
+          } else {
+            ElMessage({
+              message: response.data.message || '更新失败',
+              type: 'error',
+            });
+          }
+        } catch (error: any) {
+          console.error('更新监控信息失败:', error);
+          ElMessage({
+            message: '更新监控信息失败，请稍后重试',
+            type: 'error',
+          });
+        }
+      } else {
+        console.log('表单验证失败');
+      }
+    });
+  }
 };
 
 const playFlvVideo = (videoUrl: string | null): void => {

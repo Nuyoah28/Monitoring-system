@@ -26,6 +26,8 @@ def alarm():
             "msg": "Unauthorized"
         })
     data = request.get_json()
+    # TODO
+
     print(data)
     return jsonify({
         "code": "00000",
@@ -63,7 +65,7 @@ def modifyMonitorType():
     }
     return jsonify(res)
 
-
+#
 @monitor.route('/type', methods=['GET'])
 def getMonitorType():
     if request.headers.get('Authorization') != 'sipc115':

@@ -14,7 +14,6 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-CREATE DATABASE SweatPear;
 USE SweatPear;
 
 --
@@ -97,15 +96,17 @@ CREATE TABLE `monitor` (
   `leader` varchar(30) DEFAULT NULL COMMENT '负责人',
   `alarm_cnt` int DEFAULT 0 COMMENT '报警次数',
   `stream_link` varchar(255) DEFAULT NULL COMMENT '视频流链接',
-  `latitude` double DEFAULT NULL COMMENT '纬度',
-  `longitude` double DEFAULT NULL COMMENT '经度',
+  `running` tinyint(1) DEFAULT 0 COMMENT '是否运行中',
   `danger_area` tinyint(1) DEFAULT 0 COMMENT '是否危险区域',
   `fall` tinyint(1) DEFAULT 0 COMMENT '是否检测摔倒',
   `flame` tinyint(1) DEFAULT 0 COMMENT '是否检测明火',
   `smoke` tinyint(1) DEFAULT 0 COMMENT '是否检测烟雾',
-  `wave` tinyint(1) DEFAULT 0 COMMENT '是否检测波浪',
   `punch` tinyint(1) DEFAULT 0 COMMENT '是否检测击打',
-  `running` tinyint(1) DEFAULT 0 COMMENT '是否检测奔跑',
+  `rubbish` tinyint(1) DEFAULT 0 COMMENT '是否检测垃圾',
+  `ice` tinyint(1) DEFAULT 0 COMMENT '是否检测冰面',
+  `ebike` tinyint(1) DEFAULT 0 COMMENT '是否检测电动车',
+  `vehicle` tinyint(1) DEFAULT 0 COMMENT '是否检测载具占用车道',
+  `wave` tinyint(1) DEFAULT 0 COMMENT '挥手呼救',
   `left_x` int DEFAULT NULL COMMENT '左边界X坐标',
   `left_y` int DEFAULT NULL COMMENT '左边界Y坐标',
   `right_x` int DEFAULT NULL COMMENT '右边界X坐标',
@@ -173,16 +174,33 @@ INSERT INTO case_type_info (id, case_type_name) VALUES
 (3, '区域停留'),
 (4, '摔倒'),
 (5, '明火'),
-(6, '吸烟');
-
+(6, '吸烟'),
+(7, '打架'),
+(8, '垃圾乱放'),
+(9, '冰面'),
+(10, '电动车进楼'),
+(11, '载具占用车道'),
+(12, '挥手呼救');
+/*
+  `danger_area` tinyint(1) DEFAULT 0 COMMENT '是否危险区域',
+  `fall` tinyint(1) DEFAULT 0 COMMENT '是否检测摔倒',
+  `flame` tinyint(1) DEFAULT 0 COMMENT '是否检测明火',
+  `smoke` tinyint(1) DEFAULT 0 COMMENT '是否检测烟雾',
+  `punch` tinyint(1) DEFAULT 0 COMMENT '是否检测击打',
+  `rubbish` tinyint(1) DEFAULT 0 COMMENT '是否检测垃圾',
+  `ice` tinyint(1) DEFAULT 0 COMMENT '是否检测冰面',
+  `ebike` tinyint(1) DEFAULT 0 COMMENT '是否检测电动车',
+  `vehicle` tinyint(1) DEFAULT 0 COMMENT '是否检测载具占用车道',
+*/
 -- 监控设备表：删除现有数据并重新插入
 DELETE FROM monitor;
-INSERT INTO monitor (id, name, area, leader, alarm_cnt, stream_link, latitude, longitude, danger_area, fall, flame, smoke, wave, punch, running, left_x, left_y, right_x, right_y) VALUES 
-(1, '1号病房摄像头', '1号病房', 'aaa', 5, 'rtmp://example.com/stream1', 39.9042, 116.4074, 1, 1, 1, 1, 0, 0, 0, 100, 100, 500, 500),
-(2, '医院大厅摄像头', '医院大厅', 'bbb', 3, 'rtmp://example.com/stream2', 39.9052, 116.4084, 0, 1, 0, 1, 0, 0, 1, 150, 150, 550, 550),
-(3, '海底捞摄像头', '海底捞', 'aaa', 7, 'rtmp://example.com/stream3', 39.9062, 116.4094, 1, 1, 1, 0, 0, 0, 0, 200, 200, 600, 600),
-(4, '正阳春摄像头', '正阳春', 'bbb', 2, 'rtmp://example.com/stream4', 39.9072, 116.4104, 0, 0, 1, 1, 0, 0, 1, 250, 250, 650, 650),
-(5, '115摄像头', '115', 'bbb', 8, 'rtmp://example.com/stream5', 39.9082, 116.4114, 1, 1, 0, 0, 0, 1, 0, 300, 300, 700, 700);
+INSERT INTO monitor (id, name, area, leader, alarm_cnt, stream_link, danger_area, running, fall, flame, smoke, punch, rubbish, ice, ebike, vehicle, wave, left_x, left_y, right_x, right_y) VALUES 
+(1, '小区东门街道摄像头', '小区东门街道', 'aaa', 3, 'rtmp://example.com/street1', 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 100, 100, 500, 500),
+(2, '小区西门街道摄像头', '小区西门街道', 'bbb', 2, 'rtmp://example.com/street2', 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 150, 150, 550, 550),
+(3, '3号楼1单元门口摄像头', '3号楼1单元门口', 'aaa', 1, 'rtmp://example.com/entrance1', 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 200, 200, 600, 600),
+(4, '5号楼2单元门口摄像头', '5号楼2单元门口', 'aaa', 4, 'rtmp://example.com/entrance2', 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 250, 250, 650, 650),
+(5, '2号楼电梯内摄像头', '2号楼电梯内', 'aaa', 6, 'rtmp://example.com/elevator1', 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 300, 300, 700, 700),
+(6, '4号楼楼道摄像头', '4号楼楼道', 'bbb', 2, 'rtmp://example.com/hallway1', 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 350, 350, 750, 750);
 
 -- 告警信息表：删除现有数据并重新插入（关联到monitor和case_type）
 DELETE FROM alarm_info;
