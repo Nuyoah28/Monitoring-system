@@ -1,22 +1,25 @@
 import threading
 import traceback
 import time
-# todo: import yolo
+import os
 from Yolov8 import Yolov8_Pose as yolo
-#import sys
-#sys.path.append(r"/Yolov8")
-#import Yolov8_Pose as yolo
 import cv2
 import subprocess
 
 from Yolov8.Yolov8_Pose import LoadPoseEngine
-#from Yolov8_Pose import LoadPoseEngine
-from Yolov8.main import LoadEngineModel
+# 将原来固定类别的 LoadEngineModel 替换为 Mamba-YOLO 开放词汇检测器
+# from Yolov8.main import LoadEngineModel  # [已废弃] 原 TensorRT 烟火检测器
+from Yolov8.mamba_yolo import MambaYOLODetector
 from service import AlarmService
-#import AlarmService
 from common import monitor as monitorCommon
-#import monitor as monitorCommon
 import copy
+
+# -----------------------------------------------------------------------
+# Mamba-YOLO 自定义检测目标（在"火"和"烟"之外动态扩展）
+# 物业可以在这里追加任意目标，无需重新训练模型
+# 例如: ["bicycle in corridor", "person without helmet", "garbage on ground"]
+# -----------------------------------------------------------------------
+CUSTOM_DETECTION_PROMPTS = []  # 默认为空，只检测内置的火和烟
 
 
 def stream_video():
@@ -56,7 +59,21 @@ def stream_video():
     counter = 0  # used for count subsequent frames
     # 模型加载
     infer = LoadPoseEngine('algo/yolov8n-pose.engine')
-    infer1 = LoadEngineModel('algo/detcet3.engine')
+    # 用 Mamba-YOLO-World 开放词汇检测器替换原固定类别的 TensorRT 烟火检测器
+    # -------------------------------------------------------------------
+    # config_path:      Mamba-YOLO-World 的 mmyolo 配置文件
+    # checkpoint_path:  从 HuggingFace 下载的 .pth 模型权重
+    #                   https://huggingface.co/Xuan-World/Mamba-YOLO-World
+    # -------------------------------------------------------------------
+    MAMBA_YOLO_WORLD_ROOT = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '..', 'Mamba-YOLO-World')
+    )
+    infer1 = MambaYOLODetector(
+        config_path=os.path.join(MAMBA_YOLO_WORLD_ROOT, 'configs', 'mamba2_yolo_world_s.py'),
+        checkpoint_path='algo/mamba2_yolo_world_s.pth',   # 从 HuggingFace 下载后放这里
+        confidence=0.3,
+        extra_prompts=CUSTOM_DETECTION_PROMPTS
+    )
     print('模型加载成功！')
     
     #设置时间

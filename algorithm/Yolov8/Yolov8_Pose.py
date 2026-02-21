@@ -240,17 +240,17 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
         if indices1 is not None and indices2 is not None and indices3 is not None:
             common1 = np.intersect1d(indices1, np.intersect1d(indices2, indices3))
         # print("跌倒决策:", common1)
-        if len(common1) > 0 and TYPE_LIST[2]:
-            list2 = True
+        if len(common1) > 0 and TYPE_LIST[3]:
+            list3 = True
         else:
-            list2 = False
+            list3 = False
 
         # ---------------------------------------------------------#
         #   挥拳检测
         # ---------------------------------------------------------#
 
         # 是否检测挥拳
-        if TYPE_LIST[3]:
+        if TYPE_LIST[6]:
             # 计算关节向量
             e_s = left_elbow - left_shoulder
             e_h = left_elbow - left_hand
@@ -335,17 +335,17 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
         if indices4 is not None and indices5 is not None:
             union1 = np.union1d(indices4, indices5)
 
-        if len(union1) > 0 and TYPE_LIST[3]:
-            list3 = True
+        if len(union1) > 0 and TYPE_LIST[6]:
+            list6 = True
         else:
-            list3 = False
+            list6 = False
 
         # ---------------------------------------------------------#
         #   挥手检测
         # ---------------------------------------------------------#
 
         # 是否检测挥手
-        if TYPE_LIST[4]:
+        if TYPE_LIST[11]:
             # now - pre
             if left_hand.shape[0] == left_hand_pre.shape[0]:
                 left_hand_pos_x = left_hand[:, 0] - left_hand_pre[:, 0]
@@ -369,10 +369,10 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
         # print("挥手决策", indices_hand)
         if indices_hand is None:
             indices_hand = []
-        if len(indices_hand) > 0 and TYPE_LIST[4]:
-            list4 = True
+        if len(indices_hand) > 0 and TYPE_LIST[11]:
+            list11 = True
         else:
-            list4 = False
+            list11 = False
 
         # s
         s = time.time()
@@ -396,7 +396,7 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
         # 将所有关键点的权重相加, 除以权重总和, 得到中心点的坐标。
         # 权重
         # 是否检测进入禁区
-        if TYPE_LIST[5]:
+        if TYPE_LIST[0]:
             M1 = 0.3
             M2 = 0.7
             center_x_up = (points[:, 5 * 3] + points[:, 6 * 3]) / 2
@@ -415,19 +415,19 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
                         center_y < bound_y_down))[0]
         if indices_danger is None:
             indices_danger = []
-        if len(indices_danger) > 0 and TYPE_LIST[5]:
-            list5 = True
+        if len(indices_danger) > 0 and TYPE_LIST[0]:
+            list0 = True
         else:
-            list5 = False
+            list0 = False
         try:
-            if len(common1) > 0 and TYPE_LIST[2]:
+            if len(common1) > 0 and TYPE_LIST[3]:
                 if len(common1) <= bboxes.shape[0]:
                     for i in range(common1.shape[0]):
                         index = common1[i]
                         x = int(bboxes[index, 0])
                         y = int(bboxes[index, 1])
                         cv2.putText(np_img, "fall", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
-            if len(union1) > 0 and TYPE_LIST[3]:
+            if len(union1) > 0 and TYPE_LIST[6]:
 
                 if len(union1) <= bboxes.shape[0]:
                     for i in range(union1.shape[0]):
@@ -435,14 +435,14 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
                         x = int(bboxes[index, 0])
                         y = int(bboxes[index, 1])
                         cv2.putText(np_img, "punch", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
-            if len(indices_hand) > 0 and TYPE_LIST[4]:
+            if len(indices_hand) > 0 and TYPE_LIST[11]:
                 if len(indices_hand) <= bboxes.shape[0]:
                     for i in range(indices_hand.shape[0]):
                         index = indices_hand[i]
                         x = int(bboxes[index, 0])
                         y = int(bboxes[index, 1])
                         cv2.putText(np_img, "wave", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
-            if len(indices_danger) > 0 and TYPE_LIST[5]:
+            if len(indices_danger) > 0 and TYPE_LIST[0]:
                 if len(indices_danger) <= bboxes.shape[0]:
                     for i in range(indices_danger.shape[0]):
                         index = indices_danger[i]
@@ -453,29 +453,34 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
             pass
 
         # 如果不检测目标,则不进行模型运算
-        if TYPE_LIST[0] or TYPE_LIST[1]:
+        # TYPE_LIST[4]=明火(caseType=5), TYPE_LIST[1]=烟雾(caseType=2)
+        if TYPE_LIST[4] or TYPE_LIST[1]:
             boxes1, scores1, idxs1 = infer1(np_img)
-            boxes1, scores1, idxs1 = boxes1.cpu().numpy(), scores1.cpu().numpy(), idxs1.cpu().numpy()
-            fire_indices = np.where(idxs1 == 0)[0]
+            # MambaYOLODetector 直接返回 numpy 数组，无需 .cpu().numpy() 转换
+            # 使用 np.asarray() 做安全转换，兼容可能仍为 Tensor 的历史调用路径
+            boxes1  = np.asarray(boxes1,  dtype=np.float32)
+            scores1 = np.asarray(scores1, dtype=np.float32)
+            idxs1   = np.asarray(idxs1,   dtype=np.int32)
+            fire_indices  = np.where(idxs1 == 0)[0]
             smoke_indices = np.where(idxs1 == 1)[0]
         if fire_indices is None:
             fire_indices = []
         if smoke_indices is None:
             smoke_indices = []
-        if len(fire_indices) > 0 and TYPE_LIST[0]:
-            list0 = True
+        if len(fire_indices) > 0 and TYPE_LIST[4]:
+            list4 = True
         else:
-            list0 = False
+            list4 = False
 
         if len(smoke_indices) > 0 and TYPE_LIST[1]:
             list1 = True
         else:
             list1 = False
         # 选择了才显示
-        # 火灾
-        if TYPE_LIST[0]:
+        # 明火 (caseType=5, TYPE_LIST[4])
+        if TYPE_LIST[4]:
             draw_on_src(np_img, boxes1[fire_indices], idxs1[fire_indices])
-        # 抽烟
+        # 烟雾 (caseType=2, TYPE_LIST[1])
         if TYPE_LIST[1]:
             draw_on_src(np_img, boxes1[smoke_indices], idxs1[smoke_indices])
 
@@ -483,13 +488,22 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
         np_img = cv2.resize(np_img, (640, 480))
         # if TYPE_LIST[0]:
         #     np_img = np_img[0:640, 0:640]
-        RES_LIST = []
-        RES_LIST.append(list0)
-        RES_LIST.append(list1)
-        RES_LIST.append(list2)
-        RES_LIST.append(list3)
-        RES_LIST.append(list4)
-        RES_LIST.append(list5)
+        # 构建 12 元素的 RES_LIST，顺序严格对应 case_type_info 表 (caseType 1~12)
+        # [危险区域, 烟雾, 区域停留, 摔倒, 明火, 吸烟, 打架, 垃圾乱放, 冰面, 电动车, 载具, 挥手]
+        RES_LIST = [
+            list0,   # [0] caseType=1  进入危险区域
+            list1,   # [1] caseType=2  烟雾
+            False,   # [2] caseType=3  区域停留 (暂未实现)
+            list3,   # [3] caseType=4  摔倒
+            list4,   # [4] caseType=5  明火
+            False,   # [5] caseType=6  吸烟 (暂未独立实现，与烟雾共用)
+            list6,   # [6] caseType=7  打架
+            False,   # [7] caseType=8  垃圾乱放 (Mamba-YOLO 扩展)
+            False,   # [8] caseType=9  冰面 (Mamba-YOLO 扩展)
+            False,   # [9] caseType=10 电动车进楼 (Mamba-YOLO 扩展)
+            False,   # [10] caseType=11 载具占用车道 (Mamba-YOLO 扩展)
+            list11,  # [11] caseType=12 挥手呼救
+        ]
         monitorCommon.preList = avg_hip_y_pre, v_y, indices1, left_angle_pre, right_angle_pre, right_hand_pre, s, left_hand_pre, left_angle_vari, right_angle_vari, cond1, cond2, cond3, cond7, cond4, cond5, cond6, cond8, left_hand_pos_x, right_hand_pos_x, cond_right_hand, cond_left_hand, cond_left_hand_y, cond_right_hand_y, indices2, indices3, union1, indices_hand, indices_danger, fire_indices, smoke_indices, indices4, indices5 
         return np_img, RES_LIST
     finally:

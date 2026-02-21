@@ -4,12 +4,21 @@ import torch
 from torchvision import transforms as T
 
 
-# event_en = ['people', 'smoke', 'fire', 'road_water', 'wall_water', 'stop_too_long', 'fall_down', 'waving', 'smoking',
-#             'xxx']
-event_en = ["fire", "smoke", "no-smoke"]
+# 类别名称列表（与数据库 case_type_info 表 1:1 对应）
+# MambaYOLODetector 初始化时会动态覆盖 fire/smoke 相关的项
+event_en = [
+    "danger_zone",  # caseType=1  -> 但 Mamba-YOLO class_id=0 = fire
+    "smoke",        # caseType=2  -> Mamba-YOLO class_id=1 = smoke
+]
 
-event_textSize = [(103, 22), (103, 22), (53, 22), (174, 22), (161, 22), (434, 22), (146, 22), (105, 22), (131, 22),
-                  (53, 22)]
+
+def update_event_names(categories: list):
+    """
+    由 MambaYOLODetector 调用，动态同步检测类别名称。
+    保证画框时显示正确的类别文字，而不是 IndexError。
+    """
+    global event_en
+    event_en = list(categories)
 
 
 def draw_on_src(img_src, boxes, class_ids):
@@ -18,20 +27,17 @@ def draw_on_src(img_src, boxes, class_ids):
     for i in range(len(class_ids)):
         class_id = int(class_ids[i])
         box = boxes[i]
-        # 根据输入来进行调整
-        # cv.rectangle(img_src, (box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (0, 0, 255), 2)
         cv.rectangle(img_src, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 2)
-        # 绘制类别在图像上
-        text = event_en[class_id]
+        # 安全取类别名：超出范围时显示 class_N 而非崩溃
+        if class_id < len(event_en):
+            text = event_en[class_id]
+        else:
+            text = f"class_{class_id}"
         font = cv.FONT_HERSHEY_SIMPLEX
         fontScale = 1
         thickness = 2
-        # 获取文本的大小
-        textSize = event_textSize[class_id]
-        # 计算文本的起始点
         textX = box[0]
-        textY = textSize[1] + box[1]
-        # 将文本放置在图像中
+        textY = 22 + box[1]
         cv.putText(img_src, text, (textX, textY), font, fontScale, (0, 0, 255), thickness)
 
 def to_even(number):
