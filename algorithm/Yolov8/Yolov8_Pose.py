@@ -453,8 +453,12 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
             pass
 
         # 如果不检测目标,则不进行模型运算
-        # TYPE_LIST[4]=明火(caseType=5), TYPE_LIST[1]=烟雾(caseType=2)
-        if TYPE_LIST[4] or TYPE_LIST[1]:
+        # TYPE_LIST[4]=明火, [1]=烟雾, [7]=垃圾, [8]=冰面, [9]=电动车, [10]=载具
+        garbage_indices = None
+        ice_indices = None
+        ebike_indices = None
+        vehicle_indices = None
+        if TYPE_LIST[4] or TYPE_LIST[1] or TYPE_LIST[7] or TYPE_LIST[8] or TYPE_LIST[9] or TYPE_LIST[10]:
             boxes1, scores1, idxs1 = infer1(np_img)
             # MambaYOLODetector 直接返回 numpy 数组，无需 .cpu().numpy() 转换
             # 使用 np.asarray() 做安全转换，兼容可能仍为 Tensor 的历史调用路径
@@ -463,10 +467,23 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
             idxs1   = np.asarray(idxs1,   dtype=np.int32)
             fire_indices  = np.where(idxs1 == 0)[0]
             smoke_indices = np.where(idxs1 == 1)[0]
+            # 扩展检测: Mamba-YOLO extra_prompts (class_id 2~5)
+            garbage_indices = np.where(idxs1 == 2)[0]  # 垃圾乱放
+            ice_indices     = np.where(idxs1 == 3)[0]  # 冰面
+            ebike_indices   = np.where(idxs1 == 4)[0]  # 电动车进楼
+            vehicle_indices = np.where(idxs1 == 5)[0]  # 载具占用车道
         if fire_indices is None:
             fire_indices = []
         if smoke_indices is None:
             smoke_indices = []
+        if garbage_indices is None:
+            garbage_indices = []
+        if ice_indices is None:
+            ice_indices = []
+        if ebike_indices is None:
+            ebike_indices = []
+        if vehicle_indices is None:
+            vehicle_indices = []
         if len(fire_indices) > 0 and TYPE_LIST[4]:
             list4 = True
         else:
@@ -483,6 +500,18 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
         # 烟雾 (caseType=2, TYPE_LIST[1])
         if TYPE_LIST[1]:
             draw_on_src(np_img, boxes1[smoke_indices], idxs1[smoke_indices])
+        # 垃圾乱放 (caseType=8, TYPE_LIST[7])
+        if TYPE_LIST[7] and len(garbage_indices) > 0:
+            draw_on_src(np_img, boxes1[garbage_indices], idxs1[garbage_indices])
+        # 冰面 (caseType=9, TYPE_LIST[8])
+        if TYPE_LIST[8] and len(ice_indices) > 0:
+            draw_on_src(np_img, boxes1[ice_indices], idxs1[ice_indices])
+        # 电动车进楼 (caseType=10, TYPE_LIST[9])
+        if TYPE_LIST[9] and len(ebike_indices) > 0:
+            draw_on_src(np_img, boxes1[ebike_indices], idxs1[ebike_indices])
+        # 载具占用车道 (caseType=11, TYPE_LIST[10])
+        if TYPE_LIST[10] and len(vehicle_indices) > 0:
+            draw_on_src(np_img, boxes1[vehicle_indices], idxs1[vehicle_indices])
 
         # 重新定义大小
         np_img = cv2.resize(np_img, (640, 480))
@@ -498,10 +527,10 @@ def main(infer,infer1, np_img, TYPE_LIST, AREA_LIST):
             list4,   # [4] caseType=5  明火
             False,   # [5] caseType=6  吸烟 (暂未独立实现，与烟雾共用)
             list6,   # [6] caseType=7  打架
-            False,   # [7] caseType=8  垃圾乱放 (Mamba-YOLO 扩展)
-            False,   # [8] caseType=9  冰面 (Mamba-YOLO 扩展)
-            False,   # [9] caseType=10 电动车进楼 (Mamba-YOLO 扩展)
-            False,   # [10] caseType=11 载具占用车道 (Mamba-YOLO 扩展)
+            bool(len(garbage_indices) > 0 and TYPE_LIST[7]),   # [7] caseType=8  垃圾乱放
+            bool(len(ice_indices) > 0 and TYPE_LIST[8]),       # [8] caseType=9  冰面
+            bool(len(ebike_indices) > 0 and TYPE_LIST[9]),     # [9] caseType=10 电动车进楼
+            bool(len(vehicle_indices) > 0 and TYPE_LIST[10]),  # [10] caseType=11 载具占用车道
             list11,  # [11] caseType=12 挥手呼救
         ]
         monitorCommon.preList = avg_hip_y_pre, v_y, indices1, left_angle_pre, right_angle_pre, right_hand_pre, s, left_hand_pre, left_angle_vari, right_angle_vari, cond1, cond2, cond3, cond7, cond4, cond5, cond6, cond8, left_hand_pos_x, right_hand_pos_x, cond_right_hand, cond_left_hand, cond_left_hand_y, cond_right_hand_y, indices2, indices3, union1, indices_hand, indices_danger, fire_indices, smoke_indices, indices4, indices5 

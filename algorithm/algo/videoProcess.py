@@ -16,10 +16,20 @@ import copy
 
 # -----------------------------------------------------------------------
 # Mamba-YOLO 自定义检测目标（在"火"和"烟"之外动态扩展）
-# 物业可以在这里追加任意目标，无需重新训练模型
-# 例如: ["bicycle in corridor", "person without helmet", "garbage on ground"]
+# 顺序决定 class_id:
+#   class_id=0  fire   (内置)
+#   class_id=1  smoke  (内置)
+#   class_id=2  garbage on ground     → caseType=8  垃圾乱放
+#   class_id=3  ice on road           → caseType=9  冰面
+#   class_id=4  electric scooter      → caseType=10 电动车进楼
+#   class_id=5  vehicle on sidewalk   → caseType=11 载具占用车道
 # -----------------------------------------------------------------------
-CUSTOM_DETECTION_PROMPTS = []  # 默认为空，只检测内置的火和烟
+CUSTOM_DETECTION_PROMPTS = [
+    "garbage on ground",
+    "ice on road",
+    "electric scooter",
+    "vehicle on sidewalk",
+]
 
 
 def stream_video():
