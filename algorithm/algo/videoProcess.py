@@ -10,6 +10,7 @@ from Yolov8.Yolov8_Pose import LoadPoseEngine
 # 将原来固定类别的 LoadEngineModel 替换为 Mamba-YOLO 开放词汇检测器
 # from Yolov8.main import LoadEngineModel  # [已废弃] 原 TensorRT 烟火检测器
 from Yolov8.mamba_yolo import MambaYOLODetector
+from Yolov8.stgcn_action import ActionRecognizer
 from service import AlarmService
 from common import monitor as monitorCommon
 import copy
@@ -84,6 +85,13 @@ def stream_video():
         confidence=0.3,
         extra_prompts=CUSTOM_DETECTION_PROMPTS
     )
+    # ST-GCN++ 动作识别器 (替换 Yolov8_Pose.py 中的手写 if-else 规则)
+    # 权重来源: PYSKL 官方 ST-GCN++ NTU-60 预训练权重
+    action_recognizer = ActionRecognizer(
+        checkpoint_path='algo/stgcnpp_ntu60.pth',
+        buffer_size=30,
+        confidence_threshold=0.5,
+    )
     print('模型加载成功！')
     
     #设置时间
@@ -111,7 +119,7 @@ def stream_video():
                 monitorCommon.cacheQueue.put_nowait(frame)
             # todo: 在这里进行图像处理
             try:
-                frame, warningList = yolo.main(infer=infer, infer1=infer1, np_img=frame, TYPE_LIST=monitorCommon.TYPE_LIST, AREA_LIST=monitorCommon.AREA_LIST)
+                frame, warningList = yolo.main(infer=infer, infer1=infer1, action_recognizer=action_recognizer, np_img=frame, TYPE_LIST=monitorCommon.TYPE_LIST, AREA_LIST=monitorCommon.AREA_LIST)
             except Exception as e:
                 print(traceback.format_tb(e))
                 continue
