@@ -1,3 +1,16 @@
+# Mamba-YOLO-World (ICASSP 2025 Oral) 需要先安装这些依赖，版本严格按照要求安装
+# 底层框架: mmyolo + mmdetection + mamba-ssm (状态空间模型)
+torch>=2.0.0
+mmengine
+mmcv>=2.0.1
+mmdet>=3.3.0
+mmyolo>=0.6.0
+mamba-ssm>=2.1.0
+supervision>=0.20.0
+open-clip-torch
+transformers>=4.20.0,<4.35.0  # 避免与mmengine的兼容性问题
+
+//其他依赖 无需按照版本安装
 blinker==1.6.2
 certifi==2023.7.22
 charset-normalizer==3.2.0
@@ -19,14 +32,5 @@ urllib3==2.0.5
 Werkzeug==2.3.7
 xmltodict==0.13.0
 zipp==3.17.0
-# Mamba-YOLO-World (ICASSP 2025 Oral) 核心依赖
-# 底层框架: mmyolo + mmdetection + mamba-ssm (状态空间模型)
-torch>=2.0.0
-mmengine
-mmcv>=2.0.1
-mmdet>=3.3.0
-mmyolo>=0.6.0
-mamba-ssm>=2.1.0
-supervision>=0.20.0
-open-clip-torch
+
 

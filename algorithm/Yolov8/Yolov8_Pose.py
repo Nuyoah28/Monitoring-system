@@ -48,12 +48,34 @@ class LoadPoseEngine:
             model = runtime.deserialize_cuda_engine(f.read())
             if model is None:
                 print("模型加载失败!!")
-            for index in range(model.num_bindings):
-                name = model.get_binding_name(index)
-                dtype = trt.nptype(model.get_binding_dtype(index))
-                shape = model.get_binding_shape(index)
-                data = torch.from_numpy(np.empty(shape, dtype=dtype)).to(device)
-                self.bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()))
+            # 适配TensorRT 10.x版本的API
+            if hasattr(model, 'num_bindings'):
+                # TensorRT 8.x 或 9.x
+                num_bindings = model.num_bindings
+                for index in range(num_bindings):
+                    name = model.get_binding_name(index)
+                    dtype = trt.nptype(model.get_binding_dtype(index))
+                    shape = model.get_binding_shape(index)
+                    data = torch.from_numpy(np.empty(shape, dtype=dtype)).to(device)
+                    self.bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()))
+            elif hasattr(model, 'nb_bindings'):
+                # TensorRT 7.x 或更早版本
+                num_bindings = model.nb_bindings
+                for index in range(num_bindings):
+                    name = model.get_binding_name(index)
+                    dtype = trt.nptype(model.get_binding_dtype(index))
+                    shape = model.get_binding_shape(index)
+                    data = torch.from_numpy(np.empty(shape, dtype=dtype)).to(device)
+                    self.bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()))
+            else:
+                # TensorRT 10.x 版本，使用新的API
+                num_io_tensors = model.num_io_tensors
+                for index in range(num_io_tensors):
+                    name = model.get_tensor_name(index)
+                    dtype = trt.nptype(model.get_tensor_dtype(name))
+                    shape = model.get_tensor_shape(name)
+                    data = torch.from_numpy(np.empty(shape, dtype=dtype)).to(device)
+                    self.bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()))
             self.bindings_addrs = OrderedDict((n, d.ptr) for n, d in self.bindings.items())
             self.context = model.create_execution_context()
 

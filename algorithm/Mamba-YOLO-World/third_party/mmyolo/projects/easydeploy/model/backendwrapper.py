@@ -54,15 +54,48 @@ class TRTWrapper(torch.nn.Module):
 
         context = model.create_execution_context()
 
-        names = [model.get_binding_name(i) for i in range(model.num_bindings)]
+        # 适配TensorRT 10.x版本的API
+        if hasattr(model, 'num_bindings'):
+            # TensorRT 8.x 或 9.x
+            num_bindings = model.num_bindings
+            names = [model.get_binding_name(i) for i in range(num_bindings)]
+        elif hasattr(model, 'nb_bindings'):
+            # TensorRT 7.x 或更早版本
+            num_bindings = model.nb_bindings
+            names = [model.get_binding_name(i) for i in range(num_bindings)]
+        else:
+            # TensorRT 10.x 版本，使用新的API
+            num_io_tensors = model.num_io_tensors
+            names = [model.get_tensor_name(i) for i in range(num_io_tensors)]
 
         num_inputs, num_outputs = 0, 0
 
-        for i in range(model.num_bindings):
-            if model.binding_is_input(i):
-                num_inputs += 1
+        for i in range(len(names)):
+            if hasattr(model, 'binding_is_input'):
+                # 旧版本TensorRT
+                if model.binding_is_input(i):
+                    num_inputs += 1
+                else:
+                    num_outputs += 1
             else:
-                num_outputs += 1
+                # TensorRT 10.x，需要使用新API判断输入输出
+                # 通过其他方式判断，比如通过名称模式或通过实际的tensor模式
+                tensor_name = names[i]
+                # 简单的启发式判断：通常输入tensor名称包含"input"，但这不是绝对的
+                # 更准确的方式需要根据具体模型来判断
+                try:
+                    # 尝试使用TensorRT 10.x的新API判断输入输出
+                    if model.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
+                        num_inputs += 1
+                    else:
+                        num_outputs += 1
+                except:
+                    # 如果无法获取tensor mode，则按默认顺序分配（通常是先输入后输出）
+                    # 这种情况下我们先假设有固定的输入输出数量
+                    if i < 1:  # 假设第一个是输入（通常对于YOLO模型来说是图像输入）
+                        num_inputs += 1
+                    else:
+                        num_outputs += 1
 
         self.is_dynamic = -1 in model.get_binding_shape(0)
 

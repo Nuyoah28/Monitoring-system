@@ -12,7 +12,9 @@ class Config:
 
 class DevConfig(Config):
     BACKEND_URL = "http://localhost:10115"
-    STREAM_URL = "rtsp://localhost:1935"
+    # 当videoProcess.py运行在Docker容器中时，需要连接到宿主机的RTMP服务器
+    # 在Docker容器中，host.docker.internal通常指向宿主机
+    STREAM_URL = "rtmp://host.docker.internal:1935"
     TOKEN = None
     pass
 

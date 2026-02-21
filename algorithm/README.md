@@ -53,14 +53,14 @@ algorithm/
 pip install -r requirements.txt
 ```
 
-核心依赖版本参考:
+核心依赖版本(不能改):
 | 包 | 版本 |
 |:---|:---|
-| torch | ≥ 2.0.0 |
-| mmcv | ≥ 2.0.1 |
-| mmdet | ≥ 3.3.0 |
-| mmyolo | ≥ 0.6.0 |
-| mamba-ssm | ≥ 2.1.0 |
+| torch | 2.0.0 |
+| mmcv | 2.0.1 |
+| mmdet | 3.3.0 |
+| mmyolo | 0.6.0 |
+| mamba-ssm | 2.1.0 |
 
 ### 2. 下载 Mamba-YOLO-World 权重
 
@@ -83,6 +83,8 @@ pip install ultralytics
 yolo export model=yolov8n-pose.pt format=engine device=0
 mv yolov8n-pose.engine algo/
 ```
+可以试试上面的做法，linux下高版本TensorRT且安装ultralytics应该会报一堆各种不兼容
+若失败，尝试使用下载官方onnx文件之后通过convert.py脚本生成engine文件，且指定使用TensorRT 10.x版本，代码用ai做了兼容，不知道低版本能不能用
 
 ### 4. 克隆 mmyolo (如未完成)
 

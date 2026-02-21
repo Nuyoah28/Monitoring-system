@@ -2,6 +2,11 @@ import threading
 import traceback
 import time
 import os
+
+# 首先应用导入补丁
+from fix_imports import apply_patches
+apply_patches()
+
 from Yolov8 import Yolov8_Pose as yolo
 import cv2
 import subprocess
@@ -34,15 +39,56 @@ CUSTOM_DETECTION_PROMPTS = [
 
 
 def stream_video():
-    cap = cv2.VideoCapture(monitorCommon.STREAM_RAW_URL)
-    # 设置摄像头分辨率
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    print("fps:", fps)
-    # 设置缓冲区大小为2
+    # 增加重试连接机制
+    max_retries = 30  # 最多重试30次
+    retry_interval = 2  # 每隔2秒重试一次
+    retry_count = 0
+    
+    cap = None
+    while retry_count < max_retries:
+        try:
+            cap = cv2.VideoCapture(monitorCommon.STREAM_RAW_URL)
+            if cap.isOpened():
+                # 设置摄像头分辨率
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # 减小缓冲区，降低延迟
+                
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                print(f"成功连接到视频流，FPS: {fps}")
+                
+                if fps > 0:  # 确认流是活动的
+                    break
+                else:
+                    print("连接到流但无法获取FPS，重试...")
+                    cap.release()
+            else:
+                print(f"无法连接到视频流: {monitorCommon.STREAM_RAW_URL}")
+                
+        except Exception as e:
+            print(f"连接视频流时出错 ({retry_count+1}/{max_retries}): {e}")
+        
+        retry_count += 1
+        print(f"等待 {retry_interval} 秒后重试... ({retry_count}/{max_retries})")
+        time.sleep(retry_interval)
+    
+    if retry_count >= max_retries:
+        print("达到最大重试次数，无法连接到视频流")
+        return
+    
+    # 确认视频流确实可读
+    ret, test_frame = cap.read()
+    if not ret:
+        print("连接到流但无法读取帧，持续重试...")
+        while not ret and retry_count < max_retries * 2:
+            time.sleep(1)
+            cap.release()
+            cap = cv2.VideoCapture(monitorCommon.STREAM_RAW_URL)
+            ret, test_frame = cap.read()
+            retry_count += 1
+        if not ret:
+            print("仍然无法读取帧，退出")
+            return
 
     # 定义视频编码器
     fourcc = cv2.VideoWriter_fourcc(*'X264')
@@ -52,8 +98,7 @@ def stream_video():
                   '-y',  # 覆盖已存在的文件
                   '-f', 'rawvideo',
                   '-pixel_format', 'bgr24',
-                  '-video_size', '640*480',
-                  #'-re',
+                  '-video_size', '640x480',  # 修正尺寸格式，使用 x 而不是 *
                   '-i', '-',  # 从标准输入读取数据
                   '-c:v', 'libx264',  # 使用x264编码器
                   '-preset', 'ultrafast',
@@ -62,11 +107,18 @@ def stream_video():
                   '-vf', 'scale=328:246',
                   '-f', 'flv',
                   '-r', '25',
-                  #'-b:v', '500k',
+                  '-fflags', '+genpts',  # 生成PTS以避免时间戳错误
                   monitorCommon.STREAM_PROCESSED_URL
                   ]
-    # 启动Ffmpeg进程
-    ffmepg_process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
+    # 启动Ffmpeg进程，增加错误处理
+    try:
+        ffmepg_process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError:
+        print("错误：找不到ffmpeg命令，请确保已安装ffmpeg并添加到系统PATH中")
+        return
+    except Exception as e:
+        print(f"启动FFmpeg进程时发生错误: {e}")
+        return
     counter = 0  # used for count subsequent frames
     # 模型加载
     infer = LoadPoseEngine('algo/yolov8n-pose.engine')
@@ -102,12 +154,39 @@ def stream_video():
     # 开始采集和推流
     while True:
         # 采集一帧图像
-        ret, frame = cap.read()
+        try:
+            ret, frame = cap.read()
+        except:
+            ret = False
+            
         while (not ret or not cap.isOpened()):
             print("读取帧失败或流未打开，正在重试...")
-            cap.release()
-            cap = cv2.VideoCapture(monitorCommon.STREAM_RAW_URL)
-            ret,frame = cap.read()
+            try:
+                cap.release()
+            except:
+                pass
+            # 使用带重试机制的方式重新连接
+            temp_retry_count = 0
+            max_temp_retries = 10
+            while temp_retry_count < max_temp_retries:
+                try:
+                    cap = cv2.VideoCapture(monitorCommon.STREAM_RAW_URL)
+                    ret, frame = cap.read()
+                    if ret and cap.isOpened():
+                        print("重新连接成功")
+                        break
+                    else:
+                        cap.release()
+                except Exception as e:
+                    print(f"重连尝试 {temp_retry_count+1} 失败: {e}")
+                
+                temp_retry_count += 1
+                time.sleep(2)
+            
+            if temp_retry_count >= max_temp_retries:
+                print("达到最大重连尝试次数，退出")
+                return  # 退出函数而不是继续循环以避免无限重试
+                
         if ret:
             print('帧读取成功，开始处理')
             if monitorCommon.cacheQueue.qsize() < monitorCommon.cacheMax:
