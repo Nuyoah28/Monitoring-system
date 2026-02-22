@@ -20,22 +20,10 @@ from service import AlarmService
 from common import monitor as monitorCommon
 import copy
 
-# -----------------------------------------------------------------------
 # Mamba-YOLO 自定义检测目标（在"火"和"烟"之外动态扩展）
-# 顺序决定 class_id:
-#   class_id=0  fire   (内置)
-#   class_id=1  smoke  (内置)
-#   class_id=2  garbage on ground     → caseType=8  垃圾乱放
-#   class_id=3  ice on road           → caseType=9  冰面
-#   class_id=4  electric scooter      → caseType=10 电动车进楼
-#   class_id=5  vehicle on sidewalk   → caseType=11 载具占用车道
+# 列表定义和更改标志位已移至 common.monitor 中，
+# 并通过 controller/monitorController.py 的 /update_prompt 接口动态修改。
 # -----------------------------------------------------------------------
-CUSTOM_DETECTION_PROMPTS = [
-    "garbage on ground",
-    "ice on road",
-    "electric scooter",
-    "vehicle on sidewalk",
-]
 
 
 def stream_video():
@@ -135,7 +123,7 @@ def stream_video():
         config_path=os.path.join(MAMBA_YOLO_WORLD_ROOT, 'configs', 'mamba2_yolo_world_s.py'),
         checkpoint_path='algo/mamba2_yolo_world_s.pth',   # 从 HuggingFace 下载后放这里
         confidence=0.3,
-        extra_prompts=CUSTOM_DETECTION_PROMPTS
+        extra_prompts=monitorCommon.CUSTOM_DETECTION_PROMPTS
     )
     # ST-GCN++ 动作识别器 (替换 Yolov8_Pose.py 中的手写 if-else 规则)
     # 权重来源: PYSKL 官方 ST-GCN++ NTU-60 预训练权重
@@ -188,7 +176,14 @@ def stream_video():
                 return  # 退出函数而不是继续循环以避免无限重试
                 
         if ret:
-            print('帧读取成功，开始处理')
+            # print('帧读取成功，开始处理')
+            
+            # 动态更新 Mamba-YOLO 检测目标 (无需重启模型)
+            if monitorCommon.PROMPTS_CHANGED:
+                print(f"🔥 检测到前端指令更新，正在注入新的 Mamba-YOLO 目标: {monitorCommon.CUSTOM_DETECTION_PROMPTS}")
+                infer1.set_custom_prompts(monitorCommon.CUSTOM_DETECTION_PROMPTS)
+                monitorCommon.PROMPTS_CHANGED = False
+                
             if monitorCommon.cacheQueue.qsize() < monitorCommon.cacheMax:
                 monitorCommon.cacheQueue.put_nowait(frame)
                 # print("put frame into queue " + str(monitorCommon.cacheQueue.qsize()))

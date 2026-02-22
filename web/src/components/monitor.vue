@@ -8,7 +8,7 @@
       <el-button @click="drawer = true" type="primary" class="btn">
         点击查看监控列表
       </el-button>
-
+      
       <el-drawer
         title="监控列表"
         v-model="drawer"
@@ -76,6 +76,82 @@
         </template>
       </el-dialog>
     </div>
+
+    <!-- 新增：Mamba-YOLO 智能助手 (悬浮球 + 展开框) -->
+    <!-- 1. 悬浮小球状态 -->
+    <div 
+      class="ai-floating-ball" 
+      v-show="flvPlayer && !isPanelExpanded"
+      :style="{ left: panelPosition.x + 'px', top: panelPosition.y + 'px' }"
+      @mousedown="startDrag"
+      @click="togglePanel"
+    >
+      <div class="ball-core">
+        <i class="el-icon-service"></i>
+      </div>
+      <div class="ball-ring"></div>
+    </div>
+
+    <!-- 2. 展开的 HUD 面板 -->
+    <div 
+      class="ai-prompt-panel hud-style" 
+      v-show="flvPlayer && isPanelExpanded"
+      :style="{ left: panelPosition.x + 'px', top: panelPosition.y + 'px' }"
+    >
+      <!-- HUD 四个角的科幻折线 -->
+      <span class="hud-angle hud-tl"></span>
+      <span class="hud-angle hud-tr"></span>
+      <span class="hud-angle hud-bl"></span>
+      <span class="hud-angle hud-br"></span>
+
+      <!-- 拖拽手柄 & 头部 -->
+      <div 
+        class="panel-header drag-handle" 
+        @mousedown="startDrag"
+      >
+        <div class="title">动态目标侦测</div>
+        <div class="hud-collapse" @click.stop="isPanelExpanded = false">收起</div>
+      </div>
+      
+      <!-- 对话/提示信息区 -->
+      <div class="panel-chat">
+        <div class="chat-msg">
+          <span class="chat-role">系统</span>
+          <span class="chat-text">欢迎使用 Mamba-YOLO 开放世界目标提取系统。请输入你想要侦测的物体（如：红色电动车，戴帽子的人），多个目标请用逗号分隔。</span>
+        </div>
+        <div class="chat-msg" v-if="activePrompts.length > 0">
+          <span class="chat-role" style="color:#52eecb;">侦测中</span>
+          <span class="chat-text">
+            <el-tag 
+              v-for="(p, index) in activePrompts" 
+              :key="index" 
+              size="mini" 
+              effect="dark" 
+              class="prompt-tag"
+            >{{ p }}</el-tag>
+          </span>
+        </div>
+      </div>
+
+      <!-- 底部输入框区 -->
+      <div class="panel-footer-input">
+        <input 
+          type="text" 
+          v-model="customPrompts" 
+          placeholder="请输入侦测目标，回车下发" 
+          class="hud-input"
+          @keyup.enter="submitCustomPrompts"
+        />
+        <button 
+          class="hud-send-btn" 
+          @click="submitCustomPrompts" 
+          :disabled="isPromptSubmitting"
+        >
+          {{ isPromptSubmitting ? '下发中' : '下发' }}
+        </button>
+      </div>
+    </div>
+
     <div class="panel-footer"></div>
   </div>
   
@@ -104,6 +180,19 @@ interface MonitorItem {
   running: boolean;
   video: string | null;
 }
+
+// === 动态提示词相关状态 ===
+const customPrompts = ref<string>(''); // 用户输入框绑定的值
+const activePrompts = ref<string[]>([]); // 当前正在生效的自定义检测词
+const isPromptSubmitting = ref<boolean>(false);
+const isPanelExpanded = ref<boolean>(false); // 控制是显示球还是面板
+
+// === 拖拽相关状态 ===
+const panelPosition = reactive({ x: typeof window !== 'undefined' ? window.innerWidth - 350 : 800, y: typeof window !== 'undefined' ? window.innerHeight - 400 : 500 });
+let isDragging = false;
+let startMousePos = { x: 0, y: 0 };
+let startPanelPos = { x: 0, y: 0 };
+let hasMoved = false; // 用于区分点击和拖拽
 
 const flvPlayer = ref<any>(null); // 更改为 flvPlayer
 const drawer = ref<boolean>(false);
@@ -356,6 +445,96 @@ const playFlvVideo = (videoUrl: string | null): void => {
   }
 };
 
+// ==========================================
+// 核心：Mamba-YOLO 动态提示词下发逻辑
+// ==========================================
+const submitCustomPrompts = async () => {
+  if (!customPrompts.value.trim()) {
+    ElMessage.warning('提示词不能为空呀，你想找什么？');
+    return;
+  }
+  
+  // 处理中文逗号和分号为英文逗号
+  const cleanPrompts = customPrompts.value
+    .replace(/，/g, ',')
+    .replace(/；/g, ',')
+    .replace(/;/g, ',')
+    .split(',')
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
+
+  if (cleanPrompts.length === 0) return;
+
+  isPromptSubmitting.value = true;
+  
+  try {
+    const userStore = useUserStore();
+    const response = await axios.post('/api/v1/monitor/update_prompt', {
+      prompts: cleanPrompts
+    }, {
+      headers: { 'Authorization': userStore.token }
+    });
+
+    if (response.data.code === '00000') {
+      ElMessage.success('🚀 AI 侦测指令已通过云端翻译并下发算法！');
+      activePrompts.value = cleanPrompts;
+      // 可选: 清空输入框 customPrompts.value = '';
+    } else {
+      ElMessage.error('指令下发失败: ' + (response.data.message || response.data.msg || '未知错误'));
+    }
+  } catch (error: any) {
+    if (error.response && error.response.data) {
+      ElMessage.error('指令下发失败: ' + (error.response.data.message || '未知异常'));
+    } else {
+      ElMessage.error('网络请求失败，算法节点未就绪或已掉线。');
+    }
+    console.error('下发提示词出错:', error);
+  } finally {
+    isPromptSubmitting.value = false;
+  }
+};
+
+// ==========================================
+// 拖拽与切换面板控制逻辑
+// ==========================================
+const togglePanel = () => {
+  if (!hasMoved) {
+    isPanelExpanded.value = !isPanelExpanded.value;
+  }
+};
+
+const startDrag = (e: MouseEvent) => {
+  isDragging = true;
+  hasMoved = false; // 重置移动标志
+  startMousePos = { x: e.clientX, y: e.clientY };
+  startPanelPos = { x: panelPosition.x, y: panelPosition.y };
+  
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', endDrag);
+  // 防止拖拽时选中文本
+  e.preventDefault();
+};
+
+const drag = (e: MouseEvent) => {
+  if (!isDragging) return;
+  const dx = e.clientX - startMousePos.x;
+  const dy = e.clientY - startMousePos.y;
+  
+  // 设置一个简单的容差值，区分轻微抖动和真实的拖拽
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+    hasMoved = true;
+  }
+  
+  panelPosition.x = startPanelPos.x + dx;
+  panelPosition.y = startPanelPos.y + dy;
+};
+
+const endDrag = () => {
+  isDragging = false;
+  document.removeEventListener('mousemove', drag);
+  document.removeEventListener('mouseup', endDrag);
+};
+
 onMounted(() => {
   getVideoData();
 });
@@ -458,5 +637,184 @@ video {
   margin: 0 auto;
   margin-top: -0.6rem;
   object-fit: cover; /* 使视频填充容器并裁剪超出部分 */
+}
+
+/* AI 智能助手面板样式 (悬浮 HUD 风格) */
+.hud-style {
+  background: rgba(14, 42, 98, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(41, 128, 255, 0.3);
+  border-radius: 4px;
+  padding: 20px;
+  width: 420px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(41, 128, 255, 0.1);
+}
+
+.ai-prompt-panel {
+  position: fixed; /* 悬浮层 */
+  color: #fff;
+  z-index: 9999;
+}
+
+/* 4个角的科技感折线 */
+.hud-angle {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border: 2px solid transparent;
+}
+.hud-tl { top: -1px; left: -1px; border-top-color: #22d3e9; border-left-color: #22d3e9; }
+.hud-tr { top: -1px; right: -1px; border-top-color: #22d3e9; border-right-color: #22d3e9; }
+.hud-bl { bottom: -1px; left: -1px; border-bottom-color: #22d3e9; border-left-color: #22d3e9; }
+.hud-br { bottom: -1px; right: -1px; border-bottom-color: #22d3e9; border-right-color: #22d3e9; }
+
+/* 拖拽手柄 & 头部 */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.title {
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+}
+.hud-collapse {
+  font-size: 0.9rem;
+  color: #c0c4cc;
+  border: 1px solid #c0c4cc;
+  border-radius: 12px;
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.hud-collapse:hover {
+  color: #fff;
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 聊天历史区域 */
+.panel-chat {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.chat-msg {
+  display: flex;
+  margin-bottom: 10px;
+}
+.chat-role {
+  color: #a0cfff;
+  white-space: nowrap;
+  margin-right: 15px;
+}
+.chat-text {
+  color: #e4e7ed;
+}
+
+/* 底部输入框区 */
+.panel-footer-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+.hud-input {
+  flex: 1;
+  border: none;
+  border-radius: 4px;
+  padding: 0 15px;
+  height: 38px;
+  background: #ffffff;
+  color: #333;
+  outline: none;
+  font-size: 0.95rem;
+}
+.hud-input::placeholder {
+  color: #999;
+}
+.hud-send-btn {
+  background: #a0cfff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0 20px;
+  height: 38px;
+  cursor: pointer;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  transition: background 0.3s;
+}
+.hud-send-btn:hover {
+  background: #79bbff;
+}
+.hud-send-btn:disabled {
+  background: #c8e1fa;
+  cursor: not-allowed;
+}
+.prompt-tag {
+  background-color: rgba(34, 211, 233, 0.2);
+  border-color: #22d3e9;
+  color: #22d3e9;
+  margin-right: 5px;
+  margin-bottom: 5px;
+}
+
+/* 悬浮小球样式 */
+.ai-floating-ball {
+  position: fixed;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  cursor: grab;
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.ai-floating-ball:active {
+  cursor: grabbing;
+}
+.ball-core {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #22d3e9, #409eff);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 15px rgba(34, 211, 233, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  color: #fff;
+  z-index: 2;
+  transition: transform 0.3s;
+}
+.ai-floating-ball:hover .ball-core {
+  transform: scale(1.05);
+}
+.ball-ring {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(34, 211, 233, 0.3);
+  animation: pulse 2s infinite ease-out;
+  z-index: 1;
+}
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.3); opacity: 0; }
 }
 </style>

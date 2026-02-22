@@ -93,20 +93,14 @@
                 return item ? item.total : 0;
             };
 
-            this.result = [
-              { name: '进入危险区域', value: getVal('进入危险区域') },
-              { name: '区域停留', value: getVal('区域停留') },
-              { name: '烟雾', value: getVal('烟雾') },
-              { name: '摔倒', value: getVal('摔倒') },
-              { name: '明火', value: getVal('明火') },
-              { name: '吸烟', value: getVal('吸烟') },
-              { name: '打架斗殴', value: getVal('打架斗殴') }
-            ].filter(item => item.value > 0); // 只显示有数据的项，或者保留全部
-            
-            const targetNames = ['进入危险区域', '烟雾', '打架斗殴', '摔倒', '明火', '吸烟'];
+            const targetNames = [
+              '进入危险区域', '烟雾', '区域停留', '摔倒', '明火', 
+              '吸烟', '打架斗殴', '垃圾乱放', '冰面', '电动车进楼', 
+              '载具占用车道', '挥手呼救'
+            ];
             this.result = targetNames.map(name => {
                 return { name: name, value: getVal(name) };
-            });
+            }).filter(item => item.value > 0);
           }
         })
       },

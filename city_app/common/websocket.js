@@ -81,27 +81,37 @@ uni.onSocketError((err) => {
     isConnected = false;
 });
 
-/**
- * 处理收到的消息
- */
 function handleMessage(data) {
     if (data.type === 'NEW_ALARM') {
         console.log('[WebSocket] 收到新报警:', data);
 
-        // 使用模态弹窗确保用户看到
-        uni.showModal({
-            title: '⚠️ 报警提醒',
-            content: data.message || '您有新的报警信息',
-            showCancel: false,
-            confirmText: '知道了',
-            success: (res) => console.log('[WebSocket] 模态框已确认', res),
-            fail: (err) => console.error('[WebSocket] 模态框调用失败', err)
-        });
+        const alarmData = data.data || {};
 
-        // 振动提醒
-        uni.vibrateLong();
+        // 区分“原生常态告警”和“AI自定义下发动态监测(caseType=13)”
+        if (alarmData.caseType === 13) {
+            // 给负责人的特快专递消息
+            uni.showModal({
+                title: '🎯 [特急] AI 目标抓拍通知',
+                content: `您关注的动态目标监控点【${alarmData.name || '摄像头区域'}】刚刚抓拍到目标，请立即核实处理！`,
+                showCancel: false,
+                confirmText: '收到',
+                success: (res) => console.log('[WebSocket] 动态AI消息已确认', res)
+            });
+            // 振动提醒更强力（连震两次）
+            uni.vibrateLong({ success: () => { setTimeout(() => uni.vibrateLong(), 500); } });
+        } else {
+            // 普通警报
+            uni.showModal({
+                title: '⚠️ 报警提醒',
+                content: data.message || '您有新的常规报警信息，请及时处理。',
+                showCancel: false,
+                confirmText: '前往处理',
+                success: (res) => console.log('[WebSocket] 常规报警确认', res)
+            });
+            uni.vibrateLong();
+        }
 
-        // 触发全局事件刷新列表
+        // 依然触发全局事件供页面刷新(页面流里已将 caseType=13 过滤，不会污染列表)
         uni.$emit('newAlarm', data);
     }
 }

@@ -226,8 +226,14 @@ export default {
       status: [["1级", "2级", "3级"]],
       statusValue: [1, 2, 3],
       statusIndex: null,
-      filters: [["进入危险区域", "挥手", "摔倒", "明火", "吸烟"]],
-      filterValue: [1, 2, 3, 4, 5],
+      filters: [
+        [
+          "进入危险区域", "烟雾", "区域停留", "摔倒", "明火", 
+          "吸烟", "打架斗殴", "垃圾乱放", "冰面", "电动车进楼", 
+          "载具占用车道", "挥手呼救"
+        ]
+      ],
+      filterValue: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       filterIndex: null,
       scrollHeight: 0,
       choosen: 0,
@@ -376,7 +382,8 @@ export default {
         }
         uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
 			console.log('data',data)
-          this.historyData.push(...data.data.alarmList);
+          const filteredList = data.data.alarmList.filter(item => item.caseType !== 13);
+          this.historyData.push(...filteredList);
           if (data.data.count < this.pageSize) {
 			  // console.log(data.data.count)
             this.hisIsAll = true;
@@ -407,7 +414,8 @@ export default {
         }
         uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
           console.log(data);
-          this.warnData.push(...data.data.alarmList);
+          const filteredList = data.data.alarmList.filter(item => item.caseType !== 13);
+          this.warnData.push(...filteredList);
           if (data.data.count < this.pageSize) {
             this.warnIsAll = true;
             this.statusList = "nomore";
@@ -439,7 +447,7 @@ export default {
       }
       uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
         // console.log(data);
-        this.warnData = data.data.alarmList;
+        this.warnData = data.data.alarmList.filter(item => item.caseType !== 13);
 		if(!this.warnData.length) this.statusList = 'nomore'
         if (data.data.count < this.pageSize) {
           this.warnIsAll = true;
@@ -464,7 +472,7 @@ export default {
         data.warningLevel = this.warningLevel;
       }
       uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
-        this.historyData = data.data.alarmList;
+        this.historyData = data.data.alarmList.filter(item => item.caseType !== 13);
 		if(!this.historyData.length) this.statusList = 'nomore'
         if (data.data.count < this.pageSize) {
           this.hisIsAll = true;

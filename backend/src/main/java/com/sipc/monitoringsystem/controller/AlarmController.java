@@ -16,6 +16,10 @@ import com.sipc.monitoringsystem.util.HttpUtils;
 import com.sipc.monitoringsystem.util.JwtUtils;
 import com.sipc.monitoringsystem.util.TokenThreadLocalUtil;
 import com.sipc.monitoringsystem.websocket.AlarmWebSocketServer;
+import com.sipc.monitoringsystem.service.UserService;
+import com.sipc.monitoringsystem.service.MonitorService;
+import com.sipc.monitoringsystem.model.po.Monitor.Monitor;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +53,12 @@ public class AlarmController {
     @Autowired
     AlarmService alarmService;
 
+    @Autowired
+    UserService userService;
+
+    @Autowired
+    MonitorService monitorService;
+
     @PostMapping("/receive")
     @ClearRedis
     @Pass
@@ -81,8 +91,22 @@ public class AlarmController {
             socketMessage.put("message", "您有一条新的报警信息，请及时处理");
             socketMessage.put("data", alarmRes); // Include detailed data
 
-            AlarmWebSocketServer.sendToAll(socketMessage);
-            log.info("WebSocket 广播报警: cameraId={}, caseType={}", cameraId, caseType);
+            // 获取推送目标（负责人及所有管理员）
+            List<String> targetUserIds = new ArrayList<>();
+            Monitor monitor = monitorService.getMonitorById(cameraId);
+            if (monitor != null && monitor.getLeader() != null) {
+                User leaderUser = userService.getOne(new QueryWrapper<User>().eq("user_name", monitor.getLeader()));
+                if (leaderUser != null) {
+                    targetUserIds.add(String.valueOf(leaderUser.getId()));
+                }
+            }
+            List<User> admins = userService.list(new QueryWrapper<User>().eq("role", 0));
+            for (User admin : admins) {
+                targetUserIds.add(String.valueOf(admin.getId()));
+            }
+
+            AlarmWebSocketServer.sendToUsers(targetUserIds, socketMessage);
+            log.info("WebSocket 定向推送报警: cameraId={}, caseType={}, targets={}", cameraId, caseType, targetUserIds);
 
             // 3. 同时发送 UniPush 手机推送通知
             // sendUniPushNotification();
@@ -172,8 +196,14 @@ public class AlarmController {
             @RequestParam(value = "time1", required = false) String time1,
             @RequestParam(value = "time2", required = false) String time2) {
 
-        // 从 Token 获取当前用户信息
-        User user = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
+        // 从 Token 获取当前用户信息基础信息 (此时只包含id和role)
+        User tokenUser = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
+
+        // 🚨根据id从数据库获取完整的用户信息，因为token里没有userName，而鉴权过滤强依赖 userName
+        User user = userService.getById(tokenUser.getId());
+        if (user == null) {
+            user = tokenUser; // fallback
+        }
 
         // 根据用户权限获取报警列表
         List<SqlGetAlarm> alarmList = alarmService.queryAlarmList(pageNum, pageSize, caseType, status, warningLevel,

@@ -1,8 +1,11 @@
 from flask import Blueprint, request, current_app as app, jsonify, send_file
 from service.AlarmService import postAlarm
 from common import monitor as monitorCommon
+from util.translator import TencentTranslator
 import io
 import cv2
+
+translator = TencentTranslator()
 
 monitor = Blueprint('monitor', __name__)
 
@@ -17,6 +20,40 @@ def test():
 def test_alarm():
     postAlarm([True, False, False, False, False, True])
     return 'ok'
+
+
+@monitor.route('/update_prompt', methods=['POST'])
+def update_prompt():
+    """
+    动态更新大模型 Mamba-YOLO-World 检测的自定义单词。
+    接收 { "prompts": ["垃圾", "电动车"] } 的 JSON
+    """
+    data = request.get_json()
+    if not data or 'prompts' not in data:
+        return jsonify({"code": "E0400", "msg": "Bad request"})
+    
+    # 也可以限制这口的访问权限
+    # if request.headers.get('Authorization') != 'sipc115': return jsonify(...)
+    
+    raw_prompts = data['prompts']
+    
+    # 将中文通过翻译器转为英文
+    english_prompts = []
+    for p in raw_prompts:
+        en_str = translator.translate_zh_to_en(p)
+        english_prompts.append(en_str)
+        
+    print(f"动态更新 Prompt: {raw_prompts} -> {english_prompts}")
+    
+    # 更新到全局配置中心，并标记修改位
+    monitorCommon.CUSTOM_DETECTION_PROMPTS = english_prompts
+    monitorCommon.PROMPTS_CHANGED = True
+    
+    return jsonify({
+        "code": "00000",
+        "msg": "success",
+        "translated": english_prompts
+    })
 
 @monitor.route('/alarm',methods=['POST'])  # 接受物联网端发来的报警并重新确认
 def alarm():

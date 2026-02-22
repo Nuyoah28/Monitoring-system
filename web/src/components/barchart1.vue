@@ -47,7 +47,7 @@ const initChart = (): void => {
             grid: {
                 left: '3%',
                 right: '4%',
-                bottom: '3%',
+                bottom: '8%', // 增加底部空间放文字
                 containLabel: true
             },
             xAxis: {
@@ -55,8 +55,9 @@ const initChart = (): void => {
                 data: [],
                 axisLabel: {
                     color: 'white',
-                    fontSize: '1rem',
+                    fontSize: '0.9rem', // 稍微变小
                     interval: 0,
+                    rotate: 25, // 旋转标签，防止文字堆叠在一起
                 },
             },
             yAxis: {
@@ -83,7 +84,8 @@ const initChart = (): void => {
                     itemStyle: {
                         borderRadius: 8,
                     },
-                    barWidth: '25rem',
+                    barWidth: '40%', // 改为相对比例
+                    barMaxWidth: 35, // 限制最大宽度
                 },
             ],
             

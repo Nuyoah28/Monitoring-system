@@ -17,87 +17,28 @@
     <view class="chart">
       <ring-chart></ring-chart>
     </view>
-    <view class="category">
-      <!--  -->
-      <view class="dangerArea">
-        <view class="title">
-          <view class="icon">
-            <image src="../../../static//alarm.png" mode="aspectFit"></image>
+    <scroll-view scroll-y="true" class="category-scroll">
+      <view class="category">
+        <view 
+          v-for="(cat, index) in categoryConfigs" 
+          :key="index"
+          class="cat-block"
+          :style="{ backgroundColor: cat.bg }"
+        >
+          <view class="title">
+            <view class="icon">
+              <!-- 为了防止不同大小的图标拉伸，使用 aspectFit; 注意：打包时可能会遇到静态资源路径动态拼接的问题，安全起见可以用 require 计算 -->
+              <image :src="'../../../static/' + cat.icon" mode="aspectFit"></image>
+            </view>
+            <view class="titleText" :style="{ color: cat.color }">{{ cat.name }}</view>
           </view>
-          <view class="titleText">禁区</view>
-        </view>
-        <view class="text">
-          <span>总事件数：{{ getData('进入危险区域').total }}</span>
-          <span>今日新增：{{ getData('进入危险区域').todayNew }}</span>
+          <view class="text">
+            <span>总事件数：{{ getData(cat.name).total }}</span>
+            <span>今日新增：{{ getData(cat.name).todayNew }}</span>
+          </view>
         </view>
       </view>
-      <!--  -->
-      <view class="fog">
-        <view class="title">
-          <view class="icon">
-            <image src="../../../static/fist.png" mode="aspectFit"></image>
-          </view>
-          <div class="titleText">打架斗殴</div>
-        </view>
-        <view class="text">
-          <span>总事件数：{{ getData('打架斗殴').total }}</span>
-          <span>今日新增：{{ getData('打架斗殴').todayNew }}</span>
-        </view>
-      </view>
-      <!--  -->
-      <view class="standArea">
-        <view class="title">
-          <view class="icon">
-            <image src="../../../static/fuck.png" mode="aspectFit"></image>
-          </view>
-          <div class="titleText">烟雾</div>
-        </view>
-        <view class="text">
-          <span>总事件数：{{ getData('烟雾').total }}</span>
-          <span>今日新增：{{ getData('烟雾').todayNew }}</span>
-        </view>
-      </view>
-      <!--  -->
-      <view class="fall">
-        <view class="title">
-          <view class="icon">
-            <image src="../../../static/fall.png" mode="aspectFit"></image>
-          </view>
-          <div class="titleText">摔倒</div>
-        </view>
-        <view class="text">
-          <span>总事件数：{{ getData('摔倒').total }}</span>
-          <span>今日新增：{{ getData('摔倒').todayNew }}</span>
-        </view>
-      </view>
-      <!--  -->
-      <view class="fire">
-        <view class="title">
-          <view class="icon">
-            <image src="../../../static/fire.png"></image>
-          </view>
-          <div class="titleText">明火</div>
-        </view>
-        <view class="text">
-          <span>总事件数：{{ getData('明火').total }}</span>
-          <span>今日新增：{{ getData('明火').todayNew }}</span>
-        </view>
-      </view>
-      <!--  -->
-      <view class="smoke">
-        <view class="title">
-          <view class="icon">
-            <image src="../../../static/smoke.png"></image>
-          </view>
-          <div class="titleText">吸烟</div>
-        </view>
-        <view class="text">
-          <span>总事件数：{{ getData('吸烟').total }}</span>
-          <span>今日新增：{{ getData('吸烟').todayNew }}</span>
-        </view>
-      </view>
-      <!--  -->
-    </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -108,14 +49,21 @@ export default {
   data() {
     return {
       upTotal: {},
-      safeHeight: 0,
-      caseList: [
-        { todayNew: 1, total: 1 },
-        { todayNew: 1, total: 1 },
-        { todayNew: 1, total: 1 },
-        { todayNew: 1, total: 1 },
-        { todayNew: 1, total: 1 },
-      ],
+      caseList: [],
+      categoryConfigs: [
+        { name: '进入危险区域', icon: 'alarm.png', bg: '#d6f6db', color: '#42a852' },
+        { name: '烟雾', icon: 'fuck.png', bg: '#dbfdf7', color: '#1db095' },
+        { name: '区域停留', icon: 'watch.png', bg: '#e2f0d9', color: '#548235' },
+        { name: '摔倒', icon: 'fall.png', bg: '#ffe3c2', color: '#d79547' },
+        { name: '明火', icon: 'fire.png', bg: '#e7e3fe', color: '#9c8eee' },
+        { name: '吸烟', icon: 'smoke.png', bg: '#ffd9d9', color: '#c47a7a' },
+        { name: '打架斗殴', icon: 'fist.png', bg: '#f5f6cc', color: '#a89f42' },
+        { name: '垃圾乱放', icon: 'rubbish.png', bg: '#e0ece4', color: '#7a9e9f' },
+        { name: '冰面', icon: 'analysis.png', bg: '#e3f2fd', color: '#1565c0' },
+        { name: '载具占用车道', icon: 'alert.png', bg: '#fce4ec', color: '#c2185b' },
+        { name: '电动车进楼', icon: 'alert.png', bg: '#fff0e5', color: '#f58220' },
+        { name: '挥手呼救', icon: 'fist.png', bg: '#f3e5f5', color: '#6a1b9a' }
+      ]
     };
   },
   methods: {
@@ -220,40 +168,38 @@ export default {
     border-radius: 15rpx;
 	// background-color: pink;
   }
-  .category {
+  .category-scroll {
     width: 99%;
     height: 51%;
+  }
+  .category {
+    width: 100%;
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    // border: 2px solid purple;
-    .dangerArea,
-    .fog,
-    .standArea,
-    .fire,
-    .fall,
-    .smoke {
+    padding-bottom: 20rpx; /* 给滚动留点空间 */
+    
+    .cat-block {
       width: 48%;
-      height: 31%;
+      height: 220rpx; /* 将相对高度改为绝对高度，使得滚动生效 */
       border-radius: 15rpx;
       display: flex;
       flex-direction: column;
-      // align-items: center;
       justify-content: flex-start;
+      margin-bottom: 15rpx;
+
       .title {
         margin-left: 5%;
         margin-top: 15rpx;
         margin-bottom: 10rpx;
-        // border: 2px solid red;
         width: 80%;
-        height: 45%;
+        height: 60rpx;
         display: flex;
         justify-content: space-around;
         align-items: center;
         .icon {
-          // border: 2px solid blue;
-          width: 31%;
-          height: 90%;
+          width: 35%;
+          height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -265,61 +211,23 @@ export default {
           }
         }
         .titleText {
-          // border: 2px solid green;
           margin-left: 20rpx;
           width: 65%;
-          font-size: 37rpx;
+          font-size: 34rpx; /* 稍微调小以防字数超长 */
           font-weight: 700;
+          white-space: nowrap;
         }
       }
       .text {
         margin-left: 5%;
-        // border: 2px solid red;
         width: 80%;
-        // height: 45%;
         display: flex;
         flex-direction: column;
-        // justify-content: flex-end;
         span {
           font-size: 30rpx;
           font-weight: 700;
+          margin-top: 5rpx;
         }
-      }
-    }
-    .dangerArea {
-      background-color: #d6f6db;
-      .titleText {
-        color: #42a852;
-      }
-    }
-    .fog {
-      background-color: #f5f6cc;
-      .titleText {
-        color: #a89f42;
-      }
-    }
-    .standArea {
-      background-color: #dbfdf7;
-      .titleText {
-        color: #1db095;
-      }
-    }
-    .fall {
-      background-color: #ffe3c2;
-      .titleText {
-        color: #d79547;
-      }
-    }
-    .fire {
-      background-color: #e7e3fe;
-      .titleText {
-        color: #9c8eee;
-      }
-    }
-    .smoke {
-      background-color: #ffd9d9;
-      .titleText {
-        color: #c47a7a;
       }
     }
   }

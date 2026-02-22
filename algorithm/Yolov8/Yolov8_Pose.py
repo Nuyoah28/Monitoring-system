@@ -263,7 +263,26 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             garbage_indices = np.where(idxs1 == 2)[0]
             ice_indices     = np.where(idxs1 == 3)[0]
             ebike_indices   = np.where(idxs1 == 4)[0]
-            vehicle_indices = np.where(idxs1 == 5)[0]
+            # vehicle_indices = np.where(idxs1 == 5)[0] # Old naive capture
+
+            # 【新增】区域级载具过滤：只捕捉“跌入”用户设置的 AREA_LIST 禁区的车辆
+            raw_vehicle_indices = np.where(idxs1 == 5)[0]
+            valid_vehicle_indices = []
+            if len(raw_vehicle_indices) > 0:
+                bound_x_left = AREA_LIST[0][0]
+                bound_x_right = AREA_LIST[1][0]
+                bound_y_up = AREA_LIST[0][1]
+                bound_y_down = AREA_LIST[1][1]
+                
+                # Check each vehicle's center point against the ROI boundaries
+                for v_idx in raw_vehicle_indices:
+                    v_box = boxes1[v_idx]
+                    v_center_x = (v_box[0] + v_box[2]) / 2
+                    v_center_y = (v_box[1] + v_box[3]) / 2
+                    if (bound_x_left < v_center_x < bound_x_right) and (bound_y_up < v_center_y < bound_y_down):
+                        valid_vehicle_indices.append(v_idx)
+            
+            vehicle_indices = np.array(valid_vehicle_indices, dtype=np.int32)
         if fire_indices is None:
             fire_indices = []
         if smoke_indices is None:
@@ -293,6 +312,15 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             draw_on_src(np_img, boxes1[ebike_indices], idxs1[ebike_indices])
         if TYPE_LIST[10] and len(vehicle_indices) > 0:
             draw_on_src(np_img, boxes1[vehicle_indices], idxs1[vehicle_indices])
+            
+        # ========================================================
+        # 【新增逻辑】：让前端动态传进来的自定义词汇也能被画上红框
+        # 在 idxs1 中，0-5 是预设目标，>= 6 都是用户临时加进来的提示词
+        # ========================================================
+        custom_indices = np.where(idxs1 >= 6)[0]
+        if len(custom_indices) > 0:
+            # 这些临时加进来的目标我们不管 TYPE_LIST 开关，霸道地强制画出来供人观看效果！
+            draw_on_src(np_img, boxes1[custom_indices], idxs1[custom_indices])
 
         # Resize output
         np_img = cv2.resize(np_img, (640, 480))

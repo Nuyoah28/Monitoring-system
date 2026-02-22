@@ -12,6 +12,7 @@ import java.sql.Timestamp;
 public class SqlGetAlarm {
 
     private Integer id;
+    private Integer caseType;
     private Integer monitorId; // 新增：监控ID，用于权限过滤
     private String clipLink;
     private String name;

@@ -158,9 +158,30 @@ export default {
       border: this.warnData.border,
       borData: {},
       painting: false,
-      ability: JSON.parse(JSON.stringify(this.warnData.ability)),
+      // warnData.ability is already an array of checked options, we initialize full list and merge
+      ability: [],
       img: "",
     };
+  },
+  watch: {
+    showEdit: {
+      handler(val) {
+        if (val) {
+            this.reset();
+            // sync backend truth to UI checkboxes
+            if (this.warnData && this.warnData.ability) {
+                let backendCheckedList = this.warnData.ability; 
+                this.ability.forEach(item => {
+                    let match = backendCheckedList.find(b => b.value === item.value);
+                    if (match && match.checked) {
+                        item.checked = true;
+                    }
+                });
+            }
+        }
+      },
+      immediate: true
+    }
   },
   methods: {
     async getImg() {
@@ -254,6 +275,31 @@ export default {
           value: 6,
           checked: false,
         },
+        {
+          name: "危险区域",
+          value: 1,
+          checked: false,
+        },
+        {
+          name: "垃圾检测",
+          value: 8,
+          checked: false,
+        },
+        {
+          name: "积冰检测",
+          value: 9,
+          checked: false,
+        },
+        {
+          name: "电瓶车",
+          value: 10,
+          checked: false,
+        },
+        {
+          name: "载具占道",
+          value: 11,
+          checked: false,
+        },
       ];
     },
     resetBorder() {
@@ -280,11 +326,16 @@ export default {
                 longitude: this.monitorData.longitude,
                 latitude: this.monitorData.latitude,
                 latitude: this.monitorData.latitude,
-                fall: this.ability[1].checked,
-                flame: this.ability[2].checked,
-                smoke: this.ability[3].checked,
-                wave: this.ability[0].checked,
-                punch: this.ability[4].checked,
+                fall: this.ability.find(x => x.value === 3)?.checked || false,
+                flame: this.ability.find(x => x.value === 4)?.checked || false,
+                smoke: this.ability.find(x => x.value === 5)?.checked || false,
+                wave: this.ability.find(x => x.value === 2)?.checked || false,
+                punch: this.ability.find(x => x.value === 6)?.checked || false,
+                rubbish: this.ability.find(x => x.value === 8)?.checked || false,
+                ice: this.ability.find(x => x.value === 9)?.checked || false,
+                ebike: this.ability.find(x => x.value === 10)?.checked || false,
+                vehicle: this.ability.find(x => x.value === 11)?.checked || false,
+                dangerArea: this.ability.find(x => x.value === 1)?.checked || false,
               };
             } else {
               data = {
@@ -295,11 +346,16 @@ export default {
                 ip: this.warnData.video,
                 longitude: this.monitorData.longitude,
                 latitude: this.monitorData.latitude,
-                fall: this.ability[1].checked,
-                flame: this.ability[2].checked,
-                smoke: this.ability[3].checked,
-                wave: this.ability[0].checked,
-                punch: this.ability[4].checked,
+                fall: this.ability.find(x => x.value === 3)?.checked || false,
+                flame: this.ability.find(x => x.value === 4)?.checked || false,
+                smoke: this.ability.find(x => x.value === 5)?.checked || false,
+                wave: this.ability.find(x => x.value === 2)?.checked || false,
+                punch: this.ability.find(x => x.value === 6)?.checked || false,
+                rubbish: this.ability.find(x => x.value === 8)?.checked || false,
+                ice: this.ability.find(x => x.value === 9)?.checked || false,
+                ebike: this.ability.find(x => x.value === 10)?.checked || false,
+                vehicle: this.ability.find(x => x.value === 11)?.checked || false,
+                dangerArea: this.ability.find(x => x.value === 1)?.checked || false,
                 leftX: Math.floor(this.border[0].leftX),
                 leftY: Math.floor(this.border[0].leftY),
                 rightX: Math.floor(this.border[0].rightX),

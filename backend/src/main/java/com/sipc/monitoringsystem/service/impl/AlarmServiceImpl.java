@@ -91,26 +91,54 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         List<SqlGetAlarm> alarms = this.baseMapper.selectAllTest();
         log.info("alarms size before filter: " + alarms.size());
 
-        // 如果是普通用户，过滤只显示自己负责的监控的报警
+        // 获取用户负责的监控ID列表（如果是管理员则为空集或全集，这里我们通过动态判断过滤）
+        Set<Integer> userMonitorIds = new HashSet<>();
         if (user.getRole() != 0) {
-            // 获取用户负责的监控ID列表
             List<Monitor> userMonitors = monitorServiceImpl.getMonitorList(user);
-            Set<Integer> userMonitorIds = userMonitors.stream()
+            userMonitorIds = userMonitors.stream()
                     .map(Monitor::getId)
                     .collect(Collectors.toSet());
+        }
 
-            // 过滤报警：只保留属于用户负责的监控的报警（根据监控ID匹配）
-            alarms = alarms.stream()
-                    .filter(alarm -> userMonitorIds.contains(alarm.getMonitorId()))
-                    .collect(Collectors.toList());
-            log.info("alarms size after filter for user " + user.getUserName() + ": " + alarms.size());
+        final Set<Integer> finalMonitorIds = userMonitorIds;
+
+        // 组合过滤所有条件
+        alarms = alarms.stream()
+                .filter(alarm -> {
+                    // 1. 用户权限过滤
+                    if (user.getRole() != 0 && !finalMonitorIds.contains(alarm.getMonitorId()))
+                        return false;
+                    // 2. 状态过滤
+                    if (status != null) {
+                        boolean alarmStatus = alarm.getStatus() != null && alarm.getStatus();
+                        boolean targetStatus = status == 1; // 假设 1=已处理, 0=未处理
+                        if (alarmStatus != targetStatus)
+                            return false;
+                    }
+                    // 3. 告警类型过滤
+                    if (caseType != null && !caseType.equals(alarm.getCaseType()))
+                        return false;
+                    // 4. 警报等级过滤
+                    if (warningLevel != null && !warningLevel.equals(alarm.getWarningLevel()))
+                        return false;
+
+                    return true;
+                })
+                .collect(Collectors.toList());
+
+        // 执行内存分页
+        int total = alarms.size();
+        int fromIndex = (pageNum - 1) * pageSize;
+        if (fromIndex >= total || fromIndex < 0) {
+            alarms = new ArrayList<>();
+        } else {
+            int toIndex = Math.min(fromIndex + pageSize, total);
+            alarms = alarms.subList(fromIndex, toIndex);
         }
 
         for (SqlGetAlarm alarm : alarms) {
             alarm.setClipLink(ossUtil.getClipLinkByUuid(alarm.getClipLink()));
         }
-        if (alarms.isEmpty())
-            return alarms;
 
         return alarms;
     }

@@ -1,16 +1,19 @@
 <template>
     <div class="panel">
         <div class="title">最新报警列表</div>
-        <div id="demoDiv">
-            <div v-for="(item, index) in alarmlist" 
-            :key="item.id" class="itemlist" 
-            :style="itemlist1[getcolor(item.eventName)]"
-            @click="showDetail(item)">
-                <div class="itemlist">
-                    <div class="text-content">
-                        <h3>{{ index + 1 }} {{ item.eventName }} -- {{ item.department }}</h3>
+        <div id="demoDiv" ref="demoDivRef" @mouseenter="stopScroll" @mouseleave="startScroll">
+            <!-- 滚动内容容器 -->
+            <div class="scroll-content">
+                <div v-for="(item, index) in scrollList" 
+                :key="'roll-' + index" class="itemlist" 
+                :style="itemlist1[getcolor(item.eventName)]"
+                @click="showDetail(item)">
+                    <div class="itemlist">
+                        <div class="text-content">
+                            <h3>{{ (index % alarmlist.length) + 1 }} {{ item.eventName }} -- {{ item.department }}</h3>
+                        </div>
+                        <img :src="item.deal === '已处理' ? require('../../public/assets/checked.png') : require('../../public/assets/unchecked.png')" alt="">
                     </div>
-                    <img :src="item.deal === '已处理' ? require('../../public/assets/checked.png') : require('../../public/assets/unchecked.png')" alt="">
                 </div>
             </div>
         </div>
@@ -41,8 +44,36 @@ const { getAlarmList } = storeToRefs(alarmStore);
 const dialogVisible1 = ref<boolean>(false);
 const item = ref<any>('');
 const alarmlist = computed(() => getAlarmList.value);
+const scrollList = computed(() => {
+    if (!alarmlist.value || alarmlist.value.length === 0) return [];
+    // 复制数据实现无缝滚动
+    return [...alarmlist.value, ...alarmlist.value];
+});
 const pageNum = ref<number>(1);
 const pageSize = ref<number>(30);
+
+const demoDivRef = ref<HTMLElement | null>(null);
+let scrollTimer: number | null = null;
+
+const startScroll = () => {
+    if (scrollTimer) return;
+    scrollTimer = window.setInterval(() => {
+        if (demoDivRef.value) {
+            demoDivRef.value.scrollTop += 1;
+            // 滚动到总高度的一半时，也就是走完第一轮数据，无缝重置回 0
+            if (demoDivRef.value.scrollTop >= demoDivRef.value.scrollHeight / 2) {
+                demoDivRef.value.scrollTop = 0;
+            }
+        }
+    }, 40); // 修改毫秒数可调节滚动速度
+};
+
+const stopScroll = () => {
+    if (scrollTimer) {
+        clearInterval(scrollTimer);
+        scrollTimer = null;
+    }
+};
 
 // WebSocket相关变量
 let websocket: WebSocket | null = null;
@@ -52,52 +83,72 @@ const wsUrl = ref<string>(''); // WebSocket连接地址
 
 const itemlist1 = [
     {
-        // 挥手
+        // 0: 挥手 (wave)
         'backgroundColor': '#F1948A'
     },
     {
-        // 摔倒
+        // 1: 摔倒 (fall / staggering / falling down)
         'backgroundColor': '#F8BD91'
     },
     {
-        // 吸烟
+        // 2: 烟雾/火灾相关
         'backgroundColor': '#ffd9d9'
     },
     {
-        // 进入危险区域
+        // 3: 进入危险区域
         'backgroundColor': '#7ABDD8'
     },
     {
-        // 打拳
-        'backgroundColor': '#F1948A'
+        // 4: 暴力打架 (punch)
+        'backgroundColor': '#E74C3C' 
     },
     {
-        // 明火
+        // 5: 明火
         'backgroundColor': '#e7e3fe'
     },
     {
-        // 区域停留
+        // 6: 区域停留
         'backgroundColor': '#2CD6DB'
     },
     {
-        // 吸烟
+        // 7: 吸烟
         'backgroundColor': '#C4D83B'
     },
     {
-        // 否则
-        'backgroundColor': '#7ABDD8'
+        // 8: 路面积冰 (ice on road)
+        'backgroundColor': '#AED6F1'
+    },
+    {
+        // 9: 垃圾乱扔 (garbage on ground)
+        'backgroundColor': '#D2B4DE'
+    },
+    {
+        // 10: 违规停车 (electric scooter / vehicle)
+        'backgroundColor': '#F7DC6F'
+    },
+    {
+        // 11: 默认 (其他/未知)
+        'backgroundColor': '#85929E'
     }
 ];
 
 const getcolor = (type: string): number => {
-    if (type === '摔倒') return 1;
-    else if (type === '烟雾') return 2;
-    else if (type === '进入危险区域') return 3;
-    //明火
-    else if (type === '明火') return 5;
-    else if(type === '区域停留') return 6;
-    else if(type === '吸烟') return 7;
-    else return 8;
+    // 处理各种算法推过来的准确中文名 (兼容 NTU-60 映射和 Mamba-YOLO 名称)
+    if (type.includes('挥手') || type.includes('wave')) return 0;
+    else if (type.includes('摔倒') || type.includes('fall') || type.includes('staggering')) return 1;
+    else if (type.includes('烟')) return 2;
+    else if (type.includes('危险区域')) return 3;
+    else if (type.includes('打架') || type.includes('punch') || type.includes('暴力')) return 4;
+    else if (type.includes('火')) return 5;
+    else if (type.includes('停留')) return 6;
+    else if (type.includes('吸烟')) return 7;
+    // Mamba-YOLO World 开放世界检测项
+    else if (type.includes('路面积冰') || type.includes('结冰')) return 8;
+    else if (type.includes('垃圾') || type.includes('garbage')) return 9;
+    else if (type.includes('电动车') || type.includes('人行道驻车') || type.includes('scooter') || type.includes('vehicle')) return 10;
+    
+    // 找不到匹配项返回默认灰色
+    return 11;
 };
 
 const showDetail = (itemData: any): void => {
@@ -290,11 +341,15 @@ onMounted(() => {
 
     // 初始化WebSocket连接
     initWebSocket();
+    
+    // 启动滚动大屏
+    startScroll();
 });
 
 // 清理WebSocket连接
 onUnmounted(() => {
     closeWebSocket();
+    stopScroll();
 });
 </script>
 

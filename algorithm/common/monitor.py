@@ -47,3 +47,17 @@ flip_method = 0
 # danger zone + Mamba-YOLO state (indices_danger, fire_indices, smoke_indices)
 preList = [None, None, None]
 
+# -----------------------------------------------------------------------
+# Mamba-YOLO 自定义检测目标（在"火"和"烟"之外动态扩展）
+# 这个列表会在 Flask 进程里修改，在 video stream 进程里被读取。
+# -----------------------------------------------------------------------
+CUSTOM_DETECTION_PROMPTS = [
+    "garbage on ground",
+    "ice on road",
+    "electric scooter",
+    "vehicle on sidewalk",
+]
+
+# 标志位：提示词是否发生更改
+PROMPTS_CHANGED = False
+

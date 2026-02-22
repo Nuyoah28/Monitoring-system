@@ -99,6 +99,35 @@ public class AlarmWebSocketServer {
         log.info("广播结束");
     }
 
+    public static void sendToUsers(java.util.List<String> userIds, Object message) {
+        String jsonStr;
+        try {
+            jsonStr = objectMapper.writeValueAsString(message);
+        } catch (IOException e) {
+            log.error("消息序列化失败", e);
+            return;
+        }
+
+        if (onlineSessions.isEmpty() || userIds == null || userIds.isEmpty()) {
+            return;
+        }
+
+        for (String userId : userIds) {
+            java.util.concurrent.CopyOnWriteArraySet<Session> userSessions = onlineSessions.get(userId);
+            if (userSessions != null) {
+                for (Session session : userSessions) {
+                    if (session.isOpen()) {
+                        try {
+                            session.getBasicRemote().sendText(jsonStr);
+                        } catch (IOException e) {
+                            log.error("定向发送消息失败: userId={}, sessionId={}", userId, session.getId(), e);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public static int getOnlineCount() {
         return onlineSessions.size();
     }

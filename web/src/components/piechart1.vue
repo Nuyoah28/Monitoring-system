@@ -1,6 +1,18 @@
 <template>
   <div class="panel">
-    <div class="chart" ref="piechart" id="demoDiv"></div>
+    <div class="chart-wrapper">
+      <div class="chart" ref="piechart" id="demoDiv"></div>
+      
+      <!-- 自定义滚动图例 -->
+      <div class="custom-legend" ref="legendDivRef" @mouseenter="stopScroll" @mouseleave="startScroll">
+        <div class="scroll-content">
+          <div v-for="(item, index) in scrollList" :key="'leg-' + index" class="legend-item" @click="toggleLegend(item.eventType)">
+             <span class="legend-color" :style="{backgroundColor: getEchartsColor(index)}"></span>
+             <span class="legend-name" :class="{ 'disabled-text': disabledLegends.includes(item.eventType) }">{{item.eventType}}</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="panel-footer"></div>
   </div>
 </template>
@@ -25,6 +37,58 @@ const piechart = ref<HTMLDivElement>();
 let mychart: any = null; // 保存echarts实例
 const chartData = computed(() => getWeekStatistics.value);
 
+// --- 自定义滚动图例相关 ---
+const defaultColors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#F8BD91', '#2CD6DB', '#C4D83B'];
+
+const getEchartsColor = (index: number) => {
+    if (!chartData.value || chartData.value.length === 0) return '#fff';
+    const realIndex = index % chartData.value.length;
+    return defaultColors[realIndex % defaultColors.length];
+};
+
+const legendDivRef = ref<HTMLElement | null>(null);
+let scrollTimer: number | null = null;
+
+const scrollList = computed(() => {
+    if (!chartData.value || chartData.value.length === 0) return [];
+    // 复制数据实现无缝滚动
+    return [...chartData.value, ...chartData.value];
+});
+
+const startScroll = () => {
+    if (scrollTimer) return;
+    scrollTimer = window.setInterval(() => {
+        if (legendDivRef.value) {
+            legendDivRef.value.scrollTop += 1;
+            if (legendDivRef.value.scrollTop >= legendDivRef.value.scrollHeight / 2) {
+                legendDivRef.value.scrollTop = 0;
+            }
+        }
+    }, 40);
+};
+
+const stopScroll = () => {
+    if (scrollTimer) {
+        clearInterval(scrollTimer);
+        scrollTimer = null;
+    }
+};
+
+const disabledLegends = ref<string[]>([]);
+const toggleLegend = (name: string) => {
+    if (!mychart) return;
+    const idx = disabledLegends.value.indexOf(name);
+    if (idx > -1) {
+        disabledLegends.value.splice(idx, 1);
+        mychart.dispatchAction({ type: 'legendSelect', name: name });
+    } else {
+        disabledLegends.value.push(name);
+        mychart.dispatchAction({ type: 'legendUnSelect', name: name });
+    }
+};
+// ----------------------
+
+
 // 初始化图表
 const initChart = (): void => {
     if(piechart.value) {
@@ -32,6 +96,7 @@ const initChart = (): void => {
 
         // 设置初始的图表选项 (可以是空数据，稍后通过 axios 填充)
         mychart.setOption({
+            color: defaultColors, // 锁定统一调色板以便图例取色
             title: {
                 text: '近一周危险行为',
                 textStyle: {
@@ -43,20 +108,14 @@ const initChart = (): void => {
                 trigger: 'item',
             },
             legend: {
-                top: '5%',
-                right: '5%', // 图例放在右侧
-                orient: 'vertical', // 竖直排列
-                textStyle: {
-                    color: 'white',
-                    fontSize: '1.3rem', // 调整图例字体大小
-                },
+                show: false, // 隐藏原生翻页图例，采用外置DOM滚动图例
             },
             series: [
                 {
                     name: '危险警报',
                     type: 'pie',
-                    radius: ['40%', '70%'],
-                    center: ['35%', '55%'], // 将饼图向左移动，设置靠左
+                    radius: ['35%', '60%'], // 稍微缩减饼图半径给图例留空间
+                    center: ['35%', '55%'], // 饼图向左靠一点点
                     avoidLabelOverlap: false,
                     padAngle: 6,
                     itemStyle: {
@@ -126,6 +185,9 @@ onMounted(() => {
     watch(chartData, (newData) => {
         updateChart(newData);
     }, { deep: true });
+    
+    // 启动自定义图例无缝滚动
+    startScroll();
 
     // 获取事件总线实例
     const bus = (window as any).$bus;
@@ -158,6 +220,9 @@ onUnmounted(() => {
         mychart.dispose();
     }
     
+    // 停止滚动图例
+    stopScroll();
+    
     // 移除窗口大小调整的监听事件
     window.removeEventListener("resize", () => {
         if(mychart) {
@@ -168,8 +233,57 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-#demoDiv {
+.chart-wrapper {
+  display: flex;
   width: 100%;
   height: 100%;
+  align-items: center;
+}
+
+#demoDiv {
+  width: 65%;
+  height: 100%;
+}
+
+.custom-legend {
+  width: 35%;
+  height: 70%;
+  margin-top: 2rem;
+  overflow: auto;
+  color: white;
+  box-sizing: border-box;
+}
+
+.custom-legend::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.8rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1.1rem;
+}
+
+.disabled-text {
+  color: #777;
+  text-decoration: line-through;
 }
 </style>
