@@ -22,14 +22,15 @@
         opts: {
           rotate: false,
           rotateLock: false,
-          color: ["#1890FF","#91CB74","#FAC858","#EE6666","#73C0DE","#3CA272","#FC8452","#9A60B4","#ea7ccc"],
-          padding: [5,5,5,5],
-          dataLabel: true,
+          color: ["#1890FF","#91CB74","#FAC858","#EE6666","#73C0DE","#3CA272","#FC8452","#9A60B4","#ea7ccc","#f56c6c","#e6a23c","#67c23a"],
+          padding: [0, 0, 0, 0], // 去除周围留白
+          dataLabel: false, // 核心逻辑：关掉饼图外围的引线标签，让饼基本盘放大数倍！
           enableScroll: false,
           legend: {
             show: true,
             position: "right",
-            lineHeight: 25
+            lineHeight: 18, // 缩小行高，腾出空间
+            margin: 2
           },
           title: {
             name: "",
@@ -43,7 +44,7 @@
           },
           extra: {
             ring: {
-              ringWidth: 30,
+              ringWidth: 35, // 圆环稍微加粗，增加视觉质感
               activeOpacity: 0.5,
               activeRadius: 10,
               offsetAngle: 0,
