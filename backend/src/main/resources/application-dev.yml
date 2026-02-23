@@ -69,4 +69,6 @@ agent:
   api:
     url: http://localhost:5000  # Python Agent API地址
 
-
+algorithm:
+  api:
+    url: http://localhost:6006 # 算法服务API地址

@@ -19,8 +19,10 @@ class DevConfig(Config):
     
     # 腾讯云机器翻译 (TMT) 密钥配置
     # 请从腾讯云控制台获取: https://console.cloud.tencent.com/cam/capi
-    TENCENT_SECRET_ID = "REMOVED"
-    TENCENT_SECRET_KEY = "REMOVED"
+    # 使用环境变量，避免将敏感信息提交到代码仓库
+    import os
+    TENCENT_SECRET_ID = os.getenv('TENCENT_SECRET_ID', '')
+    TENCENT_SECRET_KEY = os.getenv('TENCENT_SECRET_KEY', '')
     
     pass
 
