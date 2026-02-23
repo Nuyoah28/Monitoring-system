@@ -1,8 +1,20 @@
 algorithm：python模型训练的代码和python后端的代码
+运行算法端：
+提前配置好rtmp有windows方案（csdn上有）nginx-win.ecsds.eu/download/下载1.7——G那个，ffmpeg等
+首先装docker
+docker pull alaner28/myenv:v1这个是镜像，有点大得留出50g左右
+装完镜像后
+//   /d/桌面/新建文件夹 换成自己的
+docker run --gpus all -it -v /d/桌面/新建文件夹:/home/Documents --name mamba_yolo alaner28/myenv:v1 /bin/bash
+//进入linux环境之后，cd到documents文件夹并开启虚拟环境
+conda activate myenv
+在自己的电脑上先启动test.py先修改摄像头选项1是外接摄像头，0是电脑自带的
+打开rtmp服务器
+在docker的容器里运行manage.py 可以vscode连接docker容器运行
 
 backend：Java后端代码 jdk17 不然的话会报错，有个低版本的依赖
 
-后端配置：（mysql和redis） 运行前redis-server启动rediscover，mysql也要启动
+后端配置：（mysql和redis） 运行前redis-server启动redisdiscover，mysql也要启动
 Monitoring-system/backend/src/main/resources/application-dev.yml 这个里面有数据库，redis的配置 配置好自己的密码
 
 在后端backend打开，mvn clean install -DskipTests配置后端
