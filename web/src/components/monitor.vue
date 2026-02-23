@@ -169,7 +169,7 @@ import { useUserStore } from '@/stores/user';
 import { useAppStore } from '@/stores/app';
 import { ElMessage } from 'element-plus'
 import axios from 'axios';
-import { baseUrl } from '@/config/config';
+import { baseUrl, algorithmUrl } from '@/config/config';
 
 // 定义监控项接口
 interface MonitorItem {
@@ -469,10 +469,8 @@ const submitCustomPrompts = async () => {
   
   try {
     const userStore = useUserStore();
-    const response = await axios.post('/api/v1/monitor/update_prompt', {
+    const response = await axios.post(`${algorithmUrl}/api/v1/monitor-device/update_prompt`, {
       prompts: cleanPrompts
-    }, {
-      headers: { 'Authorization': userStore.token }
     });
 
     if (response.data.code === '00000') {

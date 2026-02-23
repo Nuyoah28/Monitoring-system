@@ -195,7 +195,8 @@ def stream_video():
             try:
                 frame, warningList = yolo.main(infer=infer, infer1=infer1, action_recognizer=action_recognizer, np_img=frame, TYPE_LIST=monitorCommon.TYPE_LIST, AREA_LIST=monitorCommon.AREA_LIST)
             except Exception as e:
-                print(traceback.format_tb(e))
+                print(f"处理帧时出错: {e}")
+                traceback.print_exc()
                 continue
             print(warningList)
             current_time = time.time()

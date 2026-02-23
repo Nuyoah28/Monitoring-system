@@ -249,10 +249,17 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
         # ---------------------------------------------------------#
         list1 = False   # smoke
         list4 = False   # fire
-        garbage_indices = None
-        ice_indices = None
-        ebike_indices = None
-        vehicle_indices = None
+        
+        # 初始化所有可能使用的变量为默认值
+        boxes1 = np.empty((0, 4), dtype=np.float32)
+        scores1 = np.empty((0,), dtype=np.float32)
+        idxs1 = np.empty((0,), dtype=np.int32)
+        fire_indices = []
+        smoke_indices = []
+        garbage_indices = []
+        ice_indices = []
+        ebike_indices = []
+        vehicle_indices = []
         if TYPE_LIST[4] or TYPE_LIST[1] or TYPE_LIST[7] or TYPE_LIST[8] or TYPE_LIST[9] or TYPE_LIST[10]:
             boxes1, scores1, idxs1 = infer1(np_img)
             boxes1  = np.asarray(boxes1,  dtype=np.float32)
@@ -283,18 +290,6 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
                         valid_vehicle_indices.append(v_idx)
             
             vehicle_indices = np.array(valid_vehicle_indices, dtype=np.int32)
-        if fire_indices is None:
-            fire_indices = []
-        if smoke_indices is None:
-            smoke_indices = []
-        if garbage_indices is None:
-            garbage_indices = []
-        if ice_indices is None:
-            ice_indices = []
-        if ebike_indices is None:
-            ebike_indices = []
-        if vehicle_indices is None:
-            vehicle_indices = []
         if len(fire_indices) > 0 and TYPE_LIST[4]:
             list4 = True
         if len(smoke_indices) > 0 and TYPE_LIST[1]:
