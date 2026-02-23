@@ -127,8 +127,10 @@
               :key="index" 
               size="mini" 
               effect="dark" 
+              closable
+              @close="removePrompt(index)"
               class="prompt-tag"
-            >{{ p }}</el-tag>
+            >{{ p.zh }} {{ p.en ? `(${p.en})` : '' }}</el-tag>
           </span>
         </div>
       </div>
@@ -183,7 +185,7 @@ interface MonitorItem {
 
 // === 动态提示词相关状态 ===
 const customPrompts = ref<string>(''); // 用户输入框绑定的值
-const activePrompts = ref<string[]>([]); // 当前正在生效的自定义检测词
+const activePrompts = ref<{zh: string, en: string}[]>([]); // 当前正在生效的自定义检测词
 const isPromptSubmitting = ref<boolean>(false);
 const isPanelExpanded = ref<boolean>(false); // 控制是显示球还是面板
 
@@ -455,7 +457,7 @@ const submitCustomPrompts = async () => {
   }
   
   // 处理中文逗号和分号为英文逗号
-  const cleanPrompts = customPrompts.value
+  const newInputs = customPrompts.value
     .replace(/，/g, ',')
     .replace(/；/g, ',')
     .replace(/;/g, ',')
@@ -463,30 +465,63 @@ const submitCustomPrompts = async () => {
     .map(p => p.trim())
     .filter(p => p.length > 0);
 
-  if (cleanPrompts.length === 0) return;
+  if (newInputs.length === 0) return;
 
-  isPromptSubmitting.value = true;
+  // 提取现有的中文词汇，追加新的词汇，并去重
+  const existingZhs = activePrompts.value.map(item => item.zh);
+  const combinedZhs = Array.from(new Set([...existingZhs, ...newInputs]));
+
+  await syncPromptsToBackend(combinedZhs, '添加');
   
+  // 如果追加成功，清空输入框
+  customPrompts.value = '';
+};
+
+// ==========================================
+// 删除一个提词 Tag 的逻辑
+// ==========================================
+const removePrompt = async (index: number) => {
+  const newPrompts = [...activePrompts.value];
+  newPrompts.splice(index, 1);
+  const remainingZhs = newPrompts.map(item => item.zh);
+  await syncPromptsToBackend(remainingZhs, '移除');
+};
+
+// ==========================================
+// 共用的将数组同步到后端的逻辑
+// ==========================================
+const syncPromptsToBackend = async (promptsListZh: string[], actionName: string) => {
+  isPromptSubmitting.value = true;
   try {
     const userStore = useUserStore();
-    const response = await axios.post(`${algorithmUrl}/api/v1/monitor-device/update_prompt`, {
-      prompts: cleanPrompts
+    const token = userStore.token;
+    // 使用后端的转发代理接口，而不是直接连接算法端，以保证跨内网和鉴全能成功穿透
+    const response = await axios.post(`/api/v1/monitor/update_prompt`, {
+      prompts: promptsListZh
+    }, {
+      headers: {
+        Authorization: token
+      }
     });
 
     if (response.data.code === '00000') {
-      ElMessage.success('🚀 AI 侦测指令已通过云端翻译并下发算法！');
-      activePrompts.value = cleanPrompts;
-      // 可选: 清空输入框 customPrompts.value = '';
+      ElMessage.success(`🚀 AI 侦测指令已${actionName}并下发！`);
+      // 后端会返回对应的英文翻译 translated 数组
+      const translatedEn = response.data.data || response.data.translated || [];
+      activePrompts.value = promptsListZh.map((zhStr, idx) => ({
+        zh: zhStr,
+        en: translatedEn[idx] || ''
+      }));
     } else {
-      ElMessage.error('指令下发失败: ' + (response.data.message || response.data.msg || '未知错误'));
+      ElMessage.error(`指令${actionName}失败: ` + (response.data.message || response.data.msg || '未知错误'));
     }
   } catch (error: any) {
     if (error.response && error.response.data) {
-      ElMessage.error('指令下发失败: ' + (error.response.data.message || '未知异常'));
+      ElMessage.error(`指令${actionName}失败: ` + (error.response.data.message || '未知异常'));
     } else {
       ElMessage.error('网络请求失败，算法节点未就绪或已掉线。');
     }
-    console.error('下发提示词出错:', error);
+    console.error(`下发提示词(${actionName})出错:`, error);
   } finally {
     isPromptSubmitting.value = false;
   }

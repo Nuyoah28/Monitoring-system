@@ -47,6 +47,9 @@ public class MonitorController {
     @Value("${agent.api.url:http://localhost:5000}")
     private String agentApiUrl;
 
+    @Value("${algorithm.api.url:http://localhost:6006}")
+    private String algorithmApiUrl;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     @GetMapping()
@@ -141,7 +144,7 @@ public class MonitorController {
     public CommonResult<?> updatePrompt(@RequestBody Map<String, Object> body) {
         try {
             // 将前端发来的包含中文的 prompts 透传给 Python 算法端进行翻译和动态加载
-            String targetUrl = agentApiUrl + "/api/v1/monitor-device/update_prompt";
+            String targetUrl = algorithmApiUrl + "/api/v1/monitor-device/update_prompt";
             ResponseEntity<Map> response = restTemplate.postForEntity(targetUrl, body, Map.class);
             Map respBody = response.getBody();
             if (respBody != null && "00000".equals(respBody.get("code"))) {
