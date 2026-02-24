@@ -60,11 +60,11 @@ class SparkDeskClient:
         return f"wss://{host}{path}?{qs}"
     
     def chat(self, question: str, context: List[Dict] = None, max_retries: int = 3,
-             on_chunk: Optional[callable] = None) -> str:
+             on_chunk: Optional[callable] = None, max_tokens: Optional[int] = None) -> str:
         context = context or []
         for attempt in range(max_retries):
             try:
-                return self._chat_once(question, context, on_chunk=on_chunk)
+                return self._chat_once(question, context, on_chunk=on_chunk, max_tokens=max_tokens)
             except Exception as e:
                 error_msg = str(e)
                 if attempt < max_retries - 1:
@@ -74,11 +74,12 @@ class SparkDeskClient:
         
         return ""
     
-    def _chat_once(self, question: str, context: List[Dict], on_chunk: Optional[callable] = None) -> str:
+    def _chat_once(self, question: str, context: List[Dict], on_chunk: Optional[callable] = None, max_tokens: Optional[int] = None) -> str:
         """单次聊天尝试"""
         result_text = []
         ws_close_flag = False
-        
+        token_limit = max_tokens if max_tokens is not None else 32768
+
         def on_message(ws, message):
             nonlocal ws_close_flag
             try:
@@ -110,14 +111,14 @@ class SparkDeskClient:
             text_messages.append({"role": "user", "content": question})
             request_data = {
                 "header": {"app_id": self.appid},
-                "parameter": {"chat": {"domain": "x1", "max_tokens": 32768, "top_k": 6, "temperature": 1.2, "tools": [{"web_search": {"search_mode": "normal", "enable": False}, "type": "web_search"}]}},
+                "parameter": {"chat": {"domain": "x1", "max_tokens": token_limit, "top_k": 6, "temperature": 1.2, "tools": [{"web_search": {"search_mode": "normal", "enable": False}, "type": "web_search"}]}},
                 "payload": {
                     "message": {
                         "text": text_messages
                     }
                 }
             }
-            
+
             ws.send(json.dumps(request_data))
         
         websocket.enableTrace(False)
@@ -293,6 +294,28 @@ class BackendClient:
         except Exception:
             return None
 
+    def update_detection_prompts(self, prompts: List[str]) -> Optional[Dict]:
+        """
+        设置 Mamba-YOLO 开放世界目标提取的侦测目标。
+        后端会转发到算法服务并完成中译英与动态加载。
+        """
+        if not prompts:
+            return None
+        try:
+            response = self._request(
+                "POST",
+                f"{self.base_url}/monitor/update_prompt",
+                json={"prompts": prompts},
+                timeout=10
+            )
+            data = response.json()
+            if data.get("code") != "00000":
+                return None
+            return data.get("data") or {}
+        except Exception as e:
+            print(f"❌ 更新侦测目标请求异常: {e}")
+            return None
+
 
 TOOLS_SCHEMA = {
     "tools": [
@@ -336,11 +359,18 @@ TOOLS_SCHEMA = {
             "parameters": {
                 "monitor_id": "int，监控点ID"
             }
+        },
+        {
+            "name": "update_detection_prompts",
+            "description": "设置 Mamba-YOLO 开放世界目标提取的侦测目标。当用户要求添加/设置/修改要侦测的物体（如：红色电动车、戴帽子的人）、开放世界检测、动态目标侦测、请输入侦测目标时调用。多个目标用逗号分隔。",
+            "parameters": {
+                "prompts": "string，要侦测的物体，中文，多个用逗号分隔，如：红色电动车，戴帽子的人"
+            }
         }
     ]
 }
 
-TOOL_SELECTION_PROMPT = """你是医院安全监控助手。根据用户问题，输出 JSON（仅 JSON）：
+TOOL_SELECTION_PROMPT = """你是小区安全监控助手。根据用户问题，输出 JSON（仅 JSON）：
 - 需调多个接口：[{{"tool":"工具名","params":{{...}}}}, {{"tool":"工具名2","params":{{...}}}}]
 - 只需一个：{{"tool":"工具名","params":{{...}}}}
 - 不需调：{{"tool":"none","params":{{}}}}
@@ -448,6 +478,21 @@ class IntelligentAgent:
                 return "监控点ID必须为数字"
             data = self.backend.get_weather_history(mid)
             return self._format_weather_data(data, single=False) if data else f"监控点 {mid} 暂无天气历史"
+        elif tool_name == "update_detection_prompts":
+            raw = params.get("prompts")
+            if not raw:
+                return "请提供要侦测的物体，多个目标用逗号分隔，例如：红色电动车，戴帽子的人"
+            if isinstance(raw, list):
+                prompts_list = [str(x).strip() for x in raw if str(x).strip()]
+            else:
+                prompts_list = [s.strip() for s in str(raw).replace("，", ",").split(",") if s.strip()]
+            if not prompts_list:
+                return "未解析到有效目标，请用逗号分隔多个物体，如：红色电动车，戴帽子的人"
+            result = self.backend.update_detection_prompts(prompts_list)
+            if result is None:
+                return "下发侦测目标失败，请确认后端与算法服务已启动。"
+            translated = result if isinstance(result, list) else result.get("translated", result)
+            return f"已更新 Mamba-YOLO 开放世界侦测目标：{', '.join(prompts_list)}。算法端已译为：{translated}。"
         return None
     
     def _format_alarm_data(self, alarm_data: Dict) -> str:
@@ -549,7 +594,11 @@ class IntelligentAgent:
             AI分析后的回答
         """
         print(f"\n🤔 用户问题: {question}")
-        
+
+        # 立即给前端一条状态，降低“卡住”的体感延迟
+        if on_chunk:
+            on_chunk("正在分析您的问题...\n\n")
+
         # 1. 如果前端提供token，则切换为用户token模式
         if user_token:
             self.backend.set_token(user_token, external=True)
@@ -558,21 +607,27 @@ class IntelligentAgent:
                 self.backend.login()
 
         # 2. 由大模型决定调用哪个工具（Tool-Calling 第一步）
-        tools_desc = self._get_tools_desc()
-        tool_prompt = TOOL_SELECTION_PROMPT.format(tools_desc=tools_desc, question=question)
-        
-        print("🔍 大模型分析意图中...")
-        try:
-            tool_selection_response = self.ai_client.chat(
-                tool_prompt,
-                context=[],
-                on_chunk=None
-            )
-        except Exception as e:
-            print(f"❌ 意图分析失败: {e}，将直接回答（不调用接口）")
-            tool_selection_response = '{"tool": "none", "params": {}}'
-        
-        tool_calls = self._parse_tool_calls(tool_selection_response)
+        # 快路径：短句且无明显查数据意图时跳过工具选择，少一次 LLM 调用
+        tool_calls = []
+        q = question.strip()
+        tool_keywords = ("告警", "监控", "统计", "侦测", "设置", "有哪些", "列表", "未处理", "天气", "监控点", "温度", "数量")
+        if len(q) <= 20 and not any(k in q for k in tool_keywords):
+            tool_calls = []
+        else:
+            tools_desc = self._get_tools_desc()
+            tool_prompt = TOOL_SELECTION_PROMPT.format(tools_desc=tools_desc, question=question)
+            print("🔍 大模型分析意图中...")
+            try:
+                tool_selection_response = self.ai_client.chat(
+                    tool_prompt,
+                    context=[],
+                    on_chunk=None,
+                    max_tokens=512
+                )
+                tool_calls = self._parse_tool_calls(tool_selection_response)
+            except Exception as e:
+                print(f"❌ 意图分析失败: {e}，将直接回答（不调用接口）")
+                tool_calls = []
         parts = []
         for tool_name, tool_params in tool_calls:
             r = self._execute_tool(tool_name, tool_params)
@@ -581,11 +636,12 @@ class IntelligentAgent:
         data_summary = "\n\n".join(parts) if parts else ""
         
         # 4. 构建AI提示词（Tool-Calling 第二步：根据数据生成回答）
-        system_prompt = """你是医院安全监控系统的智能助手"小智"。你的职责是：
+        system_prompt = """你是小区安全监控系统的智能助手"小城"。你的职责是：
 1. 帮助用户理解监控数据和告警信息
 2. 提供专业的安全知识建议
 3. 分析告警数据并给出处理建议
-4. 用友好、专业、简洁的语言回答问题
+4. 支持 Mamba-YOLO 开放世界目标提取：用户可设置要侦测的物体（如：红色电动车、戴帽子的人），多个目标用逗号分隔，你会通过接口下发到算法并生效。
+5. 用友好、专业、简洁的语言回答问题
 
 请用中文回答，回答要专业、准确、易懂。"""
         
@@ -605,19 +661,22 @@ class IntelligentAgent:
 
 用户问题：{question}
 
-请直接回答用户的问题。如果涉及医院安全监控相关知识，请提供专业建议。"""
+请直接回答用户的问题。如果涉及小区安全监控相关知识，请提供专业建议。"""
         
-        # 5. 调用AI分析
+        # 5. 调用AI分析（先发 [REPLACE] 让前端清掉“正在分析...”再流式输出正文）
         print("🤖 调用AI分析...")
+        if on_chunk:
+            on_chunk("[REPLACE]")
+        history = self.conversation_history[-6:] if len(self.conversation_history) > 6 else self.conversation_history
         try:
-            ai_response = self.ai_client.chat(ai_prompt, self.conversation_history, on_chunk=on_chunk)
+            ai_response = self.ai_client.chat(ai_prompt, history, on_chunk=on_chunk)
             print(f"✅ AI分析完成")
-            
-            # 保存对话历史（只保存最近5轮）
+
+            # 保存对话历史（只保留最近 3 轮，减少下次请求的 prompt 体积）
             self.conversation_history.append({"role": "user", "content": question})
             self.conversation_history.append({"role": "assistant", "content": ai_response})
-            if len(self.conversation_history) > 10:  # 保留最近5轮对话
-                self.conversation_history = self.conversation_history[-10:]
+            if len(self.conversation_history) > 6:
+                self.conversation_history = self.conversation_history[-6:]
             
             return ai_response
         except Exception as e:
@@ -643,6 +702,8 @@ def main():
     print("2. 可以询问监控点信息（如：有哪些监控点？）")
     print("3. 可以询问实时统计（如：当前告警统计如何？）")
     print("4. 可以询问安全知识（如：如何预防火灾？如何处理摔倒事件？）")
+    print("5. Mamba-YOLO 开放世界目标提取：可设置要侦测的物体，如「侦测红色电动车，戴帽子的人」（多个用逗号分隔）")
+    print("6. 语音：输入 v 后按回车，使用麦克风说话识别为文字并提问（需安装 SpeechRecognition sounddevice edge-tts）")
     print("\n输入 'exit' 或 'quit' 退出\n")
     
     try:
@@ -654,7 +715,7 @@ def main():
     
     while True:
         try:
-            question = input("\n💬 请输入您的问题: ").strip()
+            question = input("\n💬 请输入您的问题（输入 v 进入语音）: ").strip()
             
             if not question:
                 continue
@@ -662,6 +723,26 @@ def main():
             if question.lower() in ['exit', 'quit', '退出']:
                 print("\n👋 再见！")
                 break
+
+            used_voice_input = False
+            # 语音输入
+            if question.lower() == 'v':
+                try:
+                    from voice_utils import voice_to_text, tts_play
+                    print("🎤 请说话（约 5 秒后自动结束）...")
+                    ok, text = voice_to_text(record_seconds=5)
+                    if not ok:
+                        print(f"❌ 语音识别失败: {text}")
+                        continue
+                    if not text:
+                        print("未识别到内容，请重试")
+                        continue
+                    question = text
+                    used_voice_input = True
+                    print(f"📝 识别结果: {question}")
+                except ImportError as e:
+                    print("❌ 语音功能未安装。请执行: pip install SpeechRecognition sounddevice edge-tts")
+                    continue
             
             # 处理问题
             response = agent.process_question(question)
@@ -672,6 +753,16 @@ def main():
             print("=" * 60)
             print(response)
             print("=" * 60)
+
+            # 语音输出（仅在使用语音输入时询问是否播放）
+            if used_voice_input and response and input("是否播放语音回答？(y/N): ").strip().lower() == 'y':
+                try:
+                    from voice_utils import tts_play
+                    ok, err = tts_play(response)
+                    if not ok:
+                        print(f"播放失败: {err}")
+                except ImportError:
+                    print("TTS 未安装: pip install edge-tts")
             
         except KeyboardInterrupt:
             print("\n\n👋 再见！")

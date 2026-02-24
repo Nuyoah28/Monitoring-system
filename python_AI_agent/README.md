@@ -6,6 +6,8 @@
 
 支持实时流式回复
 
+**语音功能**：命令行输入 `v` 可麦克风说话识别后提问；API 提供 `POST /chat/voice` 上传 WAV 或 base64 音频，可选返回 TTS 语音。需安装：`pip install SpeechRecognition sounddevice edge-tts`（见 `requirements.txt`）。
+
 ```
 python agent_api.py
 ```

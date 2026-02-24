@@ -111,7 +111,7 @@ import UnityModelViewer from '../../../components/UnityModelViewer.vue'
 				let token = uni.getStorageSync('token')
 				
 				// this.websocket = new wsRequest(`ws://123.57.77.71:10215/api/v1/gpt/ws/${token}`,5000)
-				this.websocket = new wsRequest(`ws://127.0.0.1:10115/api/v1/gpt/ws/${token}`,5000)
+				this.websocket = new wsRequest(`ws://192.168.1.8:10115/api/v1/gpt/ws/${token}`,5000)
 				
 				this.websocket.getMessage(res => {
 					this.cnt ++;

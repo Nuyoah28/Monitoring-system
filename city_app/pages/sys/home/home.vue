@@ -16,14 +16,15 @@
 			<view class="title">
 				<span>AI助手</span>
 			</view>
-			<scroll-view :scroll-top="scrollTop" class="scroll" scroll-y @scroll="recordHeight" :style="{ height: scrollHeight + 'px' , }">
+			<scroll-view :scroll-top="scrollTop" class="scroll" scroll-y @scroll="recordHeight" :style="{ height: scrollHeight + 'px' }">
 				<view class="chat">
 					<view id="msgbar" v-for="(item, index) in textList" :key="index" :class="index%2 === 1 ? 'left' : 'right'">
 						<view class="avatar">
 							<image :src="index % 2 === 0 ? '../../../static/AIuser.png' : '../../../static/ai.png' "></image>
 						</view>
 						<view class="msg">
-							<view>{{ item }}</view>
+							<rich-text v-if="index % 2 === 1" class="msg-rich" :nodes="mdToHtml(item)"></rich-text>
+							<view v-else>{{ item }}</view>
 						</view>
 					</view>
 					<view class="loading" v-show="isLoading">
@@ -42,11 +43,19 @@
 				</view>
 			</scroll-view>
 			<view class="down" id="down">
-				<view class="input">
-					<input type="text" v-model="text">
-					<button @click="send()" :disabled="isDisabled">
-						<span>发 送</span>
-					</button>
+				<view class="input-wrap">
+					<input class="input-inner" type="text" v-model="text" placeholder="输入或点击麦克风说话" :disabled="isLoading" />
+					<view class="btn-voice" :class="{ recording: isRecording }" @click="voiceClickHandler" :style="{ opacity: isLoading ? 0.6 : 1 }">
+						<text class="btn-voice-text">{{ isRecording ? '停止' : '🎤' }}</text>
+					</view>
+					<view class="btn-send" :class="{ disabled: isDisabled }" @click="!isDisabled && send()">
+						<text class="btn-send-text">发送</text>
+					</view>
+				</view>
+				<view class="voice-tip" v-if="isRecording">正在录音，再次点击停止并发送</view>
+				<view class="tts-bar" v-if="isTtsPlaying">
+					<text class="tts-bar-text">语音播放中</text>
+					<view class="btn-stop-tts" @click.stop="stopTtsPlayback">停止播放</view>
 				</view>
 			</view>
 		</view>
@@ -71,6 +80,12 @@ import Vue from 'vue';
 				websocket: null,
 				cnt: 0,
 				isLoading: false,
+				// 语音
+				agentBaseUrl: 'http://192.168.1.8:5050',
+				isRecording: false,
+				isTtsPlaying: false,
+				recorderManager: null,
+				innerAudioContext: null,
 			}
 		},
 		onShow() {
@@ -79,18 +94,62 @@ import Vue from 'vue';
 		},
 		beforeDestroy() {
 
-		},		
+		},
+		computed: {
+			voiceClickHandler() {
+				const self = this;
+				return function() {
+					try {
+						if (self.isRecording) self.stopVoiceRecordAndSend();
+						else self.startVoiceRecord();
+					} catch (e) {
+						uni.showToast({ title: '语音功能异常', icon: 'none' });
+					}
+				};
+			}
+		},
 		methods:{
+			// 将 Markdown 转为富文本可用的 HTML，去掉符号并保留排版
+			mdToHtml(str) {
+				if (str == null || typeof str !== 'string') return ''
+				let s = str
+				// 先转义 HTML
+				s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+				// 代码块 ```...```（多行）
+				s = s.replace(/```[\s\S]*?```/g, (m) => {
+					const text = m.replace(/^```\n?|```$/g, '').trim()
+					return '<div class="md-code-block">' + text + '</div>'
+				})
+				// 行内代码 `...`
+				s = s.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>')
+				// ### 标题
+				s = s.replace(/^###\s+(.+)$/gm, '<div class="md-h3">$1</div>')
+				s = s.replace(/^##\s+(.+)$/gm, '<div class="md-h2">$1</div>')
+				s = s.replace(/^#\s+(.+)$/gm, '<div class="md-h1">$1</div>')
+				// **粗体** __粗体__
+				s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+				s = s.replace(/__(.+?)__/g, '<b>$1</b>')
+				// *斜体* _斜体_
+				s = s.replace(/\*([^*]+)\*/g, '<i>$1</i>')
+				s = s.replace(/_([^_]+)_/g, '<i>$1</i>')
+				// 换行
+				s = s.replace(/\n/g, '<br/>')
+				return s
+			},
 			createWs() {
 				let token = uni.getStorageSync('token')
 				// 关于ai对话部分的，如果没有需求先不用管这一部分
 				// this.websocket = new wsRequest(`ws://8.152.219.117:10215/api/v1/gpt/ws/${token}`,5000) //服务器
-				// this.websocket = new wsRequest(`ws://localhost:10215/api/v1/gpt/ws/${token}`,5000) //本地
-				this.websocket = new wsRequest(`ws://192.168.3.135:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接
+				this.websocket = new wsRequest(`ws://192.168.1.8:5050/api/v1/gpt/ws/${token}`,5000) // Python Agent
 				this.websocket.getMessage(res => {
 					// console.log('res=',res.data)
 					// console.log('textList=',this.textList[this.textList.length-1])
 					this.cnt ++;
+					if (res.data === "[REPLACE]") {
+						this.answerText = '';
+						Vue.set(this.textList, this.textList.length - 1, '');
+						return;
+					}
 					this.isLoading = false;
 					if(res.data !== "[DONE]"){
 						this.answerText += res.data;
@@ -98,6 +157,10 @@ import Vue from 'vue';
 					Vue.set(this.textList , this.textList.length-1 , this.answerText)
 					if(res.data === "[DONE]") {
 						this.isDisabled = false;
+						// 文字回复也播放语音（与 Web 端体验一致）
+						if (this.answerText && this.answerText.trim()) {
+							this.requestTtsAndPlay(this.answerText.trim());
+						}
 					}
 					if (this.cnt == 12) {
 						this.toBottom();
@@ -107,14 +170,21 @@ import Vue from 'vue';
 			},
 			setSafeArea() {
 				this.safeHeight = uni.getWindowInfo().safeArea.height;
-				// console.log("安全高度：" + this.safeHeight);
-				this.$nextTick(()=>{
+				this.$nextTick(() => {
 					const query = uni.createSelectorQuery().in(this);
-					query.select('#down').boundingClientRect(data => {
-						// console.log(data);
-						this.scrollHeight = (data.height / 0.1) * 0.8;	
-					}).exec();	
-				})
+					query.select('.body').boundingClientRect();
+					query.select('.title').boundingClientRect();
+					query.select('#down').boundingClientRect();
+					query.exec((res) => {
+						const body = res[0];
+						const title = res[1];
+						const down = res[2];
+						if (body && down) {
+							const titleH = (title && title.height) ? title.height : 50;
+							this.scrollHeight = Math.max(200, (body.height || 0) - titleH - down.height);
+						}
+					});
+				});
 			},
 			jump() {
 			  uni.navigateTo({
@@ -172,6 +242,203 @@ import Vue from 'vue';
 					.exec();
 					this.query = null;
 				});
+			},
+			// 语音输入（安全包装，避免 handler 为 undefined 报错）
+			onVoiceClick() {
+				try {
+					if (this.isRecording) {
+						this.stopVoiceRecordAndSend();
+					} else {
+						this.startVoiceRecord();
+					}
+				} catch (e) {
+					uni.showToast({ title: '语音功能异常', icon: 'none' });
+				}
+			},
+			toggleVoice() {
+				this.onVoiceClick();
+			},
+			startVoiceRecord() {
+				try {
+					if (typeof uni.authorize === 'function') {
+						uni.authorize({
+							scope: 'scope.record',
+							success: () => { this.doStartRecord(); },
+							fail: () => {
+								uni.showModal({
+									title: '需要麦克风权限',
+									content: '请在设置中允许使用麦克风，用于语音输入',
+									confirmText: '去设置',
+									success: (res) => {
+										if (res.confirm && typeof uni.openSetting === 'function') uni.openSetting();
+									}
+								});
+							}
+						});
+					} else {
+						this.doStartRecord();
+					}
+				} catch (e) {
+					uni.showToast({ title: '录音不可用', icon: 'none' });
+				}
+			},
+			doStartRecord() {
+				try {
+					if (typeof uni.getRecorderManager !== 'function') {
+						uni.showToast({ title: '当前环境不支持录音', icon: 'none' });
+						return;
+					}
+					const rm = uni.getRecorderManager();
+					if (!rm || typeof rm.start !== 'function') {
+						uni.showToast({ title: '当前环境不支持录音', icon: 'none' });
+						return;
+					}
+					this.recorderManager = rm;
+					if (typeof rm.onStart === 'function') rm.onStart(() => { this.isRecording = true; });
+					if (typeof rm.onStop === 'function') {
+						rm.onStop((res) => {
+							this.isRecording = false;
+							if (res && res.tempFilePath) this.sendVoiceToAgent(res.tempFilePath);
+							else uni.showToast({ title: '录音失败', icon: 'none' });
+						});
+					}
+					if (typeof rm.onError === 'function') {
+						rm.onError((err) => {
+							this.isRecording = false;
+							const msg = (err && err.errMsg) ? err.errMsg : '录音错误';
+							if (msg.indexOf('auth') !== -1 || msg.indexOf('权限') !== -1) {
+								uni.showModal({
+									title: '麦克风权限未开启',
+									content: '请到系统设置中允许本应用使用麦克风',
+									confirmText: '去设置',
+									success: (res) => { if (res.confirm && typeof uni.openSetting === 'function') uni.openSetting(); }
+								});
+							} else {
+								uni.showToast({ title: '录音错误', icon: 'none' });
+							}
+						});
+					}
+					// 先用最简参数启动，兼容各平台（部分不支持 format: 'wav'）
+					try {
+						rm.start({ duration: 60000, format: 'wav', sampleRate: 16000, numberOfChannels: 1 });
+					} catch (e) {
+						rm.start({ duration: 60000 });
+					}
+				} catch (e) {
+					uni.showToast({ title: '录音不可用，请使用 App 或小程序', icon: 'none' });
+				}
+			},
+			stopVoiceRecordAndSend() {
+				if (this.recorderManager) {
+					this.recorderManager.stop();
+					this.recorderManager = null;
+				}
+			},
+			sendVoiceToAgent(tempFilePath) {
+				const token = uni.getStorageSync('token') || '';
+				this.isLoading = true;
+				uni.uploadFile({
+					url: this.agentBaseUrl + '/chat/voice',
+					filePath: tempFilePath,
+					name: 'audio',
+					header: token ? { Authorization: 'Bearer ' + token } : {},
+					formData: { return_tts: 'true' },
+					success: (res) => {
+						try {
+							if (res.statusCode && res.statusCode !== 200) {
+								let msg = '服务异常 ' + (res.statusCode || '');
+								try {
+									const raw = res.data;
+									const data = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+									if (data.message) msg = data.message;
+								} catch (e) {}
+								uni.showToast({ title: msg, icon: 'none' });
+								this.isLoading = false;
+								return;
+							}
+							// 部分平台 res.data 已是对象，部分为字符串
+							const raw = res.data;
+							if (raw === undefined || raw === null || raw === '') {
+								uni.showToast({ title: '无返回数据', icon: 'none' });
+								this.isLoading = false;
+								return;
+							}
+							const data = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+							if (data.code !== '00000' || !data.data) {
+								uni.showToast({ title: data.message || '请求失败', icon: 'none' });
+								this.isLoading = false;
+								return;
+							}
+							const { question: recognized, answer } = data.data;
+							this.textList.push(recognized || '(语音)');
+							this.textList.push(answer || '');
+							this.toBottom();
+							if (answer && answer.trim()) this.requestTtsAndPlay(answer.trim());
+						} catch (e) {
+							uni.showToast({ title: '解析失败，请确认 Agent 已启动', icon: 'none' });
+						}
+						this.isLoading = false;
+					},
+					fail: () => {
+						uni.showToast({ title: '网络异常', icon: 'none' });
+						this.isLoading = false;
+					}
+				});
+			},
+			// 使用可播放的 URL 播放（兼容各平台）
+			playTtsByPlayUrl(playUrl) {
+				if (!playUrl) return;
+				this.stopTtsPlayback();
+				if (typeof uni.createInnerAudioContext !== 'function') {
+					uni.showToast({ title: '当前环境不支持语音播放', icon: 'none' });
+					return;
+				}
+				const ctx = uni.createInnerAudioContext();
+				this.innerAudioContext = ctx;
+				ctx.obeysMuteSwitch = false;
+				ctx.src = playUrl;
+				ctx.onPlay(() => { this.isTtsPlaying = true; });
+				ctx.onEnded(() => { this.isTtsPlaying = false; this.innerAudioContext = null; });
+				ctx.onError(() => {
+					this.isTtsPlaying = false;
+					this.innerAudioContext = null;
+					uni.showToast({ title: '语音播放失败', icon: 'none' });
+				});
+				ctx.play();
+			},
+			// 请求 TTS 并播放：POST 提交全文，用返回的短 URL 播放，避免 GET 长度限制导致念不完
+			requestTtsAndPlay(text) {
+				if (!text || !this.agentBaseUrl) return;
+				const token = uni.getStorageSync('token') || '';
+				uni.request({
+					url: this.agentBaseUrl + '/tts/audio',
+					method: 'POST',
+					header: {
+						'Content-Type': 'application/json',
+						...(token ? { Authorization: 'Bearer ' + token } : {})
+					},
+					data: { text: text },
+					success: (res) => {
+						if (res.statusCode === 200 && res.data && res.data.code === '00000' && res.data.data && res.data.data.play_url) {
+							this.playTtsByPlayUrl(res.data.data.play_url);
+						} else {
+							uni.showToast({ title: res.data && res.data.message ? res.data.message : 'TTS 请求失败', icon: 'none' });
+						}
+					},
+					fail: () => {
+						uni.showToast({ title: '网络异常', icon: 'none' });
+					}
+				});
+			},
+			stopTtsPlayback() {
+				if (this.innerAudioContext) {
+					try {
+						if (typeof this.innerAudioContext.stop === 'function') this.innerAudioContext.stop();
+						if (typeof this.innerAudioContext.destroy === 'function') this.innerAudioContext.destroy();
+					} catch (e) {}
+					this.innerAudioContext = null;
+				}
+				this.isTtsPlaying = false;
 			},
 		},
 		watch:{
@@ -260,7 +527,7 @@ import Vue from 'vue';
 				display: flex;
 				flex-direction: column;
 				align-items: center;
-				justify-content: space-between;
+				justify-content: flex-start;
 				.title {
 					width: 80%;
 					height: 7%;
@@ -280,11 +547,11 @@ import Vue from 'vue';
 					}
 				}
 				.scroll {
-					// background-color:red;
-					flex-grow: 1;
+					flex: 1;
+					min-height: 0;
+					width: 100%;
 					box-sizing: border-box;
 					overflow: hidden;
-					overflow-anchor: false;
 					.chat {
 						// width: 98%;
 						// height: 79%;	
@@ -331,6 +598,22 @@ import Vue from 'vue';
 									word-wrap:break-word;
 									// border: 2px solid red;
 								}
+								.msg-rich {
+									word-break: break-all;
+									word-wrap: break-word;
+									font-size: 28rpx;
+									line-height: 1.5;
+									color: #333;
+								}
+								.md-inline-code, .md-code-block {
+									background: #f5f5f5;
+									padding: 4rpx 8rpx;
+									border-radius: 6rpx;
+									font-size: 24rpx;
+								}
+								.md-h1 { font-size: 36rpx; font-weight: 700; margin: 8rpx 0; }
+								.md-h2 { font-size: 32rpx; font-weight: 700; margin: 6rpx 0; }
+								.md-h3 { font-size: 30rpx; font-weight: 600; margin: 4rpx 0; }
 							}
 						}
 						//////RIGHT/////
@@ -369,48 +652,142 @@ import Vue from 'vue';
 									word-wrap:break-word;
 									// border: 2px solid red;
 								}
+								.msg-rich {
+									word-break: break-all;
+									word-wrap: break-word;
+									font-size: 28rpx;
+									line-height: 1.5;
+									color: #333;
+								}
+								.md-inline-code, .md-code-block {
+									background: #f5f5f5;
+									padding: 4rpx 8rpx;
+									border-radius: 6rpx;
+									font-size: 24rpx;
+								}
+								.md-h1 { font-size: 36rpx; font-weight: 700; margin: 8rpx 0; }
+								.md-h2 { font-size: 32rpx; font-weight: 700; margin: 6rpx 0; }
+								.md-h3 { font-size: 30rpx; font-weight: 600; margin: 4rpx 0; }
 							}
 						}
 					}
 				}
 				.down {
 					width: 100%;
-					height: 10%;
+					flex-shrink: 0;
+					padding: 16rpx 24rpx 24rpx;
 					background-color: #DDE4FF;
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					gap: 10rpx;
+					box-sizing: border-box;
+				}
+				.input-wrap {
+					width: 93%;
+					max-width: 680rpx;
+					height: 88rpx;
+					display: flex;
+					align-items: center;
+					background-color: #fff;
+					border-radius: 44rpx;
+					overflow: hidden;
+					padding: 0 8rpx 0 28rpx;
+					box-sizing: border-box;
+				}
+				.input-inner {
+					flex: 1;
+					min-width: 0;
+					height: 100%;
+					font-size: 28rpx;
+					color: #333;
+					background: transparent;
+				}
+				.input-inner::placeholder {
+					color: #b0b8d4;
+				}
+				.btn-voice {
+					width: 72rpx;
+					height: 72rpx;
+					min-width: 72rpx;
+					border-radius: 50%;
+					background-color: #E0E6FF;
+					display: flex;
+					justify-content: center;
+					align-items: center;
+					margin-left: 12rpx;
+					flex-shrink: 0;
+				}
+				.btn-voice:active {
+					opacity: 0.9;
+				}
+				.btn-voice.recording {
+					width: 100rpx;
+					min-width: 100rpx;
+					height: 72rpx;
+					border-radius: 36rpx;
+					background-color: #f56c6c;
+				}
+				.btn-voice-text {
+					white-space: nowrap;
+					font-size: 36rpx;
+					font-weight: 600;
+					color: #5a6ab8;
+				}
+				.btn-voice.recording .btn-voice-text {
+					color: #fff;
+					font-size: 28rpx;
+				}
+				.btn-send {
+					height: 72rpx;
+					min-width: 120rpx;
+					padding: 0 28rpx;
+					margin-left: 12rpx;
+					border-radius: 36rpx;
+					background-color: #5a6ab8;
+					display: flex;
+					justify-content: center;
+					align-items: center;
+					flex-shrink: 0;
+				}
+				.btn-send:active {
+					opacity: 0.9;
+				}
+				.btn-send.disabled {
+					opacity: 0.5;
+				}
+				.btn-send-text {
+					color: #fff;
+					font-size: 30rpx;
+					font-weight: 600;
+				}
+				.voice-tip {
+					font-size: 24rpx;
+					color: #747EA1;
+				}
+				.tts-bar {
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					.input {
-						// border: 2px solid red;
-						width: 93%;
-						height: 62%;
-						display: flex;
-						align-items: center;
-						input {
-							// border: 1px solid green;
-							height: 98%;
-							width: 73%;
-							background-color: white;
-							box-sizing: border-box;
-							padding: 20rpx;
-							border-radius: 10rpx 0 0 10rpx;
-						}
-						button {
-							border: 0px solid green;
-							height: 98%;
-							width: 27%;
-							border-radius: 0 10rpx 10rpx 0;
-							background-color: #9EB3FF;
-							display: flex;
-							justify-content: center;
-							align-items: center;
-							span {
-								color: white;
-								font-weight: 700;
-								font-size: 32rpx;
-							}
-						}
-					}
+					gap: 20rpx;
+					padding: 12rpx 24rpx;
+					background: rgba(255, 152, 0, 0.12);
+					border-radius: 24rpx;
+					width: 100%;
+					max-width: 400rpx;
+					box-sizing: border-box;
+				}
+				.tts-bar-text {
+					font-size: 24rpx;
+					color: #e65100;
+				}
+				.btn-stop-tts {
+					padding: 10rpx 28rpx;
+					font-size: 26rpx;
+					font-weight: 600;
+					background-color: #f57c00;
+					color: #fff;
+					border-radius: 24rpx;
 				}
 			}
 		// }

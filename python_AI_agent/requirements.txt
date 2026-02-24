@@ -1,0 +1,14 @@
+# Agent 核心（已有依赖，与主项目一致）
+requests
+websocket-client
+
+# 语音功能（可选，用于 STT + TTS）
+SpeechRecognition>=3.10.0   # 语音识别，默认用 Google 免费
+edge-tts>=6.1.0            # 语音合成（中文效果好，免费）
+sounddevice>=0.4.6         # 麦克风录音（语音输入时需要）
+pydub                     # 非 WAV（如 mp3）转 WAV 供 STT（需系统安装 ffmpeg）
+
+# API 服务
+flask
+flask-cors
+flask-sock

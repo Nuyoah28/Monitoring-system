@@ -21,12 +21,29 @@
         :disabled="isStreaming"
         @keyup.enter="sendQuestion"
       />
+      <el-tooltip content="语音输入" placement="top">
+        <el-button
+          :type="isRecording ? 'danger' : 'default'"
+          circle
+          class="voice-btn"
+          :disabled="isStreaming"
+          @click="toggleVoice"
+        >
+          <span v-if="!isRecording">🎤</span>
+          <span v-else class="recording-dot">●</span>
+        </el-button>
+      </el-tooltip>
       <el-button type="primary" class="send-btn" :disabled="!canSend" @click="sendQuestion">
         发送
       </el-button>
       <el-button v-if="isStreaming" type="danger" plain class="stop-btn" @click="stopStream">
         停止
       </el-button>
+      <el-tooltip v-if="isTtsPlaying" content="停止语音播放" placement="top">
+        <el-button type="warning" plain circle class="stop-tts-btn" @click="stopTtsPlayback">
+          ⏹
+        </el-button>
+      </el-tooltip>
     </div>
     <div class="panel-footer"></div>
   </div>
@@ -62,6 +79,174 @@ const panelStyle = computed(() => ({
   left: `${position.value.x}px`,
   top: `${position.value.y}px`
 }));
+
+// 语音输入
+const isRecording = ref<boolean>(false);
+// 语音播放：可随时停止
+const isTtsPlaying = ref<boolean>(false);
+let currentTtsAudio: HTMLAudioElement | null = null;
+let mediaStream: MediaStream | null = null;
+let audioContext: AudioContext | null = null;
+let processor: ScriptProcessorNode | null = null;
+let source: MediaStreamAudioSourceNode | null = null;
+const recordedChunks = ref<Int16Array[]>([]);
+let sampleRate = 16000;
+
+function floatTo16BitPCM(float32Array: Float32Array): Int16Array {
+  const int16Array = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return int16Array;
+}
+
+function encodeWAV(samples: Int16Array, sampleRate: number): Blob {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeStr = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  const offset = 44;
+  for (let i = 0; i < samples.length; i++) view.setInt16(offset + i * 2, samples[i], true);
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+const startRecording = (): void => {
+  recordedChunks.value = [];
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    mediaStream = stream;
+    audioContext = new AudioContext({ sampleRate: 16000 });
+    sampleRate = audioContext.sampleRate;
+    const input = audioContext.createMediaStreamSource(stream);
+    source = input;
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e) => {
+      const inputData = e.inputBuffer.getChannelData(0);
+      recordedChunks.value.push(floatTo16BitPCM(inputData));
+    };
+    input.connect(processor);
+    processor.connect(audioContext.destination);
+    isRecording.value = true;
+  }).catch((err) => {
+    console.error('麦克风不可用', err);
+    appendMessage('assistant', '[语音] 无法访问麦克风，请允许浏览器使用麦克风。');
+  });
+};
+
+const stopRecordingAndSend = (): void => {
+  if (!processor || !source || !audioContext) return;
+  processor.disconnect();
+  source.disconnect();
+  if (mediaStream) mediaStream.getTracks().forEach((t) => t.stop());
+  isRecording.value = false;
+  const totalLength = recordedChunks.value.reduce((acc, arr) => acc + arr.length, 0);
+  const merged = new Int16Array(totalLength);
+  let offset = 0;
+  for (const arr of recordedChunks.value) {
+    merged.set(arr, offset);
+    offset += arr.length;
+  }
+  recordedChunks.value = [];
+  if (merged.length < 1000) {
+    appendMessage('assistant', '[语音] 录音太短，请重试。');
+    return;
+  }
+  const wavBlob = encodeWAV(merged, sampleRate);
+  sendVoiceToAgent(wavBlob);
+};
+
+const toggleVoice = (): void => {
+  if (isRecording.value) {
+    stopRecordingAndSend();
+  } else {
+    startRecording();
+  }
+};
+
+const stopTtsPlayback = (): void => {
+  if (currentTtsAudio) {
+    currentTtsAudio.pause();
+    currentTtsAudio.currentTime = 0;
+    currentTtsAudio = null;
+  }
+  isTtsPlaying.value = false;
+};
+
+const sendVoiceToAgent = async (wavBlob: Blob): Promise<void> => {
+  const userStore = useUserStore();
+  userStore.hydrateFromSessionStorage();
+  const token = userStore.token;
+
+  appendMessage('assistant', '');
+  isStreaming.value = true;
+  const formData = new FormData();
+  formData.append('audio', wavBlob, 'voice.wav');
+  formData.append('return_tts', 'true');
+
+  try {
+    const res = await fetch(`${agentBaseUrl}/chat/voice`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData
+    });
+    const data = await res.json();
+    if (data.code !== '00000' || !data.data) {
+      const last = messages.value[messages.value.length - 1];
+      if (last && last.role === 'assistant') last.content = `[语音] ${data.message || '请求失败'}`;
+      else appendMessage('assistant', `[语音] ${data.message || '请求失败'}`);
+      isStreaming.value = false;
+      return;
+    }
+    const { question: recognized, answer, audio_base64 } = data.data;
+    // 替换“正在生成”占位，改为用户消息 + 识别文字，再助手消息
+    messages.value.pop();
+    appendMessage('user', recognized || '(语音)');
+    appendMessage('assistant', answer || '');
+    if (audio_base64) {
+      stopTtsPlayback();
+      try {
+        const audio = new Audio('data:audio/mpeg;base64,' + audio_base64);
+        currentTtsAudio = audio;
+        isTtsPlaying.value = true;
+        audio.addEventListener('ended', () => {
+          isTtsPlaying.value = false;
+          currentTtsAudio = null;
+        });
+        audio.addEventListener('error', () => {
+          isTtsPlaying.value = false;
+          currentTtsAudio = null;
+        });
+        audio.play().catch(() => {
+          isTtsPlaying.value = false;
+          currentTtsAudio = null;
+        });
+      } catch (_) {
+        isTtsPlaying.value = false;
+        currentTtsAudio = null;
+      }
+    }
+  } catch (err) {
+    const last = messages.value[messages.value.length - 1];
+    if (last && last.role === 'assistant') last.content = '[语音] 网络异常，请重试';
+    else appendMessage('assistant', '[语音] 网络异常，请重试');
+  } finally {
+    isStreaming.value = false;
+  }
+};
 
 const scrollToBottom = (): void => {
   nextTick(() => {
@@ -249,6 +434,13 @@ const onDragEnd = (): void => {
   min-height: 14rem;
   max-width: 70vw;
   max-height: 80vh;
+  /* 磨砂质感 */
+  background: rgba(28, 32, 45, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
 }
 
 .chat-panel.expanded {
@@ -328,5 +520,22 @@ const onDragEnd = (): void => {
 .send-btn,
 .stop-btn {
   flex-shrink: 0;
+}
+
+.stop-tts-btn {
+  flex-shrink: 0;
+}
+
+.voice-btn {
+  flex-shrink: 0;
+}
+
+.recording-dot {
+  color: #f56c6c;
+  animation: blink 0.8s ease-in-out infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0.4; }
 }
 </style>
