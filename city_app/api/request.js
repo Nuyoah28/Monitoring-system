@@ -12,7 +12,7 @@ uni.$http = $http;
 // 目前是连接本地的后端，后续用服务器在这里修改
 // $http.baseUrl = "http://8.152.219.117:10215";
 // $http.baseUrl = "http://192.168.115.66:10115"
-$http.baseUrl = "http://192.168.3.135:10215";
+$http.baseUrl = "http://192.168.1.8:10215";
 
 $http.beforeRequest = function (options) {
     let token = uni.getStorageSync('token')
