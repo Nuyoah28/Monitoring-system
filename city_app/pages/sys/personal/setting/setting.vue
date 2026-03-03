@@ -4,27 +4,19 @@
       height: 100vh;
       width: 100vw;
       position: relative;
-      background-color: #7db6ff;
+      background-color: transparent;
     "
   >
     <view class="setBox" :style="{ height: safeHeight + 'px' }">
       <view class="backImg">
         <view class="title">
           <view class="backing" @click="back">
-            <image
-              src="../../../../static/left-double-arrow.png"
-              mode="aspectFit"
-              alt=""
-            ></image>
+            <u-icon name="arrow-left" color="#1A2A3A" size="44rpx"></u-icon>
           </view>
           <h3>设置</h3>
         </view>
-        <image
-          src="../../../../static/d53eb072-3395-4bc6-9dd1-41b32cc61095.png"
-          mode=""
-          style="width: 100vw"
-        ></image>
       </view>
+      
       <view class="content">
         <view class="items" @click="showAbout = true">
           <view class="text"> 关于 </view>
@@ -51,6 +43,7 @@
           </view>
         </view>
       </view>
+
       <u-modal
         :show="showAbout"
         :title="title"
@@ -121,62 +114,100 @@ export default {
   position: absolute;
   width: 100%;
   bottom: 0;
-  background-color: #fff;
+  background-color: transparent;
+  
   .backImg {
     position: absolute;
+    width: 100%;
+    
     .title {
       position: absolute;
       top: 0;
       z-index: 999;
-      color: #fff;
+      color: #1A2A3A;
       display: flex;
       align-items: center;
       justify-content: flex-start;
       width: 100%;
       padding: 26rpx 36rpx;
       box-sizing: border-box;
+      
       .backing {
-        width: 32px;
-        height: 32px;
+        width: 60rpx;
+        height: 60rpx;
         margin-right: 12rpx;
-        image {
-          width: 100%;
-          height: 100%;
-        }
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(0, 122, 255, 0.1);
+        border-radius: 50%;
+        box-shadow: 0 4rpx 12rpx rgba(100, 150, 200, 0.1);
+      }
+      
+      h3 {
+        font-weight: bold;
+        font-size: 36rpx;
       }
     }
   }
+  
   .content {
-    width: 88%;
+    width: 90%;
     box-sizing: border-box;
     position: absolute;
-    top: 30%;
+    top: 25%;
     left: 50%;
     transform: translate(-50%);
+    padding: 40rpx 30rpx;
+    border-radius: 32rpx;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 1);
+    box-shadow: 0 16rpx 48rpx rgba(26, 42, 58, 0.08);
+    
     .items {
-      background: #dceaff;
-      height: 106rpx;
+      background: rgba(255, 255, 255, 0.9);
+      height: 110rpx;
       width: 100%;
-      margin-top: 28rpx;
-      border-radius: 18rpx;
+      margin-bottom: 30rpx; /* Use margin-bottom for spacing */
+      border-radius: 24rpx;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 24rpx;
+      padding: 0 30rpx;
       box-sizing: border-box;
+      box-shadow: 0 4rpx 16rpx rgba(100, 150, 200, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      transition: transform 0.2s, box-shadow 0.2s;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+      
+      &:active {
+        transform: scale(0.98);
+        box-shadow: 0 2rpx 8rpx rgba(100, 150, 200, 0.05);
+      }
+      
+      .text {
+        margin-left: 10rpx;
+        color: #1A2A3A;
+        font-weight: 600;
+        font-size: 32rpx;
+      }
+      
       .img {
-        height: 46rpx;
-        width: 46rpx;
+        height: 40rpx;
+        width: 40rpx;
         image {
           height: 100%;
           width: 100%;
+          filter: brightness(0.6) sepia(1) hue-rotate(180deg) saturate(3); /* Darken icon slightly */
         }
-      }
-      .text {
-        margin-left: 16rpx;
-        color: #8496b0;
-        font-weight: bold;
-        font-size: 36rpx;
       }
     }
   }

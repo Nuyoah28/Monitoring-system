@@ -1,17 +1,15 @@
 {
-	"easycom":{
-		"^u-(.*)":"uview-ui/components/u-$1/u-$1.vue"
+	"easycom": {
+		"^u-(.*)": "uview-ui/components/u-$1/u-$1.vue"
 	},
 	"pages": [
 		{
-		    "path" : "pages/sys/start/start",
-		    "style" :                                                                                    
-		    {
-		        "navigationBarTitleText": "",
-		        "enablePullDownRefresh": false,
+			"path": "pages/sys/start/start",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false,
 				"navigationStyle": "custom"
-		    }
-		    
+			}
 		},
 		{
 			"path": "pages/sys/login/index",
@@ -19,133 +17,86 @@
 				"navigationBarTitleText": "登录",
 				"navigationStyle": "custom"
 			}
-		}
-	    ,{
-            "path" : "pages/sys/realtime/realtime",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false,
-				"navigationStyle": "custom",
-				"app-plus": {
-					"bounce": "none"
-				}
-            }
-            
-        }
-        ,{
-            "path" : "pages/sys/dateWatcher/dateWatcher",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false,
-				"navigationStyle": "custom"
-            }
-            
-        }
-        ,{
-            "path" : "pages/sys/home/home",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false,
-				"navigationStyle": "custom"
-            }
-            
-        }
-        ,{
-            "path" : "pages/sys/controls/controls",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false,
-				"navigationStyle": "custom",
-				"app-plus": {
-					"bounce": "none"
-				}
-            }
-            
-        }
-        ,{
-            "path" : "pages/sys/personal/personal",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false,
-				"navigationStyle": "custom",
-				"app-plus": {
-					"bounce": "none"
-				}
-            }
-            
-        }
-        ,{
-            "path" : "pages/sys/personal/setting/setting",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false,
-                "navigationStyle": "custom",
-                "app-plus": {
-                    "bounce": "none"
-                }
-            }
-            
-        }
-        ,{
-            "path" : "pages/sys/personal/edit/edit",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false,
-				"navigationStyle": "custom",
-				"app-plus": {
-					"bounce": "none"
-				}
-            }
-            
-        },
-        // {
-        // 	"path" : "pages/sys/home/home2",
-        // 	"style" : 
-        // 	{
-        // 		"navigationBarTitleText" : "",
-        // 		"enablePullDownRefresh" : false
-        // 	}
-        //  },
-        // {
-        // 	"path" : "pages/sys/home/ModelViewer",
-        // 	"style" : 
-        // 	{
-        // 		"navigationBarTitleText" : "",
-        // 		"enablePullDownRefresh" : false
-        // 	}
-        // },
-		// {
-		// 	"path" : "pages/sys/home/BabylonModelViewer",
-		// 	"style" : 
-		// 	{
-		// 		"navigationBarTitleText" : "",
-		// 		"enablePullDownRefresh" : false
-		// 	}
-		// }//,
+		},
 		{
-			"path" : "components/UnityModelViewer",
-			"style" : 
-			{
-				"navigationBarTitleText" : "",
-				"enablePullDownRefresh" : false
+			"path": "pages/sys/realtime/realtime",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false,
+				"navigationStyle": "custom",
+				"app-plus": {
+					"bounce": "none"
+				}
+			}
+		},
+		{
+			"path": "pages/sys/dateWatcher/dateWatcher",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false,
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/sys/home/home",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false,
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/sys/controls/controls",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false,
+				"navigationStyle": "custom",
+				"app-plus": {
+					"bounce": "none"
+				}
+			}
+		},
+		{
+			"path": "pages/sys/personal/personal",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false,
+				"navigationStyle": "custom",
+				"app-plus": {
+					"bounce": "none"
+				}
+			}
+		},
+		{
+			"path": "pages/sys/personal/setting/setting",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false,
+				"navigationStyle": "custom",
+				"app-plus": {
+					"bounce": "none"
+				}
+			}
+		},
+		{
+			"path": "pages/sys/personal/edit/edit",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false,
+				"navigationStyle": "custom",
+				"app-plus": {
+					"bounce": "none"
+				}
+			}
+		},
+		{
+			"path": "components/UnityModelViewer",
+			"style": {
+				"navigationBarTitleText": "",
+				"enablePullDownRefresh": false
 			}
 		}
-		// {
-		// 	"path" : "pages/sys/controls/components/map2",
-		// 	"style" : 
-		// 	{
-		// 		"navigationBarTitleText" : "",
-		// 		"enablePullDownRefresh" : false
-		// 	}
-		// }
-    ],
+	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "uni-app",
@@ -154,14 +105,16 @@
 	},
 	"uniIdRouter": {},
 	"tabBar": {
+		"color": "#6A7990",
+		"selectedColor": "#007AFF",
+		"backgroundColor": "#EBF5FF",
+		"borderStyle": "white",
 		"list": [
 			{
 				"pagePath": "pages/sys/realtime/realtime",
 				"iconPath": "static/tabBar/realTime.png",
 				"selectedIconPath": "static/chosenTabBar/realtime.png"
 			},
-			
-
 			{
 				"pagePath": "pages/sys/controls/controls",
 				"iconPath": "static/tabBar/contorl.png",
@@ -185,5 +138,4 @@
 		],
 		"iconWidth": "24"
 	}
-	
 }

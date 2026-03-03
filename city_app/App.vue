@@ -95,7 +95,10 @@ export default {
 <style lang="scss">
 @import "uview-ui/index.scss";
 @import "./static/fonts/stylesheet.css";
-page {
-  height: 100%;
+page, .uni-page-body {
+  height: 100% !important;
+  background: #D5E7F5 !important; /* 更深一点的冰蓝背景 */
+  background: linear-gradient(180deg, #D5E7F5 0%, #F0F7FF 100%) !important;
+  background-attachment: fixed !important;
 }
 </style>

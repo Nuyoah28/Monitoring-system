@@ -18,44 +18,49 @@ export default {
       type: Number
     }
   },
-  data() {
-    return {
-      chartData: {},
-      opts: {
-        color: ["#1890FF","#91CB74","#FAC858","#EE6666","#73C0DE","#3CA272","#FC8452","#9A60B4","#ea7ccc"],
-        padding: [15,30,0,5],
-        enableScroll: false,
-        legend: {},
-        xAxis: {
-          boundaryGap: "justify",
-          disableGrid: false,
-          min: 0,
-          axisLine: false,
-          max: 40
-        },
-        yAxis: {},
-        extra: {
-          bar: {
-            type: "group",
-            width: 30,
-            meterBorde: 1,
-            meterFillColor: "#FFFFFF",
-            activeBgColor: "#000000",
-            activeBgOpacity: 0.08,
-            linearType: "custom",
-            barBorderCircle: true,
-            seriesGap: 2,
-            categoryGap: 2
+    data() {
+      return {
+        chartData: {},
+        opts: {
+          color: ["#1890FF","#91CB74","#FAC858","#EE6666","#73C0DE","#3CA272","#FC8452","#9A60B4","#ea7ccc"],
+          padding: [15,30,0,5],
+          enableScroll: false,
+          legend: {
+            show: true,
+            position: "top",
+            lineHeight: 25,
+            fontColor: "#1A2A3A"
+          },
+          xAxis: {
+            boundaryGap: "justify",
+            disableGrid: false,
+            min: 0,
+            axisLine: true,
+            max: 40,
+            fontColor: "#1A2A3A"
+          },
+          yAxis: {
+            disableGrid: true,
+            fontColor: "#1A2A3A",
+            axisLineColor: "#d0d0d0"
+          },
+          extra: {
+            bar: {
+              type: "group",
+              width: 30,
+              meterBorde: 1,
+              meterFillColor: "#FFFFFF",
+              activeType: "none"
+            }
           }
         }
-      }
-    };
-  },
-  mounted() {
-      this.getServerData(1);
+      };
     },
-    onShow(){
-      this.getServerData(1);
+  mounted() {
+      // 依赖 watch 的 immediate: true 进行初次加载，移除这里的重复调用
+    },
+    onShow() {
+      // 页面展示刷新逻辑
     },
   methods: {
     async getData(range) {
@@ -104,9 +109,10 @@ export default {
   },
   watch: {
     range: {
-      handler: function(newVal , oldVal) {
-        this.chartData = {};
-        this.getServerData(newVal);
+      handler: function(newVal) {
+        if (newVal) {
+          this.getServerData(newVal);
+        }
       },
       immediate: true,
     }

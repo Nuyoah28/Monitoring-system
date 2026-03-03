@@ -92,3 +92,4 @@ backend/src/main/resources/application-dev-my.yml
 *.weights
 *.safetensors
 
+.agent

@@ -13,6 +13,8 @@ uni.$http = $http;
 // $http.baseUrl = "http://8.152.219.117:10215";
 // $http.baseUrl = "http://192.168.115.66:10115"
 $http.baseUrl = "http://192.168.1.8:10215";
+// $http.baseUrl = "http://192.168.3.135:10215";
+// $http.baseUrl = "http://192.168.68.31:10215";
 
 $http.beforeRequest = function (options) {
     let token = uni.getStorageSync('token')

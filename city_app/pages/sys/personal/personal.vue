@@ -4,20 +4,19 @@
       height: 100vh;
       width: 100vw;
       position: relative;
-      background-color: #7db6ff;
+      background-color: transparent;
     "
   >
     <view class="mainBox" :style="{ height: safeHeight + 'px' }">
       <view class="backImg">
-        <view class="title">
+        <view class="title" :style="{ paddingTop: statusBarHeight + 'px' }">
           <h2>个人中心</h2>
+          <view class="setting-btn" @click="jump('/pages/sys/personal/setting/setting')">
+            <u-icon name="setting" color="#1A2A3A" size="44rpx"></u-icon>
+          </view>
         </view>
-        <image
-          src="../../../static/d53eb072-3395-4bc6-9dd1-41b32cc61095.png"
-          mode=""
-          style="width: 100vw"
-        ></image>
       </view>
+
       <view class="content">
         <view class="inform">
           <view class="avatar">
@@ -86,11 +85,13 @@ export default {
       safeHeight: 0,
       phone: "",
       username: "",
+      statusBarHeight: 0,
     };
   },
   onShow() {
-    // console.log('show')
-    this.safeHeight = uni.getWindowInfo().safeArea.height;
+    const info = uni.getWindowInfo();
+    this.safeHeight = info.safeArea.height;
+    this.statusBarHeight = info.statusBarHeight || 20;
     this.phone = uni
       .getStorageSync("phone")
       .replace(/(\d{3})\d{4}(\d{4})/, "$1****$2");
@@ -112,103 +113,145 @@ export default {
   position: absolute;
   width: 100%;
   bottom: 0;
-  background-color: #fff;
+  background-color: transparent; /* 透出全局背景 */
+  
   .backImg {
     position: absolute;
+    width: 100%;
+    
     .title {
       position: absolute;
       top: 0;
       z-index: 999;
-      color: #fff;
+      color: #1A2A3A; /* 深色文字 */
       display: flex;
       align-items: center;
       justify-content: space-between;
-      width: 100%;
-      padding: 26rpx 36rpx;
+      width: 100vw;
+      padding: 0 40rpx;
       box-sizing: border-box;
-      .setting {
-        width: 34px;
-        height: 34px;
-        image {
-          width: 100%;
-          height: 100%;
-        }
+      height: 100rpx;
+      margin-top: 20rpx;
+
+      h2 {
+        font-weight: bold;
+      }
+
+      .setting-btn {
+        width: 60rpx;
+        height: 60rpx;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(0, 122, 255, 0.1);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 4rpx 12rpx rgba(100, 150, 200, 0.1);
       }
     }
   }
+  
   .content {
-    width: 88%;
+    width: 90%;
     box-sizing: border-box;
-    padding: 36rpx 28rpx;
-    padding-bottom: 160rpx;
-    border-radius: 15rpx;
-    background: #dceaff;
+    padding: 50rpx 40rpx;
+    padding-bottom: 80rpx;
+    border-radius: 32rpx;
+    /* 核心毛玻璃效果 */
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 1);
+    box-shadow: 0 16rpx 48rpx rgba(26, 42, 58, 0.08);
     position: absolute;
-    top: 32%;
+    top: 25%;
     left: 50%;
     transform: translate(-50%);
+    
     .inform {
       display: flex;
       justify-content: flex-start;
       align-items: flex-end;
-      padding-bottom: 32rpx;
-      margin-bottom: 94rpx;
-      border-bottom: 1px solid #b2cbf0;
+      padding-bottom: 40rpx;
+      margin-bottom: 60rpx;
+      border-bottom: 1px solid rgba(26, 42, 58, 0.1);
+      
       .avatar {
         background-color: #fff;
-        width: 98rpx;
-        height: 98rpx;
-        border: 1.3px solid #6a7990;
-        border-radius: 12rpx;
+        width: 120rpx;
+        height: 120rpx;
+        border: 2px solid #FFFFFF;
+        box-shadow: 0 8rpx 24rpx rgba(0, 122, 255, 0.15);
+        border-radius: 20rpx;
         overflow: hidden;
         image {
           width: 100%;
           height: 100%;
         }
       }
+      
       .user {
-        margin-left: 18rpx;
-        color: #6a7990;
+        margin-left: 30rpx;
+        color: #1A2A3A;
         font-weight: bold;
+        
         .name {
-          margin-bottom: 10rpx;
-          font-size: 39rpx;
-          font-family: "Novecento wide", "半展开", "粗体";
+          margin-bottom: 12rpx;
+          font-size: 42rpx;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
+        
         .phone {
-          font-size: 20rpx;
+          font-size: 24rpx;
+          color: rgba(26, 42, 58, 0.6);
+          font-weight: 500;
         }
       }
     }
+    
     .command {
       width: 100%;
+      
       .items {
-        background: #fff;
-        height: 106rpx;
+        background: rgba(255, 255, 255, 0.9);
+        height: 110rpx;
         width: 100%;
-        margin-top: 48rpx;
-        border-radius: 18rpx;
+        margin-top: 30rpx;
+        border-radius: 24rpx;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 24rpx;
+        padding: 0 30rpx;
         box-sizing: border-box;
+        box-shadow: 0 4rpx 16rpx rgba(100, 150, 200, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        transition: transform 0.2s, box-shadow 0.2s;
+        
+        &:active {
+          transform: scale(0.98);
+          box-shadow: 0 2rpx 8rpx rgba(100, 150, 200, 0.05);
+        }
+        
         .left {
           display: flex;
           width: 80%;
           align-items: center;
+          
           .text {
-            margin-left: 16rpx;
-            color: #8496b0;
-            font-weight: bold;
-            font-size: 36rpx;
+            margin-left: 20rpx;
+            color: #1A2A3A;
+            font-weight: 600;
+            font-size: 32rpx;
             display: flex;
             align-items: center;
           }
         }
+        
         .img {
-          height: 46rpx;
-          width: 46rpx;
+          height: 40rpx;
+          width: 40rpx;
           image {
             height: 100%;
             width: 100%;

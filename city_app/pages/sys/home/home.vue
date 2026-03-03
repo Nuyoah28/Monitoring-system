@@ -1,15 +1,13 @@
 <template>
-	<view class="main" :style="{ height: safeHeight + 'px' }">
+	<view class="main" :style="{ minHeight: safeHeight + 'px', paddingTop: statusBarHeight + 'px' }">
 		<view class="header">
 			<view class="topNav">
 				<view class="choosen">
-					<span>
-						<h2>智慧助手</h2>
-					</span>
+					<span>智慧助手</span>
 				</view>
 			</view>
-			<view class="setting" @click="jump">
-				<image src="../../../static/edb8e6b3-f7e0-4778-bdc4-691d6e4f1511.png" mode="aspectFit" alt=""></image>
+			<view class="setting-btn" @click="jump">
+				<u-icon name="setting" color="#666" size="44rpx"></u-icon>
 			</view>
 		</view>
 		<view class="body">
@@ -70,6 +68,7 @@ import Vue from 'vue';
 			return {
 				isDisabled:false,
 				safeHeight:0,
+				statusBarHeight:0,
 				text: "",
 				answerText: "",
 				textList:[],
@@ -89,7 +88,9 @@ import Vue from 'vue';
 			}
 		},
 		onShow() {
-			this.setSafeArea();
+			const info = uni.getWindowInfo();
+			this.safeHeight = info.safeArea.height;
+			this.statusBarHeight = info.statusBarHeight || 20;
 			this.createWs();
 		},
 		beforeDestroy() {
@@ -141,6 +142,9 @@ import Vue from 'vue';
 				// 关于ai对话部分的，如果没有需求先不用管这一部分
 				// this.websocket = new wsRequest(`ws://8.152.219.117:10215/api/v1/gpt/ws/${token}`,5000) //服务器
 				this.websocket = new wsRequest(`ws://192.168.1.8:5050/api/v1/gpt/ws/${token}`,5000) // Python Agent
+				// this.websocket = new wsRequest(`ws://localhost:10215/api/v1/gpt/ws/${token}`,5000) //本地
+				// this.websocket = new wsRequest(`ws://192.168.3.135:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接
+				// this.websocket = new wsRequest(`ws://192.168.68.31:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接
 				this.websocket.getMessage(res => {
 					// console.log('res=',res.data)
 					// console.log('textList=',this.textList[this.textList.length-1])
@@ -470,51 +474,33 @@ import Vue from 'vue';
 		// 	flex-direction: column;
 		//  justify-content: space-around;
 			.header {
-				// border: 2px solid red;
-				width: 95%;
+				width: 100%;
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
-				margin-bottom: 3%;
-				padding: 0 5rpx;
-				padding-bottom: 0;
+				padding: 0 40rpx;
 				box-sizing: border-box;
-				height: 80rpx;
+				height: 100rpx;
+				margin-bottom: 20rpx;
+
 				.topNav {
-					// border: 2px solid red;
-					width: 445rpx;
-					display: flex;
-					justify-content: space-between;
 					.choosen {
-						display: flex;
-						justify-content: center;
-						align-items: flex-end;
 						span {
-							font-size: 40rpx;
-							position: relative;
-						}
-						h2::after {
-							content: "";
-							position: absolute;
-							width: 100%;
-							height: 28%;
-							left: 0;
-							bottom: 2px;
-							background: #9eb3ff;
-							z-index: -1;
-							border-radius: 5rpx;
-							font-size: 80rpx;
+							font-size: 36rpx;
+							color: #1A2A3A;
+							font-weight: bold;
 						}
 					}
 				}
-				.setting {
-					// border: 2px solid red;
-					width: 30px;
-					height: 30px;
-					image {
-						width: 100%;
-						height: 100%;
-					}
+				.setting-btn {
+					width: 60rpx;
+					height: 60rpx;
+					background: rgba(0, 0, 0, 0.05);
+					backdrop-filter: blur(5px);
+					border-radius: 50%;
+					display: flex;
+					justify-content: center;
+					align-items: center;
 				}
 			}
 			.body {

@@ -1,6 +1,6 @@
 <template>
   <view style="height: 100vh; width: 100vw; position: relative">
-    <view class="main" :style="{ height: safeHeight + 'px' }" id="watchBox">
+    <view class="main" :style="{ height: safeHeight + 'px', paddingTop: statusBarHeight + 'px' }" id="watchBox">
       <view class="header">
         <view class="topNav">
           <view
@@ -8,28 +8,18 @@
             :class="choosen === 1 ? 'choosen' : ''"
             @click="choosen = 1"
           >
-            <span>
-              <h2 v-show="choosen === 1">监控位置</h2>
-              <h3 v-show="choosen === 2">监控位置</h3>
-            </span>
+            <span>监控位置</span>
           </view>
           <view
             class="right"
             :class="choosen === 2 ? 'choosen' : ''"
             @click="choosen = 2"
           >
-            <span>
-              <h2 v-show="choosen === 2">监控列表</h2>
-              <h3 v-show="choosen === 1">监控列表</h3>
-            </span>
+            <span>监控列表</span>
           </view>
         </view>
-        <view class="setting" @tap="jump">
-          <image
-            src="../../../static/edb8e6b3-f7e0-4778-bdc4-691d6e4f1511.png"
-            mode="aspectFit"
-            alt=""
-          ></image>
+        <view class="setting-btn" @click="jump">
+          <u-icon name="setting" color="#666" size="44rpx"></u-icon>
         </view>
       </view>
 <!-- 	  <view class="map1" v-if="choosen === 1">
@@ -163,6 +153,7 @@ export default {
     return {
       showEdit: false,
       safeHeight: 0,
+      statusBarHeight: 0,
       total: 0,
       working: 0,
       longitude: 0,
@@ -264,7 +255,9 @@ export default {
     },
   },
   onLoad() {
-    this.safeHeight = uni.getWindowInfo().safeArea.height;
+    const info = uni.getWindowInfo();
+    this.safeHeight = info.safeArea.height;
+    this.statusBarHeight = info.statusBarHeight || 20;
     // console.log(this.safeHeight);
     const that = this;
     // this.$nextTick(() => {
@@ -349,106 +342,96 @@ export default {
 	background-color: pink;
   }
   .header {
-	// position: fixed;
-	// position: relative;
-	// top: 0;
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 3%;
-    padding: 0 32rpx;
-    padding-bottom: 0;
+    margin-bottom: 20rpx;
+    padding: 0 40rpx;
     box-sizing: border-box;
-    height: 80rpx;
-	z-index: 100;
+    height: 100rpx;
+    z-index: 100;
+    
     .topNav {
-      // border: 2px solid red;
-      width: 445rpx;
       display: flex;
-      justify-content: space-between;
-      .left {
-        // border: 2px solid pink;
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
+      background: rgba(0, 122, 255, 0.05);
+      padding: 6rpx;
+      border-radius: 20rpx;
+      gap: 4rpx;
+      
+      .left, .right {
+        padding: 10rpx 28rpx;
+        border-radius: 16rpx;
+        transition: all 0.3s ease;
+        cursor: pointer;
+
         span {
-          font-size: 38rpx;
+          font-size: 28rpx;
+          color: rgba(26, 42, 58, 0.5);
+          font-weight: 500;
         }
       }
+      
       .choosen {
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
+        background: #FFFFFF;
+        box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.1);
+        
         span {
-          font-size: 40rpx;
-          position: relative;
-        }
-        h2::after {
-          content: "";
-          position: absolute;
-          width: 100%;
-          height: 28%;
-          left: 0;
-          bottom: 2px;
-          background: #9eb3ff;
-          z-index: -1;
-          border-radius: 5rpx;
-          font-size: 80rpx;
-        }
-      }
-      .right {
-        // border: 2px solid pink;
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
-        span {
-          font-size: 38rpx;
+          color: #007AFF !important;
+          font-weight: 700;
         }
       }
     }
-    .setting {
-      // border: 2px solid red;
-      width: 30px;
-      height: 30px;
-      image {
-        width: 100%;
-        height: 100%;
-      }
+    
+    .setting-btn {
+      width: 60rpx;
+      height: 60rpx;
+      background: rgba(0, 0, 0, 0.05);
+      backdrop-filter: blur(5px);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
     }
   }
   .status {
-    width: 80%;
-    // position: fixed;
-	position: relative;
-    // top: 15%;
+    width: 85%;
+    position: relative;
+    top: 20rpx;
     left: 50%;
     transform: translate(-50%);
-    border: 3px solid #9eb3ff;
-    background-color: #e9eeff;
-    border-radius: 20rpx;
-    color: #606c97;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 122, 255, 0.1);
+    border-radius: 32rpx;
+    color: #1A2A3A;
     display: flex;
     justify-content: space-around;
+    padding: 10rpx 0;
     box-sizing: border-box;
-	z-index: 100;
-    // align-items: center;
+    box-shadow: 0 8rpx 30rpx rgba(0, 0, 0, 0.05);
+    z-index: 100;
   }
   .detail {
 
     margin: 0;
-    padding: 0;
-    height: 98px;
-    width: 85%;
-    background-color: rgba(0, 0, 0, 0.4);
+    padding: 24rpx;
+    height: auto;
+    width: 90%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(15px);
     display: flex;
     justify-content: space-between;
-    border-radius: 8px;
+    border-radius: 32rpx;
+    border: 1px solid rgba(255, 255, 255, 1);
     position: absolute;
-    bottom: 2%;
+    bottom: 24rpx;
     left: 50%;
     transform: translate(-50%);
-    color: #fff;
+    color: #1A2A3A;
+    box-shadow: 0 16rpx 48rpx rgba(0, 0, 0, 0.15);
     .left {
       // width: 45%;
       // border: 2px solid blue;
@@ -463,10 +446,11 @@ export default {
         align-items: center;
         justify-content: center;
         // border: 2px solid red;
-        font-size: 1.2rem;
-        color: #fff;
-        height: 27px;
+        font-size: 32rpx;
+        color: #1A2A3A;
+        height: auto;
         font-weight: 700;
+        margin-bottom: 12rpx;
       }
       .iconAndStatus {
         display: flex;
@@ -499,73 +483,111 @@ export default {
       }
     }
     .right {
-      width: 50%;
-      font-size: 14px;
+      width: 55%;
+      font-size: 24rpx;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       justify-content: space-around;
-      color: #fff;
+      color: #6A7990;
+      gap: 4rpx;
     }
   }
   .content {
     padding: 0 16rpx;
-    padding-top: 16rpx;
+    padding-bottom: 120rpx; /* 紧贴 TabBar 上方 */
     box-sizing: border-box;
     flex: 1;
     .details {
       width: 100%;
-      height: 250rpx;
-      background-color: #e9eeff;
-      margin-bottom: 20rpx;
-      border-radius: 15rpx;
-      padding: 18rpx 20rpx;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      margin-bottom: 30rpx;
+      border-radius: 40rpx;
+      border: 1px solid rgba(255, 255, 255, 1);
+      padding: 32rpx;
       box-sizing: border-box;
       position: relative;
-      font-weight: bold;
-      color: #606c97;
+      box-shadow: 0 12rpx 40rpx rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+
+      &:active {
+        transform: scale(0.98);
+      }
+
       .deviceName {
-        color: #606c97;
-        font-size: 36rpx;
-        position: absolute;
-        top: 18rpx;
-        left: 20rpx;
+        color: #1A2A3A;
+        font-size: 34rpx;
+        font-weight: 700;
+        margin-bottom: 20rpx;
+        display: block;
       }
       .positonAndtime {
-        position: absolute;
-        bottom: 18rpx;
-        left: 20rpx;
         display: flex;
         flex-direction: column;
-        align-items: baseline;
+        gap: 12rpx;
+        margin-bottom: 30rpx;
+        
         .time {
-          font-size: 28rpx;
-          margin-right: 8rpx;
+          font-size: 26rpx;
+          color: #6A7990;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          
+          &::before {
+            content: "";
+            width: 8rpx;
+            height: 8rpx;
+            background: #007AFF;
+            border-radius: 50%;
+            margin-right: 12rpx;
+            opacity: 0.5;
+          }
         }
       }
       .buttons {
-        position: absolute;
         display: flex;
-        bottom: 18rpx;
-        right: 20rpx;
-        color: #b5b5b5;
+        align-items: center;
+        gap: 20rpx;
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+        padding-top: 24rpx;
+
         .button {
           display: flex;
           align-items: center;
-          height: 24px;
+          gap: 8rpx;
+          padding: 8rpx 16rpx;
+          border-radius: 12rpx;
+          transition: background 0.2s;
+          
+          &:active {
+            background: rgba(0, 122, 255, 0.05);
+          }
+
+          span {
+            font-size: 26rpx;
+            font-weight: 600;
+          }
         }
       }
       .isDealt {
         position: absolute;
-        top: 18rpx;
-        right: 20rpx;
+        top: 32rpx;
+        right: 32rpx;
         color: #06bfa1;
         display: flex;
         align-items: center;
+        background: rgba(6, 191, 161, 0.08);
+        padding: 6rpx 16rpx;
+        border-radius: 12rpx;
+        font-size: 24rpx;
+
         .img {
-          margin-left: 6rpx;
-          width: 40rpx;
-          height: 40rpx;
+          margin-left: 8rpx;
+          width: 32rpx;
+          height: 32rpx;
           .image {
             height: 100%;
             width: 100%;
@@ -574,15 +596,20 @@ export default {
       }
       .unDealt {
         position: absolute;
-        top: 18rpx;
-        right: 20rpx;
+        top: 32rpx;
+        right: 32rpx;
         color: #ff5d5d;
         display: flex;
         align-items: center;
+        background: rgba(255, 93, 93, 0.08);
+        padding: 6rpx 16rpx;
+        border-radius: 12rpx;
+        font-size: 24rpx;
+
         .img {
-          margin-left: 6rpx;
-          width: 40rpx;
-          height: 40rpx;
+          margin-left: 8rpx;
+          width: 32rpx;
+          height: 32rpx;
           .image {
             height: 100%;
             width: 100%;

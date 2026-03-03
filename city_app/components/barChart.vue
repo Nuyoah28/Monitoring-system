@@ -1,7 +1,7 @@
 <template>
     <view class="charts-box">
       <qiun-data-charts 
-        type="column"
+        type="radar"
         :opts="opts"
         :chartData="chartData"
         :canvas2d="true"
@@ -23,47 +23,39 @@
         result: {},
         chartData: {},
         opts: {
-          color: ["#FAC858","#EE6666","#FAC858","#EE6666","#73C0DE","#3CA272","#FC8452","#9A60B4","#ea7ccc"],
-          padding: [15,15,0,5],
-          enableScroll: false,
-          legend: {},
-          xAxis: {
-            disableGrid: true
+          color: ["#00d2ff","#007aff","#FAC858","#EE6666","#73C0DE","#3CA272","#FC8452","#9A60B4","#ea7ccc"],
+          padding: [5,5,5,5],
+          fontColor: "#FFFFFF",
+          dataLabel: false, /* 雷达图一般关掉数据标签防止拥挤 */
+          legend: {
+            show: true,
+            position: "right",
+            lineHeight: 25,
+            fontColor: "#1A2A3A"
           },
-          yAxis: {
-            data: [
-              {
-                min: 0
-              }
-            ]
+          xAxis: {
+            show: true,
+            textColor: "#1A2A3A"
           },
           extra: {
-            column: {
-              type: "group",
-              width: 20,
-              activeBgColor: "#000000",
-              activeBgOpacity: 0.08,
-              linearType: "custom",
-              seriesGap: 5,
-              linearOpacity: 0.5,
-              barBorderCircle: true,
-              customColor: [
-                "#FA7D8D",
-                "#EB88E2"
-              ]
+            radar: {
+              gridType: "radar",
+              gridColor: "rgba(0,0,0,0.1)",
+              gridCount: 3,
+              opacity: 0.3, /* 增加一点透明度以在亮色背景下更清晰 */
+              max: 0,
+              radius: 50,
+              labelColor: "#1A2A3A" /* 切换为深色分类文字 */
             }
           }
         }
       };
     },
     mounted() {
-		this.$nextTick(() => {
-		  this.getServerData(1); // 组件渲染完毕后再调用
-		});
-
+      // 依赖 watch 的 immediate: true 进行初次加载，移除这里的重复调用
     },
-    onShow(){
-      this.getServerData(1);
+    onShow() {
+      // 页面展示刷新逻辑
     },
     methods: {
       async getData(range) {
@@ -112,9 +104,10 @@
     },
     watch: {
       range: {
-        handler: function(newVal , oldVal) {
-          this.chartData = {};
-          this.getServerData(newVal);
+        handler: function(newVal) {
+          if (newVal) {
+            this.getServerData(newVal);
+          }
         },
         immediate: true,
       }

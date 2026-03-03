@@ -9,12 +9,14 @@ let heartbeatTimer = null;
 
 // WebSocket 服务器地址（根据环境配置）
 const WS_BASE_URL = 'ws://192.168.1.8:10215';
+// const WS_BASE_URL = 'ws://192.168.3.135:10215';  // 开发环境 (旧)
+// const WS_BASE_URL = 'ws://192.168.68.31:10215';  // 开发环境 (新)
 // const WS_BASE_URL = 'ws://你的服务器地址:10215';  // 生产环境
 
 /**
  * 连接 WebSocket
  * @param {string} userId 用户ID
- */
+ */ 
 function connect(userId) {
     if (isConnected) {
         console.log('[WebSocket] 已经连接，无需重复连接');

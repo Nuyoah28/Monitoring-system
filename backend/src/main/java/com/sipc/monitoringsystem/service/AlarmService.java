@@ -46,6 +46,13 @@ public interface AlarmService extends IService<Alarm> {
 
         List<TimePeriod> SqlGetCaseTypesWeekHistoryCnt(String date);
 
+        // 近一个月 (30天)
+        List<TimePeriod> getMonthHistoryCnt(String date);
+
+        List<TimePeriod> getMonthAreasHistoryCnt(String date);
+
+        List<TimePeriod> SqlGetCaseTypesMonthHistoryCnt(String date);
+
         RealTimeAlarmRes getRealTimeAlarmRes();
 
         GetHistoryCntRes ServiceGetHistoryCntRes(Integer defer);

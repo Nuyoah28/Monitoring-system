@@ -299,6 +299,37 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         return this.baseMapper.SqlGetCaseTypesWeekHistoryCnt(date);
     }
 
+    // ========== 近一个月 (30天) ==========
+
+    @Override
+    public List<TimePeriod> getMonthHistoryCnt(String date) {
+        List<String> allPeriods = new ArrayList<>();
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(new Date());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        for (int i = 0; i < 30; i++) {
+            allPeriods.add(sdf.format(calendar.getTime()));
+            calendar.add(Calendar.DAY_OF_YEAR, -1);
+        }
+        List<TimePeriod> timePeriods = this.baseMapper.SqlGetMonthHistoryCnt(date);
+        Alignment(allPeriods, timePeriods);
+        // 只保留月份和日期
+        for (TimePeriod tp : timePeriods) {
+            tp.setPeriod(tp.getPeriod().substring(5));
+        }
+        return timePeriods;
+    }
+
+    @Override
+    public List<TimePeriod> getMonthAreasHistoryCnt(String date) {
+        return this.baseMapper.SqlGetAreasMonthHistoryCnt(date);
+    }
+
+    @Override
+    public List<TimePeriod> SqlGetCaseTypesMonthHistoryCnt(String date) {
+        return this.baseMapper.SqlGetCaseTypesMonthHistoryCnt(date);
+    }
+
     @Override
     @Cacheable(value = "cache", key = "'ServiceGetHistoryCntRes'+#defer", unless = "#result==null")
     public GetHistoryCntRes ServiceGetHistoryCntRes(Integer defer) {
@@ -331,6 +362,14 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
             g2 = this.getWeekAreasHistoryCnt(time);
             getHistoryCntRes.setGraph2(g2);
             g3 = this.SqlGetCaseTypesWeekHistoryCnt(time);
+            getHistoryCntRes.setGraph3(g3);
+            return getHistoryCntRes;
+        } else if (defer == 30) {
+            g1 = this.getMonthHistoryCnt(time);
+            getHistoryCntRes.setGraph1(g1);
+            g2 = this.getMonthAreasHistoryCnt(time);
+            getHistoryCntRes.setGraph2(g2);
+            g3 = this.SqlGetCaseTypesMonthHistoryCnt(time);
             getHistoryCntRes.setGraph3(g3);
             return getHistoryCntRes;
         } else {

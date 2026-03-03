@@ -29,8 +29,9 @@
           legend: {
             show: true,
             position: "right",
-            lineHeight: 18, // 缩小行高，腾出空间
-            margin: 2
+            lineHeight: 18,
+            margin: 2,
+            fontColor: "#1A2A3A"
           },
           title: {
             name: "",

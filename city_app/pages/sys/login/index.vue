@@ -1,170 +1,118 @@
 <template>
   <view class="loginBox">
-    <view class="img">
-      <image
-        src="../../../static/logBack.png"
-        mode=""
-        style="width: 100vw"
-      ></image>
-    </view>
-    <view class="login">
-      <text class="title">城市智眼</text>
-      <!-- <view class="mainTitle"> 基于YOLOv8的公共场所危险事件监控预警系统 </view> -->
-	  <view class="mainTitle"> 基于深度学习和边缘计算的智慧城市安防系统 </view>
-      <view class="logContent">
-        <text class="title">LOGIN</text>
-        <view class="log">
-          <view class="iconBox">
-            <image
-              src="../../../static/phone.png"
-              mode="aspectFit"
-              class="icon"
-            ></image>
+    <!-- 背景流光动画层 -->
+    <view class="bg-shape shape-1"></view>
+    <view class="bg-shape shape-2"></view>
+    <view class="bg-shape shape-3"></view>
+    
+    <view class="login-container">
+      <view class="header">
+        <text class="title">城市智眼</text>
+        <view class="mainTitle">基于深度学习和边缘计算的智慧城市安防系统</view>
+      </view>
+
+      <view class="glass-card logContent">
+        <text class="card-title">LOGIN</text>
+        
+        <view class="form-group">
+          <view class="input-item">
+            <view class="iconBox">
+              <!-- Inline SVG for User/Phone icon -->
+              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M20 21C20 18.2386 16.4183 16 12 16C7.58172 16 4 18.2386 4 21" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <input
+              class="input custom-input"
+              type="text"
+              v-model="username"
+              placeholder="请输入用户名/手机号"
+              placeholder-style="color:#A0B2D4"
+            />
           </view>
-          <input
-            class="input"
-            type="text"
-            v-model="username"
-            placeholder="请输入用户名"
-            placeholder-style="color:#c5c5c5"
-          />
-        </view>
-        <view class="log">
-          <view class="iconBox">
-            <image
-              src="../../../static/lock-blue.png"
-              mode="aspectFit"
-              class="icon"
-            ></image>
+          
+          <view class="input-item">
+            <view class="iconBox">
+              <!-- Inline SVG for Lock icon -->
+              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="5" y="11" width="14" height="10" rx="2" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 11V7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7V11" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <input
+              class="input custom-input"
+              v-model="password"
+              password
+              type="text"
+              placeholder="请输入密码"
+              placeholder-style="color:#A0B2D4"
+            />
           </view>
-          <input
-            class="input"
-            v-model="password"
-            password
-            type="text"
-            placeholder="请输入密码"
-            placeholder-style="color:#c5c5c5"
-          />
-        </view>
-        <view class="log">
-          <button class="btn" style="color: #fff" @tap="jump">登录</button>
-        </view>
-        <view class="log">
-          <view>
+          
+          <view class="input-item" style="border: none; background: transparent; padding: 0;">
+            <button class="btn modern-btn" @tap="jump">登录</button>
+          </view>
+          
+          <view class="input-item term-box" style="border: none; background: transparent; justify-content: center;">
             <checkbox-group @change="checked = !checked">
-              <checkbox style="transform: scale(0.6)" :value="true" /><text
-                class="deal"
-                >登录即代表您已阅读并同意<span @tap="changeShow">用户协议</span
-                >与<span @tap="changeShow">隐私政策</span></text
-              >
+              <label class="deal-wrapper">
+                <checkbox class="theme-checkbox" style="transform: scale(0.65);" value="true" :checked="checked" color="#007aff"/>
+                <text class="deal">
+                  登录即代表您已阅读并同意
+                  <span class="link" @tap.stop="changeShow">用户协议</span>
+                  与
+                  <span class="link" @tap.stop="changeShow">隐私政策</span>
+                </text>
+              </label>
             </checkbox-group>
           </view>
         </view>
       </view>
-      <view class="more">
-        <view class="text">
-          <view class="line"> </view>
-          <view class="word"> DEVELOPED BY UNIAPP AND YOLOV8 </view>
-          <view class="line"> </view>
+
+      <view class="footer-more">
+        <view class="text-line">
+          <view class="line"></view>
+          <view class="word">DEVELOPED BY UNIAPP AND YOLOV8</view>
+          <view class="line"></view>
         </view>
       </view>
     </view>
+    
     <u-modal
       :show="isShow"
       :closeOnClickOverlay="true"
       @close="isShow = false"
       @confirm="isShow = false"
+      title="用户协议与隐私政策"
+      confirmColor="#007aff"
     >
-      <scroll-view scroll-y="true" style="height: 400px">
-        <view>
-          <h3>用户协议</h3>
-          <br />
+      <scroll-view scroll-y="true" style="height: 60vh;">
+        <view class="modal-content">
           <p>
             欢迎使用我们的服务！在使用本应用程序之前，请仔细阅读以下用户协议。<br />用户协议规定了您与我们之间的权利和责任。通过使用本应用程序，即表示您同意遵守以下条款和条件。
           </p>
-          <br />
-          <!-- <br> -->
           <h4>1. 服务接受与使用</h4>
-          <br />
-          <p>
-            1.1
-            您确认并同意，您仅在合法、合规的目的下使用本应用程序，并遵守适用的法律法规。
-          </p>
-          <br />
-          <p>
-            1.2
-            您应确保所提供的个人信息和数据的准确性和完整性，并对您提供的信息和数据的安全负责。
-          </p>
-          <br />
-          <p>
-            1.3
-            您不得使用本应用程序进行任何违法、欺诈、侵权、虚假、威胁、骚扰、诽谤、淫秽、攻击性或其他不当行为。
-          </p>
-          <br />
+          <p>1.1 您确认并同意，您仅在合法、合规的目的下使用本应用程序，并遵守适用的法律法规。</p>
+          <p>1.2 您应确保所提供的个人信息和数据的准确性和完整性，并对您提供的信息和数据的安全负责。</p>
+          <p>1.3 您不得使用本应用程序进行任何违法、欺诈、侵权、虚假、威胁、骚扰、诽谤、淫秽、攻击性或其他不当行为。</p>
           <h4>2. 知识产权</h4>
-          <br />
-          <p>
-            2.1
-            本应用程序及其相关内容（包括但不限于文字、图像、音频、视频、标识、商标、服务标识等）的知识产权归属于我们或相关权利人所有。
-          </p>
-          <br />
-          <p>
-            2.2
-            未经我们或相关权利人明确授权，您不得复制、修改、传播、展示、使用或以其他方式侵犯知识产权的行为。
-          </p>
-          <br />
+          <p>2.1 本应用程序及其相关内容（包括但不限于文字、图像、音频、视频、标识、商标、服务标识等）的知识产权归属于我们或相关权利人所有。</p>
+          <p>2.2 未经我们或相关权利人明确授权，您不得复制、修改、传播、展示、使用或以其他方式侵犯知识产权的行为。</p>
           <h4>3. 隐私保护</h4>
-          <br />
-          <p>
-            3.1 我们将按照隐私政策的规定收集、使用、存储和保护您的个人信息。
-          </p>
-          <br />
-          <p>
-            3.2
-            您理解并同意，为了提供更好的服务，我们可能会与第三方共享您的个人信息，但我们将采取合理的措施保护您的个人信息的安全和保密性。
-          </p>
-          <br />
+          <p>3.1 我们将按照隐私政策的规定收集、使用、存储和保护您的个人信息。</p>
+          <p>3.2 您理解并同意，为了提供更好的服务，我们可能会与第三方共享您的个人信息，但我们将采取合理的措施保护您的个人信息的安全和保密性。</p>
           <h4>4. 免责声明</h4>
-          <br />
-          <p>
-            4.1
-            您理解并同意，您使用本应用程序的风险由您自行承担。本应用程序提供的服务仅按照现有技术和条件提供，不对服务的及时性、安全性、准确性做出任何明示或暗示的保证。
-          </p>
-          <br />
-          <p>
-            4.2
-            您理解并同意，我们不对由于以下原因导致的任何直接或间接损失承担责任：网络故障、计算机病毒、黑客攻击、系统不稳定、第三方服务故障等。
-          </p>
-          <br />
+          <p>4.1 您理解并同意，您使用本应用程序的风险由您自行承担。本应用程序提供的服务仅按照现有技术和条件提供，不对服务的及时性、安全性、准确性做出任何明示或暗示的保证。</p>
+          <p>4.2 您理解并同意，我们不对由于以下原因导致的任何直接或间接损失承担责任：网络故障、计算机病毒、黑客攻击、系统不稳定、第三方服务故障等。</p>
           <h4>5. 终止与修改</h4>
-          <br />
-          <p>
-            5.1
-            我们有权根据实际情况，在任何时候终止或修改本应用程序的部分或全部功能。
-          </p>
-          <br />
-          <p>
-            5.2
-            如您违反本用户协议的任何条款，我们有权立即终止您使用本应用程序的权利。
-          </p>
-          <br />
+          <p>5.1 我们有权根据实际情况，在任何时候终止或修改本应用程序的部分或全部功能。</p>
+          <p>5.2 如您违反本用户协议的任何条款，我们有权立即终止您使用本应用程序的权利。</p>
           <h4>6. 其他条款</h4>
-          <br />
           <p>6.1 本用户协议适用中华人民共和国的法律。</p>
-          <br />
-          <p>
-            6.2
-            如本用户协议的任何条款被认定为无效或不可执行，不影响其他条款的有效性。
-          </p>
-          <br />
-          <p>
-            6.3
-            本用户协议构成您与我们之间的完整协议，取代您与我们之间的任何其他口头或书面协议。
-          </p>
-          <br />
-          <p>
-            请在使用本应用程序之前仔细阅读并理解以上用户协议。如您对协议内容有任何疑问，请与我们联系。感谢您的合作和支持！
-          </p>
+          <p>6.2 如本用户协议的任何条款被认定为无效或不可执行，不影响其他条款的有效性。</p>
+          <p>6.3 本用户协议构成您与我们之间的完整协议，取代您与我们之间的任何其他口头或书面协议。</p>
+          <p>请在使用本应用程序之前仔细阅读并理解以上用户协议。如您对协议内容有任何疑问，请与我们联系。感谢您的合作和支持！</p>
         </view>
       </scroll-view>
     </u-modal>
@@ -185,16 +133,14 @@ export default {
     };
   },
   methods: {
-    changeShow(number) {
-      // console.log(this.isShow);
+    changeShow() {
       this.isShow = true;
     },
     jump() {
       if (!this.checked) {
-        // console.log(this.checked)
         uni.showToast({
-          title: "请勾选下方用户协议",
-          duration: 1500,
+          title: "请仔细阅读并勾选用户协议与隐私政策",
+          duration: 2000,
           icon: "none",
         });
         return;
@@ -204,8 +150,11 @@ export default {
         userName: this.username,
         password: this.password,
       };
+      
+      uni.showLoading({ title: '登录中...' });
+      
       uni.$http.post("/api/v1/user/login", data).then(({ data }) => {
-        console.log(data);
+        uni.hideLoading();
         if (data.code === "A1000") {
           uni.$showMsg(data.message);
           return;
@@ -214,9 +163,8 @@ export default {
           uni.showToast({
             title: "登录成功",
             duration: 1500,
-            icon: "none",
+            icon: "success",
             success: () => {
-              // console.log("hi");
               uni.setStorageSync("phone", this.username);
               uni.setStorageSync("username", data.data.name);
               // 保存用户ID用于WebSocket连接
@@ -227,7 +175,6 @@ export default {
                 success: () => {
                   // 登录成功后连接WebSocket接收实时报警
                   websocket.connect(data.data.id);
-                  
                   uni.switchTab({
                     url: "/pages/sys/dateWatcher/dateWatcher",
                   });
@@ -236,6 +183,12 @@ export default {
             },
           });
         }
+      }).catch(err => {
+         uni.hideLoading();
+         uni.showToast({
+           title: "网络请求失败，请稍后重试",
+           icon: "none"
+         });
       });
     },
   },
@@ -244,149 +197,257 @@ export default {
 
 <style lang="scss" scoped>
 .loginBox {
-  height: 100vh;
+  min-height: 100vh;
   width: 100vw;
-  background-color: #DCEAFF;
+  background: transparent; /* 承接 App.vue 的赛博清晨渐变 */
   position: relative;
-  .img image{
-	  height: 28vh;
-	  margin-top: 30rpx;
-  }
-  .login {
-    box-sizing: border-box;
-    padding: 82rpx;
-	padding-top: 65rpx;
-    background: #fff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 40rpx 0;
+  
+  .bg-shape {
     position: absolute;
-    height: 70vh;
-    width: 100%;
-    bottom: 0;
-    border-radius: 80rpx 80rpx 0 0;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: 0;
+    opacity: 0.3; /* 降低透明度，配合亮色背景 */
+    animation: floating 10s infinite ease-in-out alternate;
+  }
+  .shape-1 {
+    width: 600rpx;
+    height: 600rpx;
+    background: rgba(0, 122, 255, 0.3);
+    top: -10%;
+    left: -20%;
+  }
+  .shape-2 {
+    width: 500rpx;
+    height: 500rpx;
+    background: rgba(0, 210, 255, 0.2);
+    bottom: 10%;
+    right: -10%;
+    animation-delay: -3s;
+  }
+  .shape-3 {
+    width: 400rpx;
+    height: 400rpx;
+    background: rgba(100, 150, 255, 0.2);
+    top: 40%;
+    left: 40%;
+    animation-delay: -6s;
+  }
+
+  .login-container {
+    width: 90%;
+    max-width: 700rpx;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    margin: auto;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 60rpx;
+    width: 100%;
+    
     .title {
-      color: #6c84c3;
-      font-size: 72rpx;
-      font-weight: bold;
-      letter-spacing: 8rpx;
+      color: #1A2A3A; /* 深色文字 */
+      font-size: 80rpx;
+      font-weight: 900;
+      letter-spacing: 12rpx;
+      text-shadow: 0 4rpx 20rpx rgba(0, 122, 255, 0.1);
+      display: block;
     }
+    
     .mainTitle {
-      margin-top: 16rpx;
-      color: #a8baea;
-      font-size: 25rpx;
-      border-top: 1.5px solid #a8baea;
-      height: 60rpx;
-      padding-top: 20rpx;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
+      margin-top: 24rpx;
+      color: #5672b9; /* 科技蓝 */
+      font-size: 26rpx;
+      letter-spacing: 2rpx;
+      font-weight: 600;
+      position: relative;
+      display: inline-block;
+      padding: 0 30rpx;
+      
+      &::before, &::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        width: 40rpx;
+        height: 1px;
+        background: rgba(0, 122, 255, 0.2);
+      }
+      &::before { left: -20rpx; }
+      &::after { right: -20rpx; }
     }
-    .logContent {
-      margin-top: 50rpx;
-      height: 580rpx;
-      width: 665rpx;
-      background-color: #DCEAFF;
-      border-radius: 30rpx;
+  }
+
+  /* 亮色拟态白玻璃卡片 */
+  .glass-card {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.5); /* 提升透明度更显通透 */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 16rpx 60rpx rgba(100, 150, 200, 0.1);
+    border-radius: 40rpx;
+    padding: 60rpx 50rpx;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    
+    .card-title {
+      color: #1A2A3A;
+      font-size: 48rpx;
+      font-weight: bold;
+      letter-spacing: 6rpx;
+      margin-bottom: 50rpx;
+    }
+
+    .form-group {
+      width: 100%;
       display: flex;
       flex-direction: column;
-      justify-content: space-around;
-      align-items: center;
-      box-sizing: border-box;
-      .title {
-        color: #5672b9;
-        font-size: 82rpx;
-        font-family: "Novecento wide", "半展开", "粗体";
-      }
-      .log {
-        display: flex;
-        .iconBox {
-          height: 90rpx;
-          width: 80rpx;
-          border-radius: 15rpx 0 0 15rpx;
-          background-color: #fff;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          .icon {
-            height: 60%;
-            width: 60%;
-          }
-        }
-        .input {
-          width: 500rpx;
-          height: 90rpx;
-          background-color: #fff;
-          border-radius: 0 15rpx 15rpx 0;
-          box-sizing: border-box;
-          padding: 16rpx;
-        }
-        input::placeholder {
-          color: #f60202;
-        }
-        .btn {
-          width: 580rpx;
-          height: 90rpx;
-          background-color: #7b9aea;
-        }
-        .deal {
-          font-size: 24rpx;
-          font-weight: bold;
-          span {
-            color: #5672b9;
-            font-style: italic;
-          }
-        }
-      }
+      gap: 36rpx;
     }
-    .more {
-      position: absolute;
-      bottom: 10rpx;
+
+    .input-item {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      .text {
-        width: 665rpx;
+      width: 100%;
+      height: 100rpx;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 20rpx;
+      transition: all 0.3s ease;
+      overflow: hidden;
+      border: 1px solid rgba(0, 122, 255, 0.1);
+      
+      &:focus-within {
+        border-color: #007aff;
+        box-shadow: 0 0 15rpx rgba(0, 122, 255, 0.1);
+      }
+
+      .iconBox {
+        width: 100rpx;
+        height: 100%;
         display: flex;
         justify-content: center;
         align-items: center;
-        font-size: 25rpx;
-        font-weight: 800;
-        color: #d7d7d7;
-        // flex-direction: row;
-        padding: 22rpx;
-        box-sizing: border-box;
-        .line {
-          height: 0.5px;
-          width: 12%;
-          border: 0.5px solid #d7d7d7;
-        }
-        .word {
-          // border: 2px solid red;
-          padding: 10 20rpx;
-          font-size: 15rpx;
-          color: #d7d7d7;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          font-weight: "Novecento wide", "半展开", "粗体";
-        }
-        span {
-          color: #000;
-        }
       }
-      .other {
-        width: 80%;
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        .logo {
-          width: 94rpx;
-          height: 94rpx;
-        }
+
+      .custom-input {
+        flex: 1;
+        height: 100%;
+        font-size: 30rpx;
+        color: #1A2A3A;
+        border: none;
+        outline: none;
+        background: transparent;
+        padding-right: 30rpx;
+      }
+    }
+
+    .modern-btn {
+      width: 100%;
+      height: 100rpx;
+      background: linear-gradient(90deg, #007aff 0%, #00d2ff 100%);
+      color: #ffffff;
+      font-size: 34rpx;
+      font-weight: bold;
+      letter-spacing: 4rpx;
+      border-radius: 50rpx;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 10rpx 30rpx rgba(0, 122, 255, 0.3);
+      transition: transform 0.1s;
+      
+      &:active {
+        transform: scale(0.98);
+      }
+      &::after {
+        border: none;
+      }
+    }
+
+    .term-box {
+      margin-top: -10rpx;
+    }
+    .deal-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .deal {
+      font-size: 24rpx;
+      color: #1A2A3A;
+      margin-left: 8rpx;
+      opacity: 0.7;
+      
+      .link {
+        color: #007aff;
+        font-weight: bold;
+        text-decoration: underline;
+        margin: 0 4rpx;
       }
     }
   }
+
+  .footer-more {
+    margin-top: 60rpx;
+    width: 100%;
+    
+    .text-line {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20rpx;
+      
+      .line {
+        height: 1px;
+        width: 60rpx;
+        background-color: rgba(0, 122, 255, 0.1);
+      }
+      .word {
+        font-size: 20rpx;
+        color: rgba(26, 42, 58, 0.4);
+        letter-spacing: 2rpx;
+      }
+    }
+  }
+}
+
+/* 协议模态框内部样式 */
+.modal-content {
+  padding: 30rpx 40rpx;
+  color: #333333;
+  line-height: 1.6;
+  font-size: 28rpx;
+  
+  h4 {
+    font-size: 32rpx;
+    font-weight: bold;
+    color: #007aff;
+    margin: 30rpx 0 15rpx 0;
+  }
+  
+  p {
+    margin-bottom: 16rpx;
+    text-align: justify;
+  }
+}
+
+/* 背景流动动画 */
+@keyframes floating {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  100% { transform: translate(30rpx, 50rpx) rotate(15deg); }
 }
 </style>

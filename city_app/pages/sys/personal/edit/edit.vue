@@ -4,27 +4,19 @@
       height: 100vh;
       width: 100vw;
       position: relative;
-      background-color: #7db6ff;
+      background-color: transparent;
     "
   >
     <view class="setBox" :style="{ height: safeHeight + 'px' }">
       <view class="backImg">
         <view class="title">
           <view class="backing" @click="back">
-            <image
-              src="../../../../static/left-double-arrow.png"
-              mode="aspectFit"
-              alt=""
-            ></image>
+            <u-icon name="arrow-left" color="#1A2A3A" size="44rpx"></u-icon>
           </view>
           <h3>个人信息</h3>
         </view>
-        <image
-          src="../../../../static/d53eb072-3395-4bc6-9dd1-41b32cc61095.png"
-          mode=""
-          style="width: 100vw"
-        ></image>
       </view>
+      
       <view class="content">
         <view class="command">
           <view class="items">
@@ -34,7 +26,7 @@
                 v-model="phoneNumber"
                 :disabled="true"
                 type="text"
-                style="font-weight: bold; width: 50%"
+                style="font-weight: bold; width: 60%; color: #1A2A3A;"
               />
             </view>
             <view class="img" @tap="showAlert = true">
@@ -44,13 +36,14 @@
               ></image>
             </view>
           </view>
+          
           <view class="items">
             <view class="left">
               <view class="text"> 用户名 </view>
               <input
                 v-model="userName"
                 type="text"
-                style="font-weight: bold; width: 50%"
+                style="font-weight: bold; width: 60%; color: #1A2A3A;"
                 :focus="focus"
               />
             </view>
@@ -61,6 +54,7 @@
               ></image>
             </view>
           </view>
+          
           <view class="items">
             <view class="left">
               <view class="text"> 密码 </view>
@@ -68,7 +62,7 @@
                 v-model="password"
                 :disabled="true"
                 type="password"
-                style="font-weight: bold; width: 50%"
+                style="font-weight: bold; width: 60%; color: #1A2A3A;"
               />
             </view>
             <view class="img" @tap="showChangePassword = true">
@@ -78,16 +72,19 @@
               ></image>
             </view>
           </view>
-          <view class="button" @click="finish"> 确认 </view>
+          
+          <view class="button" @click="finish"> 确定修改 </view>
         </view>
       </view>
     </view>
+    
     <u-modal
       :show="showAlert"
       title="请联系管理员进行修改"
       content="为了安全性考虑,若对您造成不便我们深感抱歉"
       @confirm="showAlert = false"
     ></u-modal>
+    
     <u-modal
       :show="showChangePassword"
       title="修改密码"
@@ -95,13 +92,13 @@
       :showCancelButton="true"
       @cancel="passwordCancel"
     >
-      <view class="">
+      <view style="width: 100%;">
         <view class="change">
           <view class="text"> 旧密码 </view>
           <u-input
             v-model="oldPassword"
             type="password"
-            style="font-weight: bold; width: 78%"
+            style="font-weight: bold; width: 78%;"
             placeholder="请输入旧密码"
           ></u-input>
         </view>
@@ -110,7 +107,7 @@
           <u-input
             v-model="newPassword"
             type="password"
-            style="font-weight: bold; width: 78%"
+            style="font-weight: bold; width: 78%;"
             placeholder="请输入新密码"
           ></u-input>
         </view>
@@ -254,95 +251,133 @@ export default {
   position: absolute;
   width: 100%;
   bottom: 0;
-  background-color: #fff;
+  background-color: transparent;
+  
   .backImg {
     position: absolute;
+    width: 100%;
+    
     .title {
       position: absolute;
       top: 0;
       z-index: 999;
-      color: #fff;
+      color: #1A2A3A;
       display: flex;
       align-items: center;
       justify-content: flex-start;
       width: 100%;
       padding: 26rpx 36rpx;
       box-sizing: border-box;
+      
       .backing {
-        width: 32px;
-        height: 32px;
+        width: 60rpx;
+        height: 60rpx;
         margin-right: 12rpx;
-        image {
-          width: 100%;
-          height: 100%;
-        }
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(0, 122, 255, 0.1);
+        border-radius: 50%;
+        box-shadow: 0 4rpx 12rpx rgba(100, 150, 200, 0.1);
+      }
+      
+      h3 {
+        font-weight: bold;
+        font-size: 36rpx;
       }
     }
   }
+  
   .content {
-    width: 88%;
+    width: 90%;
     box-sizing: border-box;
-    padding: 36rpx 28rpx;
-    // padding-bottom: 160rpx;
-    border-radius: 15rpx;
-    background: #dceaff;
     position: absolute;
-    top: 28%;
+    top: 25%;
     left: 50%;
     transform: translate(-50%);
+    padding: 40rpx 30rpx;
+    border-radius: 32rpx;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 1);
+    box-shadow: 0 16rpx 48rpx rgba(26, 42, 58, 0.08);
+    
     .command {
       width: 100%;
+      
       .items {
-        background: #fff;
-        height: 106rpx;
+        background: rgba(255, 255, 255, 0.9);
+        height: 110rpx;
         width: 100%;
-        margin-top: 32rpx;
-        border-radius: 18rpx;
+        margin-bottom: 30rpx;
+        border-radius: 24rpx;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 24rpx;
+        padding: 0 30rpx;
         box-sizing: border-box;
+        box-shadow: 0 4rpx 16rpx rgba(100, 150, 200, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        transition: transform 0.2s, box-shadow 0.2s;
+        
+        &:active {
+          transform: scale(0.98);
+          box-shadow: 0 2rpx 8rpx rgba(100, 150, 200, 0.05);
+        }
+        
         .left {
           display: flex;
           align-items: center;
+          width: 80%;
+          
+          .text {
+            color: #1A2A3A;
+            font-weight: bold;
+            font-size: 32rpx;
+            width: 120rpx;
+            margin-right: 20rpx;
+          }
         }
+        
         .img {
-          height: 46rpx;
-          width: 46rpx;
+          height: 40rpx;
+          width: 40rpx;
           image {
             height: 100%;
             width: 100%;
+            filter: brightness(0.6) sepia(1) hue-rotate(180deg) saturate(3);
           }
         }
-        .text {
-          margin-left: 16rpx;
-          color: #8496b0;
-          font-weight: bold;
-          font-size: 34rpx;
-          display: flex;
-          align-items: center;
-          width: 30%;
-        }
       }
+      
       .button {
-        background: #accdff;
-        height: 114rpx;
+        background: linear-gradient(135deg, #007aff, #00d2ff);
+        height: 110rpx;
         width: 100%;
-        margin-top: 32rpx;
-        border-radius: 18rpx;
+        margin-top: 50rpx;
+        border-radius: 24rpx;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 0 24rpx;
-        box-sizing: border-box;
-        font-size: 42rpx;
+        font-size: 36rpx;
         font-weight: bold;
-        color: #6e8dbb;
+        color: #FFFFFF;
+        box-shadow: 0 8rpx 24rpx rgba(0, 122, 255, 0.3);
+        transition: all 0.2s;
+        
+        &:active {
+          transform: scale(0.96);
+          box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.2);
+        }
       }
     }
   }
 }
+
 .change {
   height: 94rpx;
   width: 100%;
@@ -350,13 +385,11 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-top: 22rpx;
+  
   .text {
-    margin-left: 16rpx;
-    // color: #8496B0;
+    color: #1A2A3A;
     font-weight: bold;
-    font-size: 34rpx;
-    display: flex;
-    align-items: center;
+    font-size: 30rpx;
     width: 20%;
     margin-right: 12rpx;
   }

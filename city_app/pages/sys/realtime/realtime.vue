@@ -1,6 +1,6 @@
 <template>
   <view style="height: 100vh; width: 100vw; position: relative">
-    <view :style="{ height: safeAreaTop + 'px' }" class="warnBox" id="warnBox">
+    <view class="warnBox" id="warnBox" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="title">
         <view class="topNav">
           <view
@@ -8,28 +8,18 @@
             :class="choosen === 0 ? 'choosen' : ''"
             @click="choosen = 0"
           >
-            <span>
-              <h2 v-show="choosen === 0">实时警报</h2>
-              <h3 v-show="choosen === 1">实时警报</h3>
-            </span>
+            <span>实时警报</span>
           </view>
           <view
             class="right"
             :class="choosen === 1 ? 'choosen' : ''"
             @click="choosen = 1"
           >
-            <span>
-              <h2 v-show="choosen === 1">历史事件</h2>
-              <h3 v-show="choosen === 0">历史事件</h3>
-            </span>
+            <span>历史事件</span>
           </view>
         </view>
-        <view class="icon" @tap="jump">
-          <image
-            src="../../../static/edb8e6b3-f7e0-4778-bdc4-691d6e4f1511.png"
-            mode="aspectFit"
-            class="img"
-          ></image>
+        <view class="setting-btn" @click="jump">
+          <u-icon name="setting" color="#666" size="44rpx"></u-icon>
         </view>
       </view>
       <view class="second">
@@ -42,13 +32,6 @@
                 class="img"
               ></image>
             </view>
-            <u-picker
-              :show="showFilter"
-              :columns="filters"
-              class="select"
-              @confirm="setFilter"
-              @cancel="showFilter = false"
-            ></u-picker>
             <view class="timeText">
               {{
                 filterIndex !== null
@@ -65,13 +48,6 @@
                 class="img"
               ></image>
             </view>
-            <u-picker
-              :show="showStatus"
-              :columns="status"
-              class="select"
-              @confirm="setStatus"
-              @cancel="showStatus = false"
-            ></u-picker>
             <view class="timeText">
               {{
                 statusIndex !== null ? status[0][statusIndex] : "请选择警报级别"
@@ -80,11 +56,12 @@
           </view>
         </view>
         <view class="icons" @click="reset">
-          <image
-            src="../../../static/fde8aa31-f3f3-41af-b0ec-d85398199844.png"
-            mode="aspectFit"
-            class="img"
-          ></image>
+          <u-icon 
+            name="reload" 
+            color="#007AFF" 
+            size="44rpx" 
+            :class="{ 'rotate-anim': isRefreshing }"
+          ></u-icon>
         </view>
       </view>
       <scroll-view
@@ -200,6 +177,20 @@
           :warnData="choosen === 0 ? warnData[index] : historyData[index]"
         ></edit>
       </u-modal>
+
+      <!-- 弹窗选择器独立放置，避免父级 transform/relative 干扰定位 -->
+      <u-picker
+        :show="showFilter"
+        :columns="filters"
+        @confirm="setFilter"
+        @cancel="showFilter = false"
+      ></u-picker>
+      <u-picker
+        :show="showStatus"
+        :columns="status"
+        @confirm="setStatus"
+        @cancel="showStatus = false"
+      ></u-picker>
     </view>
   </view>
 </template>
@@ -219,6 +210,7 @@ export default {
       statusList: "nomore",
       moveX: 0,
       startX: 0,
+      statusBarHeight: 0,
       safeAreaTop: 0,
       show: false,
       showFilter: false,
@@ -255,12 +247,13 @@ export default {
       id: null,
       index: 0,
 	  dataFetchInterval: null, // 定时器ID
-	  // warnData1:null,//标记是否产生新报警
+	  isRefreshing: false, // 正在刷新状态
     };
   },
   onLoad() {
-    // console.log(uni.getWindowInfo().safeArea);
-    this.safeAreaTop = uni.getWindowInfo().safeArea.height;
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
+    this.safeAreaTop = info.safeArea.height;
     let boxTop = 0;
     let scrollTop = 0;
     let boxHeight = 0;
@@ -484,6 +477,10 @@ export default {
       });
     },
     reset() {
+      if (this.isRefreshing) return;
+      this.isRefreshing = true;
+      setTimeout(() => { this.isRefreshing = false; }, 800); // 动效时长
+
       this.caseType = null;
       this.filterIndex = null;
       this.warningLevel = null;
@@ -614,299 +611,299 @@ export default {
 .warnBox {
   position: absolute;
   bottom: 0;
-  padding: 16rpx 32rpx;
+  padding: 20rpx 32rpx;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding-bottom: 0;
+  background: transparent;
 
   .title {
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 5%;
-    // border-bottom: 1px solid red;
+    margin-bottom: 5rpx;
+    padding-bottom: 0rpx;
+    height: 100rpx;
+    
     .topNav {
-      width: 445rpx;
       display: flex;
-      justify-content: space-between;
-      .left {
-        // border: 2px solid pink;
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
+      background: rgba(0, 122, 255, 0.05);
+      padding: 6rpx;
+      border-radius: 20rpx;
+      gap: 4rpx;
+      
+      .left, .right {
+        padding: 10rpx 28rpx;
+        border-radius: 16rpx;
+        transition: all 0.3s ease;
+        cursor: pointer;
+
         span {
-          font-size: 38rpx;
+          font-size: 28rpx;
+          color: rgba(26, 42, 58, 0.5);
+          font-weight: 500;
         }
       }
+      
       .choosen {
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
+        background: #FFFFFF;
+        box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.1);
+        
         span {
-          font-size: 38rpx;
-          position: relative;
-        }
-        h2::after {
-          content: "";
-          position: absolute;
-          width: 100%;
-          height: 28%;
-          left: 0;
-          bottom: 2px;
-          background: #9eb3ff;
-          z-index: -1;
-          border-radius: 5rpx;
-          font-size: 80rpx;
-        }
-      }
-      .right {
-        // border: 2px solid pink;
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
-        span {
-          font-size: 38rpx;
+          color: #007AFF !important;
+          font-weight: 700;
         }
       }
     }
-    .icon {
-      // background: #000;
-      height: 30px;
-      width: 30px;
-      .img {
-        height: 100%;
-        width: 100%;
-      }
+    
+    .setting-btn {
+      width: 60rpx;
+      height: 60rpx;
+      background: rgba(0, 0, 0, 0.05);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
     }
   }
 
+  /* 筛选器区域：亮色玻璃感 */
   .second {
     width: 100%;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
-    margin-bottom: 12rpx;
-    .icons {
-      width: 56rpx;
-      height: 56rpx;
-      margin-bottom: 26rpx;
-      .img {
-        height: 100%;
-        width: 100%;
-      }
-    }
+    margin-bottom: 30rpx;
+    
     .options {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      width: 90%;
+      gap: 20rpx;
+      flex: 1;
+      
       .selector {
-        border-radius: 12rpx;
-        position: relative;
-        width: 49%;
-        border: 1px solid #eaeaea;
-        box-sizing: border-box;
-        height: 88rpx;
-        padding: 12rpx;
-        box-sizing: border-box;
+        flex: 1;
+        height: 80rpx;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(0, 122, 255, 0.1);
+        border-radius: 20rpx;
         display: flex;
         align-items: center;
-        margin-bottom: 10rpx;
-        .select {
-          background-color: #fff;
-          border: none;
-          padding: 0;
-          margin: 0;
-          height: 100%;
-          flex: 1;
-        }
-        .date {
-          flex: 1;
-          height: 100%;
-          // background: #000;
-        }
-        .timeText {
-          font-size: 28rpx;
-          width: 110px;
-          position: absolute;
-          right: 0;
-          color: #b5b5b5;
-        }
-      }
-      .icon {
-        width: 46rpx;
-        height: 46rpx;
-        display: flex;
-        align-items: center;
-        .img {
-          height: 100%;
-          width: 100%;
-        }
-      }
-    }
-  }
-  .content {
-    flex: 1;
-    width: 100%;
-    .box {
-      width: 100%;
-      height: 300rpx;
-      margin-bottom: 20rpx;
-      position: relative;
-      border-radius: 15rpx;
-      // overflow: auto;
-      .bor {
-        border-radius: 15rpx !important;
-      }
-      .details {
-        width: 100%;
-        height: 300rpx;
-        background-color: #DCEAFF;
-        border-radius: 15rpx 0 0 15rpx;
-        padding: 18rpx 20rpx;
-        box-sizing: border-box;
+        padding: 0 20rpx;
         position: relative;
-        font-weight: bold;
-        color: #606c97;
-        .deviceName {
-          color: #606c97;
-          font-size: 36rpx;
-          position: absolute;
-          top: 18rpx;
-          left: 20rpx;
-        }
-        .happen {
-          position: absolute;
+        
+        .icon {
+          width: 32rpx;
+          height: 32rpx;
+          margin-right: 12rpx;
+          opacity: 0.6;
           display: flex;
           align-items: center;
-          left: 20rpx;
-          top: 50%;
-          transform: translateY(-50%);
-          font-size: 46rpx;
-          .event {
-            color: black;
-            margin-right: 16rpx;
-          }
-          .stars {
-            width: 48rpx;
-            height: 48rpx;
-            image {
-              height: 100%;
-              width: 100%;
-            }
-          }
-        }
-        .positonAndtime {
-          position: absolute;
-          bottom: 18rpx;
-          left: 20rpx;
-          display: flex;
-          align-items: baseline;
-          .time {
-            font-size: 28rpx;
-            margin-right: 16rpx;
-          }
-          .position {
-            font-size: 34rpx;
-          }
-        }
-        .buttons {
-          position: absolute;
-          top: 18rpx;
-          right: 20rpx;
-          width: 84rpx;
-          height: 84rpx;
-          image {
+          
+          .img {
             width: 100%;
             height: 100%;
           }
         }
-        .isDealt {
-          position: absolute;
-          bottom: 18rpx;
-          right: 20rpx;
-          color: #06bfa1;
+        
+        .timeText {
+          font-size: 26rpx;
+          color: #1A2A3A;
+          font-weight: 500;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+    }
+    
+    .icons {
+      width: 80rpx;
+      height: 80rpx;
+      margin-left: 20rpx;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #FFFFFF;
+      box-shadow: 0 4rpx 16rpx rgba(0, 122, 255, 0.1);
+      border-radius: 20rpx;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:active {
+        transform: scale(0.9);
+      }
+
+      .rotate-anim {
+        animation: rotateReload 0.8s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+      }
+    }
+  }
+
+  @keyframes rotateReload {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* 警报列表：呼吸感白玻璃卡片 */
+  .content {
+    flex: 1;
+    width: 100%;
+    padding: 0 16rpx;
+    padding-top: 16rpx;
+    padding-bottom: 120rpx; /* 紧贴 TabBar 上方，减少冗余留白 */
+    box-sizing: border-box;
+    
+    .box {
+      width: 100%;
+      margin-bottom: 24rpx;
+      position: relative;
+      background: transparent;
+      overflow: visible; /* 允许侧滑展开显示 */
+
+      .details {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 1);
+        border-radius: 40rpx;
+        padding: 32rpx;
+        box-sizing: border-box;
+        box-shadow: 0 12rpx 48rpx rgba(26, 42, 58, 0.12);
+        display: flex;
+        flex-direction: column;
+        gap: 16rpx;
+        transition: all 0.3s ease;
+
+        &.bor {
+          /* 未移动状态的边角样式 */
+        }
+
+        .deviceName {
+          color: rgba(26, 42, 58, 0.5);
+          font-size: 24rpx;
+          font-weight: 600;
+          letter-spacing: 1rpx;
+        }
+
+        .happen {
           display: flex;
           align-items: center;
-          .img {
-            margin-left: 6rpx;
-            width: 40rpx;
-            height: 40rpx;
-            .image {
-              height: 100%;
+          gap: 12rpx;
+          margin: 4rpx 0;
+          
+          .event {
+            color: #1A2A3A;
+            font-size: 40rpx;
+            font-weight: 900;
+          }
+          
+          .stars {
+            display: flex;
+            align-items: center;
+            width: 32rpx;
+            height: 32rpx;
+            
+            image {
               width: 100%;
+              height: 100%;
             }
           }
         }
-        .unDealt {
-          position: absolute;
-          bottom: 18rpx;
-          right: 20rpx;
-          color: #f09035;
+
+        .positonAndtime {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          
+          .time, .position {
+            font-size: 24rpx;
+            color: rgba(26, 42, 58, 0.6);
+            font-weight: 500;
+          }
+        }
+
+        /* 状态标记：精致小胶囊 */
+        .isDealt, .unDealt {
+          margin-top: 10rpx;
           display: flex;
           align-items: center;
+          justify-content: flex-end;
+          gap: 8rpx;
+          font-size: 24rpx;
+          font-weight: bold;
+          
           .img {
-            margin-left: 6rpx;
-            width: 40rpx;
-            height: 40rpx;
+            width: 32rpx;
+            height: 32rpx;
+            
             .image {
-              height: 100%;
               width: 100%;
+              height: 100%;
             }
+          }
+        }
+        
+        .isDealt { color: #07C160; }
+        .unDealt { color: #FA9D3B; }
+
+        /* 电话报警按钮 */
+        .buttons {
+          position: absolute;
+          top: 30rpx;
+          right: 30rpx;
+          width: 80rpx;
+          height: 80rpx;
+          background: rgba(255, 77, 77, 0.1);
+          border-radius: 50%;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          
+          image {
+            width: 44rpx;
+            height: 44rpx;
           }
         }
       }
+
+      /* 侧滑操作区 */
       .deleteBox {
-        border-radius: 0 15rpx 15rpx 0;
+        border-radius: 0 32rpx 32rpx 0;
         overflow: hidden;
-        height: 300rpx;
+        height: 100%;
         width: 100px;
         display: flex;
         position: absolute;
         right: -100px;
         top: 0;
-        z-index: 9;
-        font-size: 32rpx;
-        font-weight: bold;
-        color: #fff;
-        display: flex;
-        flex-direction: column;
-        .edit,
-        .deal,
-        .finish,
-        .delete {
+        z-index: -1; /* 初始隐藏在后面 */
+        
+        .edit, .deal, .finish, .delete {
           flex: 1;
-          width: 100%;
           display: flex;
           justify-content: center;
           align-items: center;
+          color: #fff;
+          font-size: 28rpx;
+          
           image {
-            height: 44rpx;
-            width: 44rpx;
+            width: 40rpx;
+            height: 40rpx;
           }
         }
-        .edit {
-          background-color: #40a4ff;
-        }
-        .deal {
-          background-color: #ffbc5d;
-        }
-        .finish {
-          background-color: #06bfa1;
-        }
-        .delete {
-          background-color: #ff5d5d;
-          image {
-            height: 34rpx;
-            width: 34rpx;
-          }
-        }
+        
+        .edit { background: #007AFF; }
+        .deal { background: #FA9D3B; }
+        .finish { background: #07C160; }
+        .delete { background: #FF4D4F; }
       }
     }
   }

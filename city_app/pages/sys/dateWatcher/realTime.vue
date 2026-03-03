@@ -1,40 +1,46 @@
 <template>
   <view class="body">
+    <!-- 顶部数据总览：赛博清晨明亮玻璃面板 -->
     <view class="total">
-      <view class="left">
-        <span>今日报警数：{{ upTotal.todayNew }}</span>
-        <span>总报警数：{{ upTotal.total }}</span>
-        <span>较昨日变化：{{ upTotal.dayChange }}</span>
+      <view class="item">
+        <view class="label">今日报警数</view>
+        <view class="num highlight">{{ upTotal.todayNew || 0 }}</view>
       </view>
-      <view class="right">
-        <image
-          src="../../../static/analysis.png"
-          mode="aspectFit"
-          alt=""
-        ></image>
+      <view class="item">
+        <view class="label">总报警数</view>
+        <view class="num">{{ upTotal.total || 0 }}</view>
+      </view>
+      <view class="item">
+        <view class="label">较昨日变化</view>
+        <view class="num">{{ upTotal.dayChange || 0 }}</view>
       </view>
     </view>
-    <view class="chart">
+    
+    <!-- 中间图表区：保持透明通透 -->
+    <view class="chart-section">
       <ring-chart></ring-chart>
     </view>
-    <scroll-view scroll-y="true" class="category-scroll">
-      <view class="category">
+    
+    <!-- 12宫格列表：白璃拟态卡片 -->
+    <scroll-view scroll-y="true" class="list-scroll">
+      <view class="grid-layout">
         <view 
           v-for="(cat, index) in categoryConfigs" 
           :key="index"
-          class="cat-block"
-          :style="{ backgroundColor: cat.bg }"
+          class="cat-card"
         >
-          <view class="title">
-            <view class="icon">
-              <!-- 为了防止不同大小的图标拉伸，使用 aspectFit; 注意：打包时可能会遇到静态资源路径动态拼接的问题，安全起见可以用 require 计算 -->
-              <image :src="'../../../static/' + cat.icon" mode="aspectFit"></image>
-            </view>
-            <view class="titleText" :style="{ color: cat.color }">{{ cat.name }}</view>
+          <view class="icon-box" :style="{ backgroundColor: cat.iconBg }">
+            <image :src="'../../../static/' + cat.iconImg" mode="aspectFit"></image>
           </view>
-          <view class="text">
-            <span>总事件数：{{ getData(cat.name).total }}</span>
-            <span>今日新增：{{ getData(cat.name).todayNew }}</span>
+          <view class="info">
+            <view class="name">{{ cat.name }}</view>
+            <view class="stats">
+              <text class="val">{{ getData(cat.name).total }}</text>
+              <text class="unit">次</text>
+            </view>
+            <view class="trend">
+              今日 <text class="plus">+{{ getData(cat.name).todayNew }}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -51,53 +57,34 @@ export default {
       upTotal: {},
       caseList: [],
       categoryConfigs: [
-        { name: '进入危险区域', icon: 'alarm.png', bg: '#d6f6db', color: '#42a852' },
-        { name: '烟雾', icon: 'fuck.png', bg: '#dbfdf7', color: '#1db095' },
-        { name: '区域停留', icon: 'watch.png', bg: '#e2f0d9', color: '#548235' },
-        { name: '摔倒', icon: 'fall.png', bg: '#ffe3c2', color: '#d79547' },
-        { name: '明火', icon: 'fire.png', bg: '#e7e3fe', color: '#9c8eee' },
-        { name: '吸烟', icon: 'smoke.png', bg: '#ffd9d9', color: '#c47a7a' },
-        { name: '打架斗殴', icon: 'fist.png', bg: '#f5f6cc', color: '#a89f42' },
-        { name: '垃圾乱放', icon: 'rubbish.png', bg: '#e0ece4', color: '#7a9e9f' },
-        { name: '冰面', icon: 'analysis.png', bg: '#e3f2fd', color: '#1565c0' },
-        { name: '载具占用车道', icon: 'alert.png', bg: '#fce4ec', color: '#c2185b' },
-        { name: '电动车进楼', icon: 'alert.png', bg: '#fff0e5', color: '#f58220' },
-        { name: '挥手呼救', icon: 'fist.png', bg: '#f3e5f5', color: '#6a1b9a' }
+        { name: '进入危险区域', iconImg: 'alarm.png', iconBg: 'rgba(76, 217, 100, 0.1)' },
+        { name: '烟雾', iconImg: 'fuck.png', iconBg: 'rgba(0, 210, 255, 0.1)' },
+        { name: '区域停留', iconImg: 'watch.png', iconBg: 'rgba(84, 130, 53, 0.1)' },
+        { name: '摔倒', iconImg: 'fall.png', iconBg: 'rgba(255, 152, 0, 0.1)' },
+        { name: '明火', iconImg: 'fire.png', iconBg: 'rgba(244, 67, 54, 0.1)' },
+        { name: '吸烟', iconImg: 'smoke.png', iconBg: 'rgba(233, 30, 99, 0.1)' },
+        { name: '打架斗殴', iconImg: 'fist.png', iconBg: 'rgba(255, 193, 7, 0.1)' },
+        { name: '垃圾乱放', iconImg: 'white-rubbish.png', iconBg: 'rgba(96, 125, 139, 0.1)' },
+        { name: '冰面', iconImg: 'analysis.png', iconBg: 'rgba(33, 150, 243, 0.1)' },
+        { name: '载具占用车道', iconImg: 'alert.png', iconBg: 'rgba(233, 30, 99, 0.1)' },
+        { name: '电动车进楼', iconImg: 'alert.png', iconBg: 'rgba(255, 193, 7, 0.1)' },
+        { name: '挥手呼救', iconImg: 'fuck.png', iconBg: 'rgba(156, 39, 176, 0.1)' }
       ]
     };
   },
   methods: {
     getInfo() {
       uni.$http.get("/api/v1/alarm/realtime").then((res) => {
-		  // console.log('res',res.data);
         if (res.data.code === "D0400") {
-          uni.showToast({
-            title: "登录失效，请重新登录！",
-            duration: 1500,
-            icon: "none",
-          });
+          uni.showToast({ title: "登录失效，请重新登录！", icon: "none" });
           uni.removeStorage({
             key: "token",
-            success: () => {
-              uni.reLaunch({
-                url: "/pages/sys/login/index",
-              });
-            },
-          });
-        }
-        if (res.data.code != "00000") {
-          uni.showToast({
-            title: "数据加载失败！",
-            duration: 1500,
-            icon: "none",
+            success: () => uni.reLaunch({ url: "/pages/sys/login/index" }),
           });
         }
         if (res.data.code === "00000") {
-		  console.log('res.data.data',res.data.data)
-          this.upTotal = res.data.data.alarmTotal;	
-		  // console.log('res.data.data.alarmCaseTypeTotalList',res.data.data.alarmCaseTypeTotalList[0].total)
-          this.caseList = res.data.data.alarmCaseTypeTotalList;
-		  console.log('caseList',this.caseList);
+          this.upTotal = res.data.data.alarmTotal || {};	
+          this.caseList = res.data.data.alarmCaseTypeTotalList || [];
         }
       });
     },
@@ -107,127 +94,159 @@ export default {
       return item ? item : { total: 0, todayNew: 0 };
     }
   },
-  mounted() {
-    this.getInfo();
-  },
-  onShow() {
-    this.getInfo();
-  },
+  mounted() { this.getInfo(); },
+  onShow() { this.getInfo(); },
 };
 </script>
 
 <style lang="scss" scoped>
 .body {
-  height: 95%;
-  // border: 2px solid green;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  padding-top: 20rpx;
+  background: transparent; /* 承接父级的浅色渐变 */
+}
+
+.total {
+  width: 92%;
+  margin: 0 auto 30rpx auto;
+  padding: 40rpx 0;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 32rpx;
+  box-shadow: 0 16rpx 40rpx rgba(100, 150, 200, 0.1);
+  display: flex;
   justify-content: space-around;
-  // margin-bottom: 20rpx;
-  .total {
-    // background-color: #7BBAF5;
-    background-image: linear-gradient(to right, #4d87ef, #99dcf9);
-    width: 99%;
-    height: 16%;
-    border-radius: 15rpx;
+  flex-shrink: 0;
+
+  .item {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-around;
-    .left {
-      // border: 2px solid red;
-      width: 70%;
-      height: 80%;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      justify-content: space-around;
-      span {
-        color: white;
-        font-weight: 600;
-        font-size: 15px;
-      }
+    flex: 1;
+
+    .label {
+      font-size: 24rpx;
+      color: rgba(26, 42, 58, 0.5);
+      margin-bottom: 12rpx;
     }
-    .right {
-      // border: 2px solid red;
-      width: 100rpx;
-      height: 100rpx;
-      image {
-        width: 100%;
-        height: 100%;
+
+    .num {
+      font-size: 48rpx;
+      font-weight: 800;
+      color: #1A2A3A;
+      
+      &.highlight {
+        color: #007AFF;
       }
     }
   }
-  .chart {
-    // border: 2px solid red;
-    background-color: #e1edf6;
-    width: 99%;
-    height: 28%;
-	// width: 200px;
-    height: 400rpx;
-    border-radius: 15rpx;
-	// background-color: pink;
-  }
-  .category-scroll {
-    width: 99%;
-    height: 51%;
-  }
-  .category {
-    width: 100%;
+}
+
+.chart-section {
+  width: 92%;
+  height: 300rpx;
+  margin: 0 auto 30rpx auto;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 32rpx;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.list-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+
+  .grid-layout {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    padding-bottom: 20rpx; /* 给滚动留点空间 */
-    
-    .cat-block {
-      width: 48%;
-      height: 220rpx; /* 将相对高度改为绝对高度，使得滚动生效 */
-      border-radius: 15rpx;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      margin-bottom: 15rpx;
+    padding: 10rpx 4% 40rpx 4%;
+  }
+}
 
-      .title {
-        margin-left: 5%;
-        margin-top: 15rpx;
-        margin-bottom: 10rpx;
-        width: 80%;
-        height: 60rpx;
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        .icon {
-          width: 35%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: white;
-          border-radius: 15rpx;
-          image {
-            width: 80%;
-            height: 80%;
-          }
-        }
-        .titleText {
-          margin-left: 20rpx;
-          width: 65%;
-          font-size: 34rpx; /* 稍微调小以防字数超长 */
-          font-weight: 700;
-          white-space: nowrap;
-        }
+.cat-card {
+  width: 48.5%;
+  height: 200rpx;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 28rpx;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  margin-bottom: 24rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  box-shadow: 0 8rpx 24rpx rgba(150, 180, 210, 0.05);
+  transition: all 0.2s;
+
+  &:active {
+    transform: scale(0.97);
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .icon-box {
+    width: 80rpx;
+    height: 80rpx;
+    border-radius: 20rpx;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 20rpx;
+    flex-shrink: 0;
+
+    image {
+      width: 60%;
+      height: 60%;
+      filter: drop-shadow(0 2rpx 4rpx rgba(0,0,0,0.05));
+    }
+  }
+
+  .info {
+    flex: 1;
+    overflow: hidden;
+
+    .name {
+      font-size: 26rpx;
+      font-weight: 600;
+      color: #1A2A3A;
+      margin-bottom: 6rpx;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stats {
+      margin-bottom: 4rpx;
+      .val {
+        font-size: 34rpx;
+        font-weight: 700;
+        color: #1A2A3A;
       }
-      .text {
-        margin-left: 5%;
-        width: 80%;
-        display: flex;
-        flex-direction: column;
-        span {
-          font-size: 30rpx;
-          font-weight: 700;
-          margin-top: 5rpx;
-        }
+      .unit {
+        font-size: 20rpx;
+        color: rgba(26, 42, 58, 0.4);
+        margin-left: 4rpx;
+      }
+    }
+
+    .trend {
+      font-size: 22rpx;
+      color: rgba(26, 42, 58, 0.5);
+      
+      .plus {
+        color: #007AFF;
+        font-weight: 600;
       }
     }
   }
