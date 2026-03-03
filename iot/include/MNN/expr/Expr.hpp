@@ -87,6 +87,9 @@ public:
         TRAINABLE = 2,
     };
     bool fix(InputType type) const;
+
+    // Only valid for Input / Const / Trainable
+    void setOrder(Dimensionformat format);
 private:
     friend class Variable;
     std::shared_ptr<Variable> mContent;
@@ -108,11 +111,14 @@ public:
         Dimensionformat order = NHWC;
         INTS dim;
         halide_type_t type;
-        int size;
+        size_t size;
         void syncSize();
     };
     const std::string& name() const;
     void setName(const std::string& name);
+    bool setDevicePtr(const void* devicePtr, int memoryType);
+    bool copyToDevicePtr(void* devicePtr, int memoryType);
+
     std::pair<EXPRP, int> expr() const {
         return std::make_pair(mFrom, mFromIndex);
     }
@@ -267,6 +273,7 @@ private:
     bool mVisited                   = false;
     std::vector<WeakEXPRP> mTo;
     bool mCanDecompose = true;
+    friend class ExprModule;
 
 };
 } // namespace Express
