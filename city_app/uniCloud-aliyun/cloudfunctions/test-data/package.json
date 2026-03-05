@@ -1,7 +1,0 @@
-{
-  "name": "test-data",
-  "dependencies": {},
-  "extensions": {
-    "uni-cloud-push": {}
-  }
-}

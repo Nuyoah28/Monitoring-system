@@ -45,6 +45,7 @@ def init_agent():
         return True
     except Exception as e:
         print(f"❌ Agent初始化失败: {e}")
+
         traceback.print_exc()
         return False
 

@@ -171,7 +171,7 @@ import { useUserStore } from '@/stores/user';
 import { useAppStore } from '@/stores/app';
 import { ElMessage } from 'element-plus'
 import axios from 'axios';
-import { baseUrl, algorithmUrl } from '@/config/config';
+import { baseUrl, algorithmUrl, rtmpAddress } from '@/config/config';
 
 // 定义监控项接口
 interface MonitorItem {
@@ -243,11 +243,10 @@ const initializeVideoPlayer = (videoUrl: string): void => {
       flvPlayer.value = null; // 清空引用
     }
     console.log('videourl', videoUrl);
-    //使用临时的001.flv，等物联网端接入后，再替换为动态的视频链接
     try {
       flvPlayer.value = flvjs.createPlayer({
         type: 'flv',
-        url:  baseUrl + '/video/001.flv', //videoUrl 
+        url: rtmpAddress,
       }, {
         enableWorker: false, // 禁用worker模式以减少复杂性
         enableStashBuffer: false, // 减少缓冲区以提高稳定性

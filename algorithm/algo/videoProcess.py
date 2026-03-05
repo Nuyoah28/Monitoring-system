@@ -2,13 +2,14 @@ import threading
 import traceback
 import time
 import os
+import cv2
+import datetime
 
 # 首先应用导入补丁
 from fix_imports import apply_patches
 apply_patches()
 
 from Yolov8 import Yolov8_Pose as yolo
-import cv2
 import subprocess
 
 from Yolov8.Yolov8_Pose import LoadPoseEngine
@@ -135,8 +136,15 @@ def stream_video():
     print('模型加载成功！')
     
     #设置时间
-    post_delay = 20  # 延迟20秒
+    post_delay = 20  # 告警推送延迟20秒
     last_post_time = time.time()  # 记录上一次post的时间
+    
+    save_img_delay = 10  # 保存图片间隔10秒
+    last_save_time = time.time()  # 记录上一次保存图片的时间
+    
+    # 创建保存图片的目录
+    save_dir = os.path.join(os.path.dirname(__file__), '..', 'saved_images')
+    os.makedirs(save_dir, exist_ok=True)
     
 
     # 开始采集和推流
@@ -203,6 +211,14 @@ def stream_video():
             if any(warningList) and current_time - last_post_time >= post_delay:
                 AlarmService.postAlarm(copy.deepcopy(warningList))
                 last_post_time = current_time
+
+            # 每10秒保存一次带检测框的图片
+            if current_time - last_save_time >= save_img_delay:
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                image_filename = os.path.join(save_dir, f"detected_frame_{timestamp}.jpg")
+                cv2.imwrite(image_filename, frame)
+                print(f"已保存检测结果图片: {image_filename}")
+                last_save_time = current_time
 
             # 通过Ffmpeg编码和推流
             ffmepg_process.stdin.write(frame.tobytes())

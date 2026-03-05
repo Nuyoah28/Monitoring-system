@@ -50,6 +50,7 @@ public class WeatherController {
     }
 
     @PostMapping("/add")
+    @Pass
     public CommonResult<CreateWeatherRes> createWeather(@RequestBody CreateWeatherParam createWeatherParam) {
         Integer id = weatherService.addWeather(createWeatherParam);
         if (id == null) {
