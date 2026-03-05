@@ -13,6 +13,29 @@
 static std::atomic<bool> weather_monitoring_active(false);
 static std::thread weather_thread;
 
+// ==== network configuration ====
+// 默认使用开发阶段服务器地址和端口，可以通过环境变量覆盖。
+static const std::string kServerIp = [](){
+    const char* ip = std::getenv("SERVER_IP");
+    return ip ? std::string(ip) : std::string("192.168.213.197");
+}();
+static const int kJavaPort = [](){
+    const char* port = std::getenv("JAVA_PORT");
+    return port ? std::atoi(port) : 10215;
+}();
+static const int kRtmpPort = [](){
+    const char* port = std::getenv("RTMP_PORT");
+    return port ? std::atoi(port) : 1935;
+}();
+
+// helper to build full URL
+static std::string makeUrl(const std::string &path) {
+    std::ostringstream oss;
+    oss << "http://" << kServerIp << ':' << kJavaPort << path;
+    return oss.str();
+}
+
+
 // 回调函数用于处理HTTP响应
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
     size_t totalSize = size * nmemb;
@@ -30,8 +53,9 @@ void triggerAlarm() {
     curl = curl_easy_init();
 
     if(curl) {
-        // 设置POST请求的URL
-        curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:6006/api/v1/monitor-device/alarm");
+        // 设置POST请求的URL (开发服务器IP/端口可通过环境变量 SERVER_IP/ JAVA_PORT 覆盖)
+        std::string url = makeUrl("/api/v1/monitor-device/alarm");
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
         // 设置POST方法
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -82,8 +106,9 @@ void sendWeatherData(int temperature, int humidity) {
     curl = curl_easy_init();
 
     if(curl) {
-        // 设置POST请求的URL
-        curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:10215/api/v1/weather/add");
+        // 设置POST请求的URL (使用与报警相同的Java后端地址)
+        std::string url = makeUrl("/api/v1/weather/add");
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
         // 设置POST方法
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
