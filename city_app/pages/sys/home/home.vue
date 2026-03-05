@@ -62,6 +62,7 @@
 
 <script>
 import wsRequest from '../../../api/websocket.js'
+import { AI_HTTP_URL, AI_WS_URL } from '../../../common/config.js'
 import Vue from 'vue';
 	export default {
 		data() {
@@ -80,7 +81,7 @@ import Vue from 'vue';
 				cnt: 0,
 				isLoading: false,
 				// 语音
-				agentBaseUrl: 'http://192.168.1.8:5050',
+				agentBaseUrl: AI_HTTP_URL,
 				isRecording: false,
 				isTtsPlaying: false,
 				recorderManager: null,
@@ -141,7 +142,7 @@ import Vue from 'vue';
 				let token = uni.getStorageSync('token')
 				// 关于ai对话部分的，如果没有需求先不用管这一部分
 				// this.websocket = new wsRequest(`ws://8.152.219.117:10215/api/v1/gpt/ws/${token}`,5000) //服务器
-				this.websocket = new wsRequest(`ws://192.168.1.8:5050/api/v1/gpt/ws/${token}`,5000) // Python Agent
+				this.websocket = new wsRequest(`${AI_WS_URL}/api/v1/gpt/ws/${token}`,5000) // Python Agent
 				// this.websocket = new wsRequest(`ws://localhost:10215/api/v1/gpt/ws/${token}`,5000) //本地
 				// this.websocket = new wsRequest(`ws://192.168.3.135:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接
 				// this.websocket = new wsRequest(`ws://192.168.68.31:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接

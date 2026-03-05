@@ -70,6 +70,7 @@
 <script>
 	
 import wsRequest from '../../../api/websocket.js'
+import { AI_WS_URL } from '../../../common/config.js'
 // import ModelViewer from '../../../components/ModelViewer.vue'
 // import BabylonModelViewer from './BabylonModelViewer.vue'
 import UnityModelViewer from '../../../components/UnityModelViewer.vue'
@@ -111,7 +112,7 @@ import UnityModelViewer from '../../../components/UnityModelViewer.vue'
 				let token = uni.getStorageSync('token')
 				
 				// this.websocket = new wsRequest(`ws://123.57.77.71:10215/api/v1/gpt/ws/${token}`,5000)
-				this.websocket = new wsRequest(`ws://192.168.1.8:10115/api/v1/gpt/ws/${token}`,5000)
+				this.websocket = new wsRequest(`${AI_WS_URL}/api/v1/gpt/ws/${token}`,5000)
 				
 				this.websocket.getMessage(res => {
 					this.cnt ++;
