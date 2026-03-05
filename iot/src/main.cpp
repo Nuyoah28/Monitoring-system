@@ -238,10 +238,9 @@ int main(int argc, char const *argv[])
     std::vector<BoxInfo> bbox_collection;
     cv::Mat image;
 
-//#if use_camera
-    // 摄像头初始化和主循环
+// RTMP流初始化和主循环
     cv::VideoCapture capture;
-    capture.open(0);
+    capture.open("rtmp://192.168.213.197:1935/live/raw");
 
     cv::Mat frame;
     while (true)
