@@ -14,22 +14,60 @@
 #define use_camera 0  //use_camera：是否使用摄像头（当前设为0，不使用）
 #define mnnd 1        //mnnd：是否使用mnnd模型（当前设为1，使用mnnd模型）
 
+static const char* OUTPUT_NAME = "output0"; // model output tensor name
+
 std::vector<BoxInfo> decode(cv::Mat &cv_mat, std::shared_ptr<MNN::Interpreter> &net, MNN::Session *session, int INPUT_SIZE)
 /*
     这个函数负责对神经网络输出进行解码，提取目标框信息：
 */
 {
-    std::vector<int> dims{1, INPUT_SIZE, INPUT_SIZE, 3};
-    auto nhwc_Tensor = MNN::Tensor::create<float>(dims, NULL, MNN::Tensor::TENSORFLOW);
-    auto nhwc_data = nhwc_Tensor->host<float>();
-    auto nhwc_size = nhwc_Tensor->size();
-    std::memcpy(nhwc_data, cv_mat.data, nhwc_size);
-
+    // always use NCHW input for this network
     auto inputTensor = net->getSessionInput(session, nullptr);
-    inputTensor->copyFromHostTensor(nhwc_Tensor);
+    auto inShape = inputTensor->shape();
+    printf("    **Tensor shape** (after resize):");
+    for (auto v : inShape) printf(" %d", v);
+    printf("\n");
+
+    // ensure cv_mat is float and has 3 channels
+    cv::Mat float_mat;
+    if (cv_mat.type() != CV_32FC3) {
+        cv_mat.convertTo(float_mat, CV_32FC3);
+    } else {
+        float_mat = cv_mat;
+    }
+    if (float_mat.channels() != 3) {
+        std::cerr << "unexpected channel count: " << float_mat.channels() << std::endl;
+    }
+
+    // prepare NCHW host tensor
+    std::vector<int> dims{1, 3, INPUT_SIZE, INPUT_SIZE};
+    std::unique_ptr<MNN::Tensor> hostTensor(MNN::Tensor::create<float>(dims, NULL, MNN::Tensor::CAFFE));
+    float *dst = hostTensor->host<float>();
+    int hw = INPUT_SIZE * INPUT_SIZE;
+    const float *src = reinterpret_cast<const float *>(float_mat.data);
+    // cv_mat is HWC BGR (converted earlier); we assume preprocess returned RGB
+    for (int h = 0; h < INPUT_SIZE; ++h) {
+        for (int w = 0; w < INPUT_SIZE; ++w) {
+            int idx = h * INPUT_SIZE + w;
+            dst[0 * hw + idx] = src[idx * 3 + 0];
+            dst[1 * hw + idx] = src[idx * 3 + 1];
+            dst[2 * hw + idx] = src[idx * 3 + 2];
+        }
+    }
+
+    inputTensor->copyFromHostTensor(hostTensor.get());
 
     net->runSession(session);
-    MNN::Tensor *tensor_scores = net->getSessionOutput(session, "outputs");
+    MNN::Tensor *tensor_scores = net->getSessionOutput(session, OUTPUT_NAME);
+    if (nullptr == tensor_scores) {
+        std::cerr << "Error: can't find output: outputs\n";
+        // dump all available outputs for debugging
+        const auto &outs = net->getSessionOutputAll(session);
+        std::cerr << "  available outputs:";
+        for (const auto &p : outs) std::cerr << ' ' << p.first;
+        std::cerr << '\n';
+        return {}; // return empty detection list
+    }
     MNN::Tensor tensor_scores_host(tensor_scores, tensor_scores->getDimensionType());
     tensor_scores->copyToHostTensor(&tensor_scores_host);
     auto pred_dims = tensor_scores_host.shape();
@@ -107,17 +145,20 @@ std::vector<BoxInfo> decode(cv::Mat &cv_mat, std::shared_ptr<MNN::Interpreter> &
         bbox_collection.push_back(box);
     }
 #endif
-    delete nhwc_Tensor;
+    // hostTensor will be freed automatically
     return bbox_collection;
 }
 
 int main(int argc, char const *argv[])
 {
+    // 输入尺寸（网络固定）
+    const int INPUT_SIZE = 320;
+
     // 启动天气监测，初始温度25度，湿度50%
     startWeatherMonitoring(25, 50);
 
     // 加载模型
-    std::string model_name = "../models/v5lite-e-mnnd_fp16.mnn";
+    std::string model_name = "../models/yolov12_fp16.mnn";
 
     std::shared_ptr<MNN::Interpreter> net = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(model_name.c_str()));
     if (nullptr == net)
@@ -138,11 +179,64 @@ int main(int argc, char const *argv[])
     config.backendConfig = &backendConfig;
     // 创建推理会话
     MNN::Session *session = net->createSession(config);
+    // 必须对输入tensor进行resize，并调用resizeSession，否则调用runSession会报 "not resized"
+    {
+        auto inputTensor = net->getSessionInput(session, nullptr);
+        if (nullptr == inputTensor) {
+            std::cerr << "getSessionInput returned null" << std::endl;
+            stopWeatherMonitoring();
+            return -1;
+        }
+        auto orig = inputTensor->shape();
+        printf("input original shape:");
+        for (auto v : orig) printf(" %d", v);
+        printf("\n");
+        std::vector<int> newShape = {1, 3, INPUT_SIZE, INPUT_SIZE};
+        net->resizeTensor(inputTensor, newShape);
+        net->resizeSession(session);
+        // note: resizeSession returns void; if it fails, MNN_ERROR will have been printed earlier by the library
+        // verify that the model actually produced outputs after resizing
+        bool session_ok = true;
+        {
+            const auto &outs = net->getSessionOutputAll(session);
+            if (outs.empty()) {
+                std::cerr << "[ERROR] session has no outputs after resize, model may be incompatible or failed to build.\n";
+                session_ok = false;
+            }
+            std::cerr << "available output tensors:";
+            for (const auto &p : outs) std::cerr << ' ' << p.first;
+            std::cerr << '\n';
+            if (session_ok) {
+                // ensure output name exists
+                if (outs.find(OUTPUT_NAME) == outs.end()) {
+                    std::cerr << "[ERROR] expected output '" << OUTPUT_NAME << "' not found.\n";
+                    session_ok = false;
+                }
+            }
+        }
+        if (!session_ok) {
+            stopWeatherMonitoring();
+            return -1;
+        }
+    }
+    // prepare matrix info used for preprocessing
+    MatInfo mmat_objection;
+    mmat_objection.inpSize = INPUT_SIZE;
+
+    // test run with a blank image to catch any runSession errors early
+    {
+        cv::Mat dummy(INPUT_SIZE, INPUT_SIZE, CV_32FC3, cv::Scalar(0,0,0));
+        cv::Mat pimg = preprocess(dummy, mmat_objection);
+        auto testres = decode(pimg, net, session, mmat_objection.inpSize);
+        if (testres.empty()) {
+            std::cerr << "[ERROR] session test run produced no output, aborting.\n";
+            stopWeatherMonitoring();
+            return -1;
+        }
+    }
 
     std::vector<BoxInfo> bbox_collection;
     cv::Mat image;
-    MatInfo mmat_objection;
-    mmat_objection.inpSize = 320;
 
 //#if use_camera
     // 摄像头初始化和主循环
@@ -164,6 +258,11 @@ int main(int argc, char const *argv[])
 
         cv::Mat pimg = preprocess(raw_image, mmat_objection);
         bbox_collection = decode(pimg, net, session, mmat_objection.inpSize);// 模型推理
+        if (bbox_collection.empty() && !frame.empty()) {
+            // likely session failed; break to avoid endless errors
+            std::cerr << "Session failed during inference, aborting loop.\n";
+            break;
+        }
         nms(bbox_collection, 0.50);// 非极大值抑制去重
         
         // 检查是否检测到需要报警的对象（例如：人、车等）

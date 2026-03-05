@@ -5,6 +5,10 @@
 #include <opencv2/opencv.hpp>
 //#include <cv/cv.hpp>
 
+// alarm configuration: person label index and score threshold
+#define PERSON_LABEL 0          // change if your model uses a different class index for person
+#define THRESHOLD 0.50f         // confidence threshold to trigger alarm
+
 
 typedef struct
 {

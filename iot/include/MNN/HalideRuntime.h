@@ -60,8 +60,9 @@ typedef enum halide_type_code_t
 {
     halide_type_int = 0,   //!< signed integers
     halide_type_uint = 1,  //!< unsigned integers
-    halide_type_float = 2, //!< floating point numbers
-    halide_type_handle = 3 //!< opaque pointer type (void *)
+    halide_type_float = 2, //!< IEEE floating point numbers
+    halide_type_handle = 3, //!< opaque pointer type (void *)
+    halide_type_bfloat = 4  //!< floating point numbers in the bfloat format
 } halide_type_code_t;
 
 // Note that while __attribute__ can go before or after the declaration,
@@ -81,7 +82,7 @@ typedef enum halide_type_code_t
  * exactly 32-bits in size. */
 struct halide_type_t {
     /** The basic type code: signed integer, unsigned integer, or floating point. */
-#if __cplusplus >= 201103L
+#ifndef _MSC_VER
     HALIDE_ATTRIBUTE_ALIGN(1) halide_type_code_t code; // halide_type_code_t
 #else
     HALIDE_ATTRIBUTE_ALIGN(1) uint8_t code; // halide_type_code_t

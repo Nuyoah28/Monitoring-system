@@ -6,6 +6,7 @@
 #include <sys/time.h>
 #include <omp.h>
 #include "utils.h"
+#include "network.h"   // for triggerAlarm declaration
 
 #define x86_64 0
 #define use_camera 0
@@ -13,14 +14,14 @@
 using namespace MNN;
 
 cv::Mat preprocess(cv::Mat &cv_mat, MatInfo &mmat_objection)
-'''
+/*
     负责图像预处理：
         颜色空间转换：将BGR格式转换为RGB格式（根据平台不同有优化实现）
         尺寸调整：按比例缩放图像，保持宽高比，使最长边等于指定输入尺寸（inpSize）
         填充处理：在缩放后的图像周围添加灰度值为127的边框，确保图像尺寸固定
         数值归一化：将像素值从[0,255]范围转换到[0,1]浮点数范围
         参数记录：更新MatInfo结构体中的缩放比例、填充宽度等参数
-'''
+*/
 {
     cv::Mat img, dstimg;
 #if x86_64
@@ -54,9 +55,9 @@ cv::Mat preprocess(cv::Mat &cv_mat, MatInfo &mmat_objection)
 }
 
 void nms(std::vector<BoxInfo> &input_boxes, float NMS_THRESH)
-'''
+/*
     非极大值抑制
-'''
+*/
 {
     std::sort(input_boxes.begin(), input_boxes.end(), [](BoxInfo a, BoxInfo b)
               { return a.score > b.score; });
@@ -91,11 +92,11 @@ void nms(std::vector<BoxInfo> &input_boxes, float NMS_THRESH)
 }
 
 void draw_box(cv::Mat &cv_mat, std::vector<BoxInfo> &boxes, MatInfo &mmat_objection)
-'''
+/*
     负责结果可视化,在图像上绘制检测框：
         遍历每个检测框，根据其坐标和置信度绘制矩形框和标签文本
         标签文本显示类别名称和置信度（保留小数点后1位）
-'''
+*/
 {
     static const char *class_names[] = {
         "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
