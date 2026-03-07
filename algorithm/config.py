@@ -2,6 +2,8 @@
 class Config:
     BACKEND_URL = ""# java后端
     STREAM_URL = ""# 流地址
+    STREAM_RAW_URL = ""# python后端拉原始流地址
+    STREAM_PROCESSED_URL = ""# python后端推处理后流地址
     TOKEN = None
     MONITOR_ID = -1
     LATITUDE = 0
@@ -11,10 +13,10 @@ class Config:
 
 
 class DevConfig(Config):
-    BACKEND_URL = "http://localhost:10115"
-    # 当videoProcess.py运行在Docker容器中时，需要连接到宿主机的RTMP服务器
-    # 在Docker容器中，host.docker.internal通常指向宿主机
-    STREAM_URL = "rtmp://host.docker.internal:1935"
+    BACKEND_URL = "http://localhost:10215"
+    STREAM_URL = "rtmp://123.56.248.17:1935"
+    STREAM_RAW_URL = "rtmp://123.56.248.17:1935/live/raw"
+    STREAM_PROCESSED_URL = "rtmp://123.56.248.17:1935/live/ai"
     TOKEN = None
     
     # 腾讯云机器翻译 (TMT) 密钥配置

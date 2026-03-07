@@ -1,13 +1,11 @@
 from queue import Queue
 from config import DevConfig as Config
-from common.stream_config import CURRENT_STREAM_RAW_URL, CURRENT_STREAM_PROCESSED_URL
 
 cacheQueue = Queue()
 cacheMax = 250
 
-# 使用动态流配置以支持不同的部署环境
-STREAM_RAW_URL = CURRENT_STREAM_RAW_URL  # python后端拉原始流的地址
-STREAM_PROCESSED_URL = CURRENT_STREAM_PROCESSED_URL  # python后端推处理之后的流的地址
+STREAM_RAW_URL = Config.STREAM_RAW_URL  # python后端拉原始流的地址
+STREAM_PROCESSED_URL = Config.STREAM_PROCESSED_URL  # python后端推处理之后的流的地址
 
 # 添加新的配置项用于视频流处理
 VIDEO_PROCESSING_ENABLED = True
