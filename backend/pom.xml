@@ -192,10 +192,6 @@
         </dependency>
 
 
-
-
-
-
     </dependencies>
 
     <build>
@@ -210,6 +206,29 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <configuration>
+                    <from>
+                        <image>docker.1ms.run/library/eclipse-temurin:17-jre-focal</image>
+                    </from>
+                    <to>
+                        <image>monitoring-system-backend:${project.version}</image>
+                    </to>
+                    <container>
+                        <ports>
+                            <port>10215</port>
+                        </ports>
+                        <environment>
+                            <TZ>Asia/Shanghai</TZ>
+                        </environment>
+                        <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+                        <mainClass>com.sipc.monitoringsystem.MonitoringSystemApplication</mainClass>
+                    </container>
                 </configuration>
             </plugin>
         </plugins>

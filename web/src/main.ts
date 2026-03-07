@@ -7,7 +7,7 @@ import axios from 'axios'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import { createPinia } from 'pinia'
-
+import {baseUrl} from './config/config'
 
 // 创建应用实例
 const app = createApp(App)
@@ -17,10 +17,7 @@ app.config.globalProperties.$axios = axios
 app.config.globalProperties.$bus = app
 
 // 设置axios默认baseURL
-// axios.defaults.baseURL = 'http://123.57.77.71:10215'
-// axios.defaults.baseURL = 'http://8.152.219.117:8001'
-axios.defaults.baseURL = 'http://localhost:10215';
-// axios.defaults.baseURL = '';
+axios.defaults.baseURL = baseUrl;
 
 // 创建并使用 pinia
 const pinia = createPinia()
