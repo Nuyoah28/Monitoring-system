@@ -18,7 +18,6 @@
             </div>
         </div>
         <dialog1 v-if="dialogVisible1" :item="item" @updateDialogVisible1="handleDialogVisibility"></dialog1>
-
         <div class="panel-footer"></div>
     </div>
 </template>
