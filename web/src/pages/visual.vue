@@ -1,6 +1,6 @@
 <template>
   <DashboardLayout @open-profile="goProfile">
-    <div class="col">
+    <div class="col left-col">
       <article class="card">
         <h3>告警指标</h3>
         <div class="kpi-grid">
@@ -11,18 +11,19 @@
         </div>
       </article>
 
-      <article class="card">
+      <article class="card alarm-list-card">
         <AlarmList />
       </article>
 
-      <article class="card">
+      <article class="card pie-card">
         <h3>分类统计图</h3>
         <PieChart1 />
       </article>
+
     </div>
 
-    <div class="col">
-      <article class="card">
+    <div class="col mid-col">
+      <article class="card monitor-main-card">
         <div class="card-head">
           <h3>实时监控</h3>
           <button class="btn view-all-btn" type="button" @click="openMonitorModal">查看全部</button>
@@ -30,17 +31,18 @@
         <div class="monitor-grid">
           <div
             v-for="tile in cameraTiles"
-            :key="tile"
+            :key="tile.name"
             class="video-tile"
             @click="openFocus(tile)"
           >
-            {{ tile }}
+            <div class="tile-title">{{ tile.name }}</div>
+            <div class="tile-sub">{{ tile.streamUrl ? 'RTMP流已接入' : '未配置流地址' }}</div>
           </div>
         </div>
       </article>
 
       <div class="split-row">
-        <article class="card">
+        <article class="card map-card">
           <h3>小区地图及其监测点</h3>
           <div class="map-square">
             <div class="map-canvas">
@@ -56,7 +58,7 @@
           </div>
         </article>
 
-        <article class="card slim-card">
+        <article class="card slim-card dispatch-card">
           <h3>开放词汇检测下发</h3>
           <div class="slim-line">
             <input
@@ -82,19 +84,13 @@
       </div>
     </div>
 
-  <div class="col">
-    <article class="card">
-      <h3>AI Agent 对话</h3>
-      <div class="chat">
-          助手：你好，我可以帮你筛选告警并生成处置建议。<br />
-          你：请列出未处理明火相关告警。<br />
-          助手：当前 1 条，位于地库入口，建议立即通知巡检。<br />
-          你：下发“消防通道堵塞”检测词汇。<br />
-          助手：已提交算法端，等待模型回执。
-      </div>
+  <div class="col right-col">
+    <article class="card agent-chat-card">
+      <h3>AI智能助手</h3>
+      <ChatPanel layout="inline" />
     </article>
 
-      <article class="card">
+      <article class="card env-chart-card">
         <h3>环境质量折线图</h3>
         <div class="chart-wrap">
           <svg width="100%" height="190" viewBox="0 0 300 190" preserveAspectRatio="none" aria-label="天气质量指标折线图">
@@ -129,7 +125,17 @@
 
     <div class="focus-modal" :style="{ display: focusVisible ? 'flex' : 'none' }" :aria-hidden="focusVisible ? 'false' : 'true'">
       <div class="focus-shell">
-        <div class="focus-screen">{{ focusText }}</div>
+        <div class="focus-screen">
+          <video
+            ref="focusVideoRef"
+            class="focus-video"
+            controls
+            muted
+            autoplay
+            playsinline
+          ></video>
+          <div v-if="!focusStreamUrl" class="focus-empty">{{ focusText }}</div>
+        </div>
         <aside class="focus-panel">
           <h4 class="focus-title">实时调控面板</h4>
           <div class="ctrl-grid">
@@ -161,7 +167,7 @@
             v-for="item in monitors"
             :key="item.name"
             class="monitor-row"
-            @click="openFocus(item.name)"
+            @click="openFocus(item)"
           >
             <div>
               <div class="row-title">{{ item.name }}</div>
@@ -178,22 +184,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '@/components/DashboardLayout.vue'
 import { useAlarmStore, type AlarmItem } from '@/stores/alarm'
 import AlarmList from '@/components/alarmlist.vue'
 import PieChart1 from '@/components/piechart1.vue'
+import ChatPanel from '@/components/chat_panel.vue'
 import axios from 'axios'
+import flvjs from 'flv.js'
+import { rtmpAddress } from '@/config/config'
+
+interface MonitorStreamItem {
+  name: string
+  department?: string
+  status?: number | string
+  streamUrl?: string
+}
 
 const router = useRouter()
 const alarmStore = useAlarmStore()
 
 const focusVisible = ref(false)
 const focusText = ref('监控大屏')
+const focusStreamUrl = ref('')
+const focusVideoRef = ref<HTMLVideoElement | null>(null)
+let focusFlvPlayer: flvjs.Player | null = null
 const linkedVideo = ref('联动视频：1号机位 - 北门实时画面')
 const monitorModalVisible = ref(false)
-const monitors = ref<Array<{ name: string; department?: string; status?: number | string }>>([])
+const monitors = ref<MonitorStreamItem[]>([])
 const keyword = ref('')
 const alarms = ref<AlarmItem[]>([])
 // 详情展示暂不使用，保留以便后续扩展
@@ -206,10 +225,10 @@ const kpis = ref([
   { name: '近一年', value: 0 },
 ])
 
-const cameraTiles = ref<string[]>([
-  '1号机位 - 北门实时画面',
-  '2号机位 - 车库入口实时画面',
-  '3号机位 - 东侧步道实时画面',
+const cameraTiles = ref<MonitorStreamItem[]>([
+  { name: '1号机位 - 北门实时画面', streamUrl: rtmpAddress },
+  { name: '2号机位 - 车库入口实时画面', streamUrl: rtmpAddress },
+  { name: '3号机位 - 东侧步道实时画面', streamUrl: rtmpAddress },
 ])
 
 const mapPoints = ref([
@@ -260,10 +279,15 @@ const fetchMonitors = async () => {
     ])
 
     if (listRes.code === '00000') {
-      const monitorList: Array<{ name: string; department?: string; status?: number | string }> = listRes.data || []
+      const monitorList: MonitorStreamItem[] = (listRes.data || []).map((item: any) => ({
+        name: item.name,
+        department: item.department,
+        status: item.status,
+        streamUrl: item.video || item.streamUrl || item.flvUrl || item.rtmpUrl || ''
+      }))
       monitors.value = monitorList
       if (monitorList.length) {
-        cameraTiles.value = monitorList.slice(0, 3).map(item => item.name)
+        cameraTiles.value = monitorList.slice(0, 3)
         if (monitorList[0]) {
           linkedVideo.value = '联动视频：' + monitorList[0].name
         }
@@ -291,13 +315,54 @@ const goProfile = () => {
   router.push('/home')
 }
 
-const openFocus = (camera: string) => {
-  focusText.value = camera + '（大屏预览）'
+const destroyFocusPlayer = () => {
+  if (focusFlvPlayer) {
+    focusFlvPlayer.unload()
+    focusFlvPlayer.destroy()
+    focusFlvPlayer = null
+  }
+
+  const videoEl = focusVideoRef.value
+  if (videoEl) {
+    videoEl.pause()
+    videoEl.removeAttribute('src')
+    videoEl.load()
+  }
+}
+
+const initFocusPlayer = (url: string) => {
+  const videoEl = focusVideoRef.value
+  if (!videoEl || !url) return
+
+  destroyFocusPlayer()
+
+  if (flvjs.isSupported() && url.includes('.flv')) {
+    focusFlvPlayer = flvjs.createPlayer({ type: 'flv', url })
+    focusFlvPlayer.attachMediaElement(videoEl)
+    focusFlvPlayer.load()
+    focusFlvPlayer.play().catch(() => {})
+    return
+  }
+
+  videoEl.src = url
+  videoEl.play().catch(() => {})
+}
+
+const openFocus = (camera: MonitorStreamItem) => {
+  focusText.value = camera.name + '（大屏预览）'
+  focusStreamUrl.value = camera.streamUrl || rtmpAddress
   focusVisible.value = true
+  nextTick(() => {
+    if (focusStreamUrl.value) {
+      initFocusPlayer(focusStreamUrl.value)
+    }
+  })
 }
 
 const closeFocus = () => {
   focusVisible.value = false
+  focusStreamUrl.value = ''
+  destroyFocusPlayer()
 }
 
 const updateLinkedVideo = (camera: string) => {
@@ -335,6 +400,10 @@ const removeTag = (tag: string) => {
 onMounted(() => {
   fetchAlarms()
   fetchMonitors()
+})
+
+onUnmounted(() => {
+  destroyFocusPlayer()
 })
 </script>
 
@@ -424,10 +493,44 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.tile-title {
+  font-weight: 600;
+  text-align: center;
+}
+
+.tile-sub {
+  margin-top: 6px;
+  color: var(--sub);
+  font-size: 12px;
+  text-align: center;
+}
+
 .row-sub {
   color: var(--sub);
   font-size: 12px;
   margin-top: 2px;
+}
+
+.focus-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+.focus-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: rgba(6, 18, 34, 0.7);
+}
+
+.focus-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  font-size: 15px;
+  pointer-events: none;
 }
 
 .status {
@@ -502,6 +605,247 @@ onMounted(() => {
 .view-all-btn:hover {
   border-color: #63b8ff;
   box-shadow: 0 5px 10px rgba(0, 0, 0, 0.16);
+}
+
+.agent-chat-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.right-col {
+  gap: 6px;
+}
+
+.right-col .card {
+  padding: 8px;
+}
+
+.left-col {
+  gap: 6px;
+}
+
+.left-col .card {
+  padding: 8px;
+}
+
+.alarm-list-card {
+  flex: 0 0 27.5rem;
+  max-height: 28rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.monitor-main-card {
+  flex: 0.88;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mid-col :deep(.split-row) {
+  flex: 1.22;
+  min-height: 0;
+}
+
+.mid-col :deep(.split-row > .card) {
+  height: 100%;
+  min-height: 0;
+}
+
+.monitor-main-card :deep(.monitor-grid) {
+  flex: 1;
+  min-height: 0;
+}
+
+.map-card,
+.dispatch-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.map-card .map-square {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.map-card .map-canvas {
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
+.dispatch-card .linked-video {
+  margin-top: auto;
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
+.pie-card {
+  min-height: 164px;
+  padding-bottom: 4px;
+}
+
+.pie-card :deep(.pie-panel) {
+  margin-top: -10px;
+}
+
+.left-col :deep(.pie-card .chart) {
+  height: 164px;
+}
+
+.env-chart-card {
+  padding: 7px 8px;
+}
+
+.left-col .alarm-list-card + .pie-card {
+  margin-top: 0;
+}
+
+.right-col .agent-chat-card + .env-chart-card {
+  margin-top: 0;
+}
+
+.env-chart-card :deep(.chart-wrap) {
+  padding: 0 6px 4px;
+  position: relative;
+}
+
+.env-chart-card :deep(.chart-wrap svg) {
+  height: 132px;
+  margin-top: -10px;
+}
+
+.env-chart-card :deep(.legend) {
+  position: absolute;
+  top: 0;
+  right: 8px;
+  margin-top: 0;
+  gap: 4px;
+  font-size: 11px;
+  flex-direction: column;
+  align-items: center;
+  align-items: flex-end;
+  background: rgba(18, 42, 68, 0.4);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.agent-chat-card :deep(.chat-panel.inline) {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  --panel-bg: linear-gradient(145deg, rgba(52, 89, 129, 0.9), rgba(35, 67, 103, 0.92));
+  --panel-border: rgba(132, 178, 226, 0.34);
+  --assistant-bubble: rgba(58, 98, 141, 0.88);
+  --user-bubble: rgba(75, 120, 168, 0.88);
+  --text-main: #e8f3ff;
+  --text-muted: #b9d3ee;
+  --accent: #8ac9ff;
+}
+
+.agent-chat-card :deep(.chat-panel.inline .chat-header) {
+  display: none;
+}
+
+.agent-chat-card :deep(.chat-panel.inline .chat-messages) {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100% - 4.2rem);
+  overflow-y: auto;
+  background: rgba(36, 70, 107, 0.62);
+  border-color: rgba(128, 173, 219, 0.28);
+}
+
+.agent-chat-card :deep(.chat-panel.inline .chat-messages::-webkit-scrollbar) {
+  width: 8px;
+}
+
+.agent-chat-card :deep(.chat-panel.inline .chat-messages::-webkit-scrollbar-thumb) {
+  background: rgba(138, 185, 229, 0.7);
+  border-radius: 999px;
+}
+
+.agent-chat-card :deep(.chat-panel.inline .chat-content) {
+  border-color: rgba(147, 188, 229, 0.24);
+  box-shadow: 0 2px 8px rgba(8, 24, 42, 0.2);
+}
+
+.agent-chat-card :deep(.chat-panel.inline .chat-message.user .chat-content) {
+  color: #f3f9ff;
+}
+
+.agent-chat-card :deep(.chat-panel.inline .chat-message.assistant .chat-content) {
+  color: #e8f3ff;
+}
+
+:deep(.dash) {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  overflow-x: hidden;
+  padding: 8px 8px 6px;
+  gap: 6px;
+}
+
+:deep(.head) {
+  padding: 8px 10px;
+  gap: 8px;
+}
+
+:deep(.status-grid) {
+  gap: 6px;
+}
+
+:deep(.pill) {
+  padding: 5px 8px;
+}
+
+:deep(.grid) {
+  grid-template-columns: 330px minmax(0, 1fr) 260px;
+  height: 100%;
+  min-height: 0;
+  gap: 6px;
+}
+
+:deep(.grid > .col) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  gap: 6px;
+}
+
+:deep(.monitor-grid .video-tile) {
+  min-height: 168px;
+}
+
+:deep(.map-canvas) {
+  min-height: 210px;
+}
+
+:deep(.linked-video) {
+  margin-top: auto;
+}
+
+@media (max-width: 1240px) {
+  :deep(.grid) {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  :deep(.dash) {
+    height: auto;
+    max-height: none;
+    overflow: auto;
+  }
 }
 </style>
   

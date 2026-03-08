@@ -1,13 +1,10 @@
 <template>
-  <DashboardLayout @open-profile="goProfile">
+  <div class="agent-page">
+    <DashboardLayout @open-profile="goProfile">
     <div class="col">
-      <article class="card">
+      <article class="card agent-chat-card">
         <h3>智能助手对话</h3>
-        <div class="chat">
-          <p>助手：你好，我是 AI Agent，可协助筛选告警、推送处置建议。</p>
-          <p>你：列出近 1 小时的未处理告警。</p>
-          <p>助手：共有 3 条，分别为“地库入口明火”“北门跌倒”“西区违停”。</p>
-        </div>
+        <ChatPanel layout="inline" />
       </article>
       <article class="card">
         <h3>快捷指令</h3>
@@ -72,13 +69,16 @@
         </div>
       </article>
     </div>
-  </DashboardLayout>
+
+    </DashboardLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '@/components/DashboardLayout.vue'
+import ChatPanel from '@/components/chat_panel.vue'
 import axios from 'axios'
 
 const router = useRouter()
@@ -108,3 +108,48 @@ const openFocus = (camera: string) => {
   console.log('open focus', camera)
 }
 </script>
+
+<style scoped>
+.agent-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.agent-page :deep(.dash) {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.col {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.agent-chat-card {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-chat-card :deep(.chat-panel.inline) {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 760px) {
+  .agent-page,
+  .agent-page :deep(.dash) {
+    height: auto;
+    overflow: visible;
+  }
+
+  .col {
+    grid-template-rows: auto;
+  }
+
+  .agent-chat-card {
+    min-height: 24rem;
+    height: auto;
+  }
+}
+</style>

@@ -1,16 +1,16 @@
 /* 全局主题，复用 best.html 风格 */
 :root {
-  --bg: #071427;
-  --bg2: #0b223f;
-  --panel: rgba(13, 38, 70, 0.72);
-  --panel-strong: rgba(8, 30, 58, 0.92);
-  --line: rgba(107, 176, 255, 0.34);
-  --text: #eaf4ff;
-  --sub: #a8c6e8;
+  --bg: #123355;
+  --bg2: #1c4670;
+  --panel: rgba(26, 58, 94, 0.62);
+  --panel-strong: rgba(20, 51, 86, 0.84);
+  --line: rgba(136, 188, 240, 0.36);
+  --text: #edf6ff;
+  --sub: #bed6ef;
   --ok: #53d5a5;
   --warn: #f8cb71;
   --danger: #ff8d8d;
-  --accent: #63b8ff;
+  --accent: #7ec5ff;
   --r: 10px;
 }
 
@@ -24,8 +24,8 @@ body {
   font: 14px/1.45 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   min-height: 100vh;
   background:
-    radial-gradient(1200px 520px at -5% -20%, rgba(99, 184, 255, 0.22), transparent 62%),
-    radial-gradient(900px 420px at 105% 0%, rgba(80, 143, 230, 0.18), transparent 64%),
+    radial-gradient(1200px 520px at -5% -20%, rgba(150, 205, 255, 0.25), transparent 62%),
+    radial-gradient(900px 420px at 105% 0%, rgba(130, 183, 238, 0.2), transparent 64%),
     linear-gradient(160deg, var(--bg), var(--bg2));
 }
 
@@ -65,7 +65,7 @@ body {
 .pill {
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: rgba(8, 31, 58, 0.68);
+  background: rgba(24, 56, 92, 0.62);
   padding: 6px 9px;
   font-size: 12px;
   color: var(--sub);
@@ -81,7 +81,7 @@ body {
   padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(9, 36, 67, 0.7);
+  background: rgba(26, 63, 102, 0.62);
   font-size: 12px;
   color: var(--sub);
   justify-self: end;
@@ -140,7 +140,7 @@ body {
 .kpi {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(8, 31, 58, 0.75);
+  background: rgba(24, 56, 92, 0.68);
   padding: 7px 8px;
 }
 
@@ -169,7 +169,7 @@ body {
   display: grid;
   place-items: center;
   color: var(--sub);
-  background: linear-gradient(145deg, rgba(13, 46, 86, 0.88), rgba(7, 27, 51, 0.95));
+  background: linear-gradient(145deg, rgba(34, 73, 115, 0.86), rgba(24, 52, 85, 0.9));
   font-size: 12px;
   cursor: pointer;
 }
@@ -185,7 +185,7 @@ body {
   border: 1px dashed rgba(107, 176, 255, 0.55);
   border-radius: 8px;
   padding: 8px;
-  background: linear-gradient(145deg, rgba(12, 44, 80, 0.9), rgba(7, 27, 51, 0.96));
+  background: linear-gradient(145deg, rgba(30, 67, 105, 0.86), rgba(22, 51, 83, 0.92));
 }
 
 .map-canvas {
@@ -197,7 +197,7 @@ body {
     radial-gradient(circle at 26% 32%, rgba(99, 184, 255, 0.2), transparent 24%),
     radial-gradient(circle at 58% 58%, rgba(83, 213, 165, 0.2), transparent 26%),
     radial-gradient(circle at 76% 36%, rgba(248, 203, 113, 0.2), transparent 22%),
-    rgba(8, 33, 61, 0.8);
+    rgba(23, 52, 84, 0.76);
   position: relative;
   overflow: hidden;
 }
@@ -259,7 +259,7 @@ body {
   display: grid;
   place-items: center;
   color: var(--sub);
-  background: linear-gradient(145deg, rgba(13, 46, 86, 0.88), rgba(7, 27, 51, 0.95));
+  background: linear-gradient(145deg, rgba(34, 73, 115, 0.86), rgba(24, 52, 85, 0.9));
   font-size: 12px;
   text-align: center;
   padding: 8px;
@@ -271,20 +271,20 @@ body {
   padding: 5px 9px;
   font-size: 12px;
   color: var(--text);
-  background: rgba(11, 36, 67, 0.85);
+  background: rgba(26, 60, 97, 0.82);
   cursor: pointer;
 }
 
 .btn.primary {
   border-color: rgba(99, 184, 255, 0.84);
-  background: rgba(99, 184, 255, 0.2);
+  background: rgba(126, 197, 255, 0.22);
 }
 
 input {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: rgba(9, 31, 58, 0.93);
+  background: rgba(23, 53, 87, 0.88);
   color: var(--text);
   padding: 7px 8px;
   font-size: 12px;
@@ -313,7 +313,7 @@ input {
 .chat {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(10, 35, 64, 0.72);
+  background: rgba(24, 56, 92, 0.66);
   padding: 8px;
   font-size: 12px;
   line-height: 1.55;
@@ -330,7 +330,7 @@ input {
 .chart-wrap {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(9, 34, 63, 0.72);
+  background: rgba(24, 56, 92, 0.66);
   padding: 8px;
 }
 

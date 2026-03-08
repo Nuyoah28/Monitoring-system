@@ -338,13 +338,15 @@ onUnmounted(() => {
 <style scoped>
 .alarm-panel {
   width: 100%;
-  height: 220px;
+  height: 100%;
   background: linear-gradient(135deg, rgba(99, 184, 255, 0.12), rgba(13, 30, 52, 0.5));
   border: 1px solid rgba(99, 184, 255, 0.35);
   border-radius: 10px;
   color: #d6e6ff;
   padding: 10px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-head {
@@ -365,13 +367,27 @@ onUnmounted(() => {
 }
 
 .list {
-  height: 174px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 185, 229, 0.75) transparent;
 }
 
 .list::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 6px;
+  height: 6px;
+}
+
+.list::-webkit-scrollbar-thumb {
+  background: rgba(138, 185, 229, 0.72);
+  border-radius: 999px;
+}
+
+.list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .scroll-content {

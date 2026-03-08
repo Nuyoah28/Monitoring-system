@@ -1,8 +1,8 @@
 <template>
-  <div class="panel chat-panel" :class="{ expanded: isExpanded }" :style="panelStyle">
+  <div class="panel chat-panel" :class="{ expanded: isExpanded, inline: isInline }" :style="panelStyle">
     <div class="chat-header" @mousedown="onDragStart">
       <span>智能助手</span>
-      <button class="toggle-btn" type="button" @click.stop="toggleExpand">
+      <button v-if="!isInline" class="toggle-btn" type="button" @click.stop="toggleExpand">
         {{ isExpanded ? '收起' : '展开' }}
       </button>
     </div>
@@ -45,7 +45,6 @@
         </el-button>
       </el-tooltip>
     </div>
-    <div class="panel-footer"></div>
   </div>
 </template>
 
@@ -55,6 +54,14 @@ import { useUserStore } from '@/stores/user';
 import { agentBaseUrl } from '@/config/config';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+
+interface ChatPanelProps {
+  layout?: 'floating' | 'inline';
+}
+
+const props = withDefaults(defineProps<ChatPanelProps>(), {
+  layout: 'floating'
+});
 
 type MessageRole = 'user' | 'assistant';
 interface ChatMessage {
@@ -73,11 +80,12 @@ const position = ref<{ x: number; y: number }>({ x: 0, y: 0 });
 const isExpanded = ref<boolean>(false);
 const isDragging = ref<boolean>(false);
 const dragOffset = ref<{ x: number; y: number }>({ x: 0, y: 0 });
+const isInline = computed(() => props.layout === 'inline');
 
 const canSend = computed(() => question.value.trim().length > 0 && !isStreaming.value);
 const panelStyle = computed(() => ({
-  left: `${position.value.x}px`,
-  top: `${position.value.y}px`
+  left: isInline.value ? 'auto' : `${position.value.x}px`,
+  top: isInline.value ? 'auto' : `${position.value.y}px`
 }));
 
 // 语音输入
@@ -361,19 +369,27 @@ const stopStream = (): void => {
 };
 
 onMounted(() => {
+  if (!isInline.value) {
+    nextTick(() => {
+      const panel = document.querySelector('.chat-panel') as HTMLElement | null;
+      const width = panel?.offsetWidth || 416;
+      const height = panel?.offsetHeight || 288;
+      position.value = {
+        x: Math.max(16, window.innerWidth - width - 24),
+        y: Math.max(16, window.innerHeight - height - 24)
+      };
+    });
+  }
   nextTick(() => {
-    const panel = document.querySelector('.chat-panel') as HTMLElement | null;
-    const width = panel?.offsetWidth || 416;
-    const height = panel?.offsetHeight || 288;
-    position.value = {
-      x: Math.max(16, window.innerWidth - width - 24),
-      y: Math.max(16, window.innerHeight - height - 24)
-    };
+    if (isInline.value) {
+      position.value = { x: 0, y: 0 };
+    }
   });
   scrollToBottom();
 });
 
 const toggleExpand = (): void => {
+  if (isInline.value) return;
   isExpanded.value = !isExpanded.value;
   nextTick(() => {
     const panel = document.querySelector('.chat-panel') as HTMLElement | null;
@@ -387,6 +403,7 @@ const toggleExpand = (): void => {
 };
 
 const onDragStart = (event: MouseEvent): void => {
+  if (isInline.value) return;
   const panel = document.querySelector('.chat-panel') as HTMLElement | null;
   if (!panel) return;
   isDragging.value = true;
@@ -421,105 +438,172 @@ const onDragEnd = (): void => {
 
 <style scoped>
 .chat-panel {
+  --panel-bg: linear-gradient(145deg, rgba(246, 251, 255, 0.94), rgba(231, 242, 252, 0.9));
+  --panel-border: rgba(110, 140, 168, 0.28);
+  --assistant-bubble: #ffffff;
+  --user-bubble: #d8ecff;
+  --text-main: #1f2a37;
+  --text-muted: #60758d;
+  --accent: #2f89d9;
   position: fixed;
   width: 26rem;
   height: 18rem;
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  color: #fff;
+  color: var(--text-main);
   resize: both;
   overflow: hidden;
   min-width: 20rem;
   min-height: 14rem;
   max-width: 70vw;
   max-height: 80vh;
-  /* 磨砂质感 */
-  background: rgba(28, 32, 45, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--panel-bg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(24, 44, 70, 0.2);
+  padding: 0.7rem 0.8rem;
+}
+
+.chat-panel.inline {
+  position: relative;
+  left: auto !important;
+  top: auto !important;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 24rem;
+  max-width: none;
+  max-height: none;
+  resize: none;
+  box-shadow: 0 8px 20px rgba(18, 38, 62, 0.14);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+  padding: 0.65rem 0.7rem;
+}
+
+.chat-panel.inline .chat-messages {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .chat-panel.expanded {
-  width: 38rem;
-  height: 70vh;
+  width: 42rem;
+  height: 74vh;
+  max-width: 86vw;
+}
+
+.chat-panel.inline.expanded {
+  width: 100%;
+  height: 100%;
+  max-width: none;
 }
 
 .chat-header {
-  font-size: 1.25rem;
+  font-size: 1rem;
+  font-weight: 700;
   text-align: left;
-  margin: 0.5rem 0;
+  margin: 0 0 0.65rem;
   cursor: move;
   user-select: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(138, 165, 190, 0.22);
 }
 
 .toggle-btn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: #fff;
-  font-size: 0.9rem;
-  padding: 0.1rem 0.6rem;
-  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(108, 139, 166, 0.35);
+  color: #2f4f6c;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.22rem 0.66rem;
+  border-radius: 999px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: #f5fbff;
+  color: #1f435f;
+  border-color: rgba(94, 132, 166, 0.55);
 }
 
 .chat-messages {
   flex: 1;
   min-height: 8rem;
   overflow-y: auto;
-  padding-right: 0.5rem;
+  padding: 0.65rem 0.6rem 0.3rem;
   text-align: left;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(125, 155, 180, 0.18);
+  border-radius: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(115, 150, 179, 0.52) transparent;
+}
+
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(115, 150, 179, 0.55);
+  border-radius: 999px;
 }
 
 .chat-message {
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.75rem;
 }
 
 .chat-role {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 0.2rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-bottom: 0.28rem;
 }
 
 .chat-content {
   white-space: pre-wrap;
-  line-height: 1.35;
+  line-height: 1.5;
   overflow-wrap: anywhere;
+  padding: 0.5rem 0.62rem;
+  border-radius: 10px;
+  border: 1px solid rgba(118, 149, 177, 0.2);
+  box-shadow: 0 2px 10px rgba(68, 96, 124, 0.08);
 }
 
 .chat-message.user .chat-content {
-  color: #c6f6ff;
+  color: #0f395a;
+  background: var(--user-bubble);
 }
 
 .chat-message.assistant .chat-content {
-  color: #ffffff;
+  color: #24384d;
+  background: var(--assistant-bubble);
 }
 
 .chat-typing {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  color: #5d7188;
+  padding: 0.2rem 0.1rem;
 }
 
 .chat-input {
   display: flex;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.7rem;
+  align-items: center;
 }
 
 .send-btn,
 .stop-btn {
   flex-shrink: 0;
+  border-radius: 10px;
 }
 
 .stop-tts-btn {
@@ -528,11 +612,59 @@ const onDragEnd = (): void => {
 
 .voice-btn {
   flex-shrink: 0;
+  border-color: rgba(112, 144, 172, 0.35);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .recording-dot {
   color: #f56c6c;
   animation: blink 0.8s ease-in-out infinite;
+}
+
+:deep(.chat-input .el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(112, 144, 172, 0.26) inset;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+:deep(.chat-input .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+:deep(.chat-content p),
+:deep(.chat-content ul),
+:deep(.chat-content ol),
+:deep(.chat-content pre) {
+  margin: 0.15rem 0;
+}
+
+:deep(.chat-content code) {
+  background: #eef5fb;
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .chat-panel {
+    min-width: 18rem;
+    width: 90vw;
+    max-width: 90vw;
+    height: 52vh;
+    min-height: 16rem;
+  }
+
+  .chat-panel.expanded {
+    width: 92vw;
+    height: 76vh;
+  }
+
+  .chat-panel.inline,
+  .chat-panel.inline.expanded {
+    width: 100%;
+    max-width: 100%;
+    min-height: 20rem;
+    height: 100%;
+  }
 }
 
 @keyframes blink {
