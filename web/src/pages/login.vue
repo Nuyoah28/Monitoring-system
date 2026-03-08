@@ -30,7 +30,7 @@
             </div>
 
             <div class="info-text login">
-                <h2>智慧城市危险事件</h2>
+                <h2>智慧社区</h2>
                 <h2>监控预警系统</h2>
                 <p>——web可视化平台——</p>
             </div>
@@ -57,7 +57,7 @@ const login = (): void => {
         password: password.value
     }
     
-    axios.post('/api/v1/user/login', data).then((res: any) => {
+    axios.post('/user/login', data).then((res: any) => {
         console.log(res.data);
         if(res.data.code === "A1000"){
             ElMessage(res.data.message)

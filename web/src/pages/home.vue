@@ -1,28 +1,30 @@
 <template>
-  <div class="home">
-    <div class="contentText1">
-      <el-button type="primary" round class="btn2" @click="goBack">
-      <span>&#8592;</span>
-       返回
-      </el-button>
-      <el-button type="success" round class="btn-agent" @click="goAgent">
-        智能助手
-      </el-button>
-    </div>
-    
-
-    <div class="contentText2">
-      <div class="text1">
-        <div>用户名： 小警</div>
-        <hr>
-        <div>手机号： 18735261687</div>
-        <hr>
+  <div class="dash home">
+    <header class="head">
+      <div>
+        <h1>值班员信息</h1>
+        <p>快速查看个人资料，返回驾驶舱或进入智能助手</p>
       </div>
-      <div class="text2">
-        <img src="../../public/assets/t01c209d217482e57de.jpg" alt="">
-      </div>
-    </div>
+      <div class="pill" @click="goBack" style="cursor:pointer">返回驾驶舱</div>
+      <div class="pill" @click="goAgent" style="cursor:pointer">进入智能助手</div>
+    </header>
 
+    <section class="grid single">
+      <article class="card profile">
+        <div class="profile-meta">
+          <div class="avatar big">张三</div>
+          <div>
+            <div class="label">用户名</div>
+            <div class="value">张三</div>
+            <div class="label">手机号</div>
+            <div class="value">18735261687</div>
+          </div>
+        </div>
+        <div class="profile-img">
+          <img src="../../public/assets/t01c209d217482e57de.jpg" alt="avatar" />
+        </div>
+      </article>
+    </section>
   </div>
 </template>
 
@@ -31,70 +33,75 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const goBack = (): void => {
-    router.push('/visual')
+const goBack = () => {
+  router.push('/visual')
 }
 
-const goAgent = (): void => {
-    router.push('/agent')
+const goAgent = () => {
+  router.push('/agent')
 }
 </script>
 
 <style scoped>
 .home {
-  width: 100%;
-  height: 100%;
-    background-color: white;
-    position: relative;
+  min-height: 100vh;
 }
 
-.btn2 {
-  position: absolute;
-  left: 0;
-  top: 0;
+.grid.single {
+  grid-template-columns: 1fr;
 }
 
-.btn-agent {
-  position: absolute;
-  right: 0;
-  top: 0;
+.profile {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  align-items: center;
 }
 
-.btn2 span {
-  font-size: 1.3rem;
+.profile-meta {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 12px;
+  align-items: center;
 }
 
-.contentText1 {
-  height: 5rem;
-}
-.contentText2 {
-  width: 50%;
-  margin: 0 auto;
-  /* background-color: skyblue; */
-  text-align: left;
-  font-size: 1.8rem;
-  display: flex;
+.profile-img {
+  justify-self: end;
 }
 
-.text1 {
-  flex: 11;
+.profile-img img {
+  width: 180px;
+  height: 180px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid var(--line);
 }
 
-.text2 {
-  flex: 4;
-  margin-left: 1rem;
+.label {
+  color: var(--sub);
+  font-size: 12px;
+  margin-top: 6px;
 }
 
-.text1 div {
-  margin-bottom: 1.5rem;
-  margin-top: 1.5rem;
+.value {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
-.text2 img {
-  width: 20rem;
-  height: 20rem;
-  border: 1px solid gray;
-  padding: 1rem;
+.avatar.big {
+  width: 72px;
+  height: 72px;
+  font-size: 18px;
 }
 
+@media (max-width: 760px) {
+  .profile {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .profile-img {
+    justify-self: start;
+  }
+}
 </style>

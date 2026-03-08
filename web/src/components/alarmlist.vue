@@ -1,38 +1,41 @@
 <template>
-    <div class="panel">
-        <div class="title">最新报警列表</div>
-        <div id="demoDiv" ref="demoDivRef" @mouseenter="stopScroll" @mouseleave="startScroll">
-            <!-- 滚动内容容器 -->
-            <div class="scroll-content">
-                <div v-for="(item, index) in scrollList" 
-                :key="'roll-' + index" class="itemlist" 
-                :style="itemlist1[getcolor(item.eventName)]"
-                @click="showDetail(item)">
-                    <div class="itemlist">
-                        <div class="text-content">
-                            <h3>{{ (index % alarmlist.length) + 1 }} {{ item.eventName }} -- {{ item.department }}</h3>
-                        </div>
-                        <img :src="item.deal === '已处理' ? require('../../public/assets/checked.png') : require('../../public/assets/unchecked.png')" alt="">
-                    </div>
-                </div>
-            </div>
-        </div>
-        <dialog1 v-if="dialogVisible1" :item="item" @updateDialogVisible1="handleDialogVisibility"></dialog1>
-        <div class="panel-footer"></div>
+  <div class="alarm-panel">
+    <div class="panel-head">
+      <h3>最新报警列表</h3>
     </div>
+    <div class="list" ref="demoDivRef" @mouseenter="stopScroll" @mouseleave="startScroll">
+      <div class="scroll-content">
+        <div
+          v-for="(item, index) in scrollList"
+          :key="'roll-' + index"
+          class="item"
+          :style="itemlist1[getcolor(item.eventName)]"
+          @click="showDetail(item)"
+        >
+          <div class="item-main">
+            <div class="text">
+              <div class="line1">{{ item.eventName || '未命名告警' }}</div>
+              <div class="line2">{{ item.department || item.location || '未标注位置' }} · {{ item.date || item.time || item.createTime || '--' }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="!alarmlist.length" class="empty">暂无报警数据</div>
+    </div>
+    <dialog1 v-if="dialogVisible1" :item="item" @updateDialogVisible1="handleDialogVisibility"></dialog1>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import dialog1 from './dialog1.vue';
-import axios from 'axios';
-import { useAlarmStore } from '@/stores/alarm';
-import { useUserStore } from '@/stores/user';
-import { storeToRefs } from 'pinia';
-import { ElMessage } from 'element-plus';
-import { baseUrl } from '@/config/config';
-import { webSocketBaseUrl } from '@/config/config';
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import dialog1 from './dialog1.vue'
+import axios from 'axios'
+import { useAlarmStore } from '@/stores/alarm'
+import { useUserStore } from '@/stores/user'
+import { storeToRefs } from 'pinia'
+import { ElMessage } from 'element-plus'
+import { baseUrl, webSocketBaseUrl } from '@/config/config'
 // 无需重新定义AlarmItem接口，使用store中定义的
 
 const router = useRouter();
@@ -164,59 +167,44 @@ const handleDialogVisibility = (res: boolean): void => {
 
 // 一次性获取所有报警消息
 const fetchAlarmList = (): void => {
-    const data = {
-        pageNum: pageNum.value,
-        pageSize: pageSize.value,
-        status: 0,
-    };
+  const data = {
+    pageNum: pageNum.value,
+    pageSize: pageSize.value,
+    status: 0,
+  }
 
-    const token = userStore.token;
-    axios.get('/api/v1/alarm/query', {
-        params: data,
-        headers: {
-            'Authorization': token
+  axios
+    .get('/alarm/query', { params: data })
+    .then((response: any) => {
+      const res = response.data
+      const newAlarmList = res?.data?.alarmList || res?.data?.list || []
+      if (newAlarmList.length > 0) {
+        alarmStore.setAlarmList(newAlarmList)
+        alarmStore.updateStatisticsFromAlarms()
+
+        if (alarmStore.getAlarmList.length > 0) {
+          const bus = (window as any).$bus
+          if (bus) {
+            bus.$emit('alarm')
+          }
+
+          ElMessage({
+            message: '您有报警新消息',
+            type: 'warning',
+          })
         }
+      }
     })
-        .then((response: any) => {
-            // console.log('收到报警查询数据',response.data.data);
-            console.log('response:', response);
-            const newAlarmList = response.data.data.alarmList;
-            console.log('newAlarmList', newAlarmList);
-            if (newAlarmList.length > 0) {
-                // 将数据存储到Pinia中
-                alarmStore.setAlarmList(newAlarmList);
-
-                // 根据报警列表更新统计数据
-                alarmStore.updateStatisticsFromAlarms();
-
-                // 检查是否有新数据变化，如果有则触发报警事件
-                if(alarmStore.getAlarmList.length > 0){
-                    const bus = (window as any).$bus;
-                    if(bus) {
-                        bus.$emit('alarm');  // 触发事件总线'alarm'事件
-                    }
-
-                    ElMessage({
-                        message: '您有报警新消息',
-                        type: 'warning'
-                    });
-                }
-            }
+    .catch((error: any) => {
+      if (error.response && (error.response.status === 401 || error.response.data?.code === 'D0400')) {
+        ElMessage({
+          message: 'token过期，请重新登录',
+          type: 'warning',
         })
-        .catch((error: any) => {
-            console.log('报警数据查询失败');
-
-            console.log('Error fetching alarm list:', error);
-            if (error.response && (error.response.status === 401 || error.response.data.code === 'D0400')) {
-                // Token过期或无效，跳转到登录页
-                ElMessage({
-                    message: 'token过期，请重新登录',
-                    type: 'warning'
-                });
-                router.push('/login');
-            }
-        });
-};
+        router.push('/login')
+      }
+    })
+}
 
 // 初始化WebSocket连接
 const initWebSocket = (): void => {
@@ -335,86 +323,121 @@ const closeWebSocket = (): void => {
 //let intervalId: number | null = null;
 
 onMounted(() => {
-    // 初始获取报警列表（可选，如果需要初始数据）
-    fetchAlarmList();
-
-    // 初始化WebSocket连接
-    initWebSocket();
-    
-    // 启动滚动大屏
-    startScroll();
-});
+  fetchAlarmList()
+  initWebSocket()
+  startScroll()
+})
 
 // 清理WebSocket连接
 onUnmounted(() => {
-    closeWebSocket();
-    stopScroll();
-});
+  closeWebSocket()
+  stopScroll()
+})
 </script>
 
-<style lang="less" scoped>
-#demoDiv {
-    width: 80%;
-    height: 90%;
-    margin-left: 2.2rem;
-    margin-top: 1rem;
-    overflow: auto;
+<style scoped>
+.alarm-panel {
+  width: 100%;
+  height: 220px;
+  background: linear-gradient(135deg, rgba(99, 184, 255, 0.12), rgba(13, 30, 52, 0.5));
+  border: 1px solid rgba(99, 184, 255, 0.35);
+  border-radius: 10px;
+  color: #d6e6ff;
+  padding: 10px;
+  box-sizing: border-box;
 }
 
-#demoDiv::-webkit-scrollbar {
-    width: 0;
-    height: 0;
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
-.itemlist {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    height: 2.8rem;
-    margin-top: 0.8rem;
-    margin-bottom: 1.5rem;
-    border-radius: 0.8rem;
-    text-align: left;
-    box-sizing: border-box;
-    padding-top: 0.2rem;
-    cursor: pointer;
-    
-    .text-content {
-        flex: 1; /* 占据剩余空间 */
-        min-width: 0; /* 关键：允许flex子项收缩到内容以下 */
-        margin-left: 1.2rem;
-        display: flex; /* 让文字垂直居中 */
-        align-items: center;
-    }
-
-    h3 {
-        font-size: 1.4rem; /* 稍微调小字体 */
-        margin: 0;
-        white-space: nowrap; 
-        overflow: hidden; 
-        text-overflow: ellipsis; 
-        width: 100%; /* 确保在min-width:0的父容器内生效 */
-    }
-
-    img {
-        margin-top: 0.2rem;
-        margin-right: 1rem;
-        width: 2rem;
-        height: 2rem;
-        flex-shrink: 0; /* 防止图片被压缩 */
-    }
+.panel-head h3 {
+  margin: 0;
 }
 
-.panel {
-    color: white;
-    display: flex;
+.muted {
+  color: var(--sub);
+  font-size: 12px;
 }
 
-.title {
-    width: 2rem;
-    font-size: 1.8rem;
-    padding-top: 1.2rem;
-    font-weight: 600;
+.list {
+  height: 174px;
+  overflow: auto;
+}
+
+.list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.scroll-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 6px;
+}
+
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 184, 255, 0.25);
+  background: rgba(255, 255, 255, 0.9);
+  color: #0a1b2f;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.1s ease;
+}
+
+.item:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.text {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  min-width: 0;
+  align-items: center;
+}
+
+.line1 {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #0a1b2f;
+  font-size: 13px;
+}
+
+.line2 {
+  color: #4a5768;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.status {
+  display: none;
+}
+
+.empty {
+  text-align: center;
+  color: var(--sub);
+  padding: 20px 0;
 }
 </style>

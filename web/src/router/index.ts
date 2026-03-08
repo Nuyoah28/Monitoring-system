@@ -4,6 +4,8 @@ import visual from '@/pages/visual.vue'
 import login from '@/pages/login.vue'
 import home from '@/pages/home.vue'
 
+const Agent = () => import('@/pages/agent.vue')
+
 const routes = [
   
   {
@@ -14,6 +16,12 @@ const routes = [
     path:'/visual',
     name:'visual',
     component:visual,
+    meta: { requiresAuth: true }
+  },
+  {
+    path:'/agent',
+    name:'agent',
+    component: Agent,
     meta: { requiresAuth: true }
   },
   {

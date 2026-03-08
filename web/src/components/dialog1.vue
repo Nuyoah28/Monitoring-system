@@ -178,7 +178,7 @@ const getVideoData = (): void => {
 
   const token = userStore.token;
   console.log('token', userStore.token);
-  axios.get('/api/v1/monitor', {
+  axios.get('/monitor', {
     headers: {
       Authorization: token,
     },
