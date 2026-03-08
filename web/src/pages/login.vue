@@ -32,7 +32,6 @@
             <div class="info-text login">
                 <h2>智慧社区</h2>
                 <h2>监控预警系统</h2>
-                <p>——web可视化平台——</p>
             </div>
     </div>
     </div>
@@ -240,8 +239,11 @@ const login = (): void => {
 
 .wrapper .info-text.login {
     right: 0;
+    z-index: 2;
     text-align: right;
-    padding: 0 2.5rem 3.75rem 9.375rem; /* 40px -> 2.5rem, 60px -> 3.75rem, 150px -> 9.375rem */
+    align-items: flex-end;
+    gap: 0.375rem;
+    padding: 0 2.5rem 3rem 7rem;
 }
 
 .info-text h2 {
@@ -254,6 +256,29 @@ const login = (): void => {
 .info-text p {
     font-size: 1rem; /* 16px -> 1rem */
     color: #fff;
+}
+
+.info-text.login h2 {
+    margin: 0;
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: 0.14rem;
+    line-height: 1.15;
+    text-shadow: 0 0 1.25rem rgba(1, 173, 225, 0.4);
+}
+
+.info-text.login h2:nth-of-type(2) {
+    font-size: 1.7rem;
+    font-weight: 500;
+    letter-spacing: 0.08rem;
+    color: #b7f0ff;
+}
+
+.info-text.login p {
+    margin-top: 0.75rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.24rem;
+    color: #89dbf3;
 }
 
 .wrapper .bg-animate {

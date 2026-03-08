@@ -170,12 +170,9 @@ class LoadPoseEngine:
 # ---------------------------------------------------------#
 def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
     from common import monitor as monitorCommon
-    # Simplified preList: only danger zone + Mamba-YOLO state
     indices_danger, fire_indices, smoke_indices = monitorCommon.preList
     try:
-        # ---------------------------------------------------------#
         #   Pose estimation + ST-GCN++ action recognition
-        # ---------------------------------------------------------#
         list0 = False   # danger zone
         list3 = False   # fall
         list6 = False   # punch
@@ -190,7 +187,7 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             points = points.cpu().numpy()
             infer.draw_pose(np_img, bboxes, scores, points)
 
-            # --- ST-GCN++ action recognition (replaces hand-written if-else rules) ---
+            # --- ST-GCN++ action recognition 
             if TYPE_LIST[3] or TYPE_LIST[6] or TYPE_LIST[11]:
                 action_result = action_recognizer.predict(points, bboxes)
                 if TYPE_LIST[3]:

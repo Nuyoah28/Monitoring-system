@@ -632,8 +632,8 @@ onUnmounted(() => {
 }
 
 .alarm-list-card {
-  flex: 0 0 27.5rem;
-  max-height: 28rem;
+  flex: 0 0 30rem;
+  max-height: 31rem;
   min-height: 0;
   overflow: hidden;
 }
