@@ -105,37 +105,45 @@
 	},
 	"uniIdRouter": {},
 	"tabBar": {
-		"color": "#6A7990",
-		"selectedColor": "#007AFF",
-		"backgroundColor": "#EBF5FF",
-		"borderStyle": "white",
-		"list": [
-			{
-				"pagePath": "pages/sys/realtime/realtime",
-				"iconPath": "static/tabBar/realTime.png",
-				"selectedIconPath": "static/chosenTabBar/realtime.png"
-			},
-			{
-				"pagePath": "pages/sys/controls/controls",
-				"iconPath": "static/tabBar/contorl.png",
-				"selectedIconPath": "static/chosenTabBar/control.png"
-			},
-			{
-				"pagePath": "pages/sys/dateWatcher/dateWatcher",
-				"iconPath": "static/tabBar/chart.png",
-				"selectedIconPath": "static/chosenTabBar/chart.png"
-			},
-			{
-				"pagePath": "pages/sys/home/home",
-				"iconPath": "static/tabBar/GPT.png",
-				"selectedIconPath": "static/chosenTabBar/GPT.png"
-			},
-			{
-				"pagePath": "pages/sys/personal/personal",
-				"iconPath": "static/tabBar/personal.png",
-				"selectedIconPath": "static/chosenTabBar/personal.png"
-			}
-		],
-		"iconWidth": "24"
+	  "color": "#6A7990",
+	  "selectedColor": "#007AFF",
+	  "backgroundColor": "#EBF5FF",
+	  "borderStyle": "white",
+	  "height": "56px", // 固定tabBar高度，给文字留空间（建议50-60px）
+	  "iconWidth": "20px", // 缩小图标宽度（原24无单位，需加px）
+	  "fontSize": "10px", // 文字大小
+	  "spacing": "2px", // 图标与文字间距
+	  "list": [
+	    {
+	      "pagePath": "pages/sys/realtime/realtime",
+	      "text": "警报信息", // 必须保留text字段
+	      "iconPath": "static/tabBar/realTime.png",
+	      "selectedIconPath": "static/chosenTabBar/realtime.png"
+	    },
+	    {
+	      "pagePath": "pages/sys/controls/controls",
+	      "text": "设备控制",
+	      "iconPath": "static/tabBar/contorl.png",
+	      "selectedIconPath": "static/chosenTabBar/control.png"
+	    },
+	    {
+	      "pagePath": "pages/sys/dateWatcher/dateWatcher",
+	      "text": "数据统计",
+	      "iconPath": "static/tabBar/chart.png",
+	      "selectedIconPath": "static/chosenTabBar/chart.png"
+	    },
+	    {
+	      "pagePath": "pages/sys/home/home",
+	      "text": "智能分析",
+	      "iconPath": "static/tabBar/GPT.png",
+	      "selectedIconPath": "static/chosenTabBar/GPT.png"
+	    },
+	    {
+	      "pagePath": "pages/sys/personal/personal",
+	      "text": "个人中心",
+	      "iconPath": "static/tabBar/personal.png",
+	      "selectedIconPath": "static/chosenTabBar/personal.png"
+	    }
+	  ]
 	}
 }
