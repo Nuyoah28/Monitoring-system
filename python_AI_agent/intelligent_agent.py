@@ -31,9 +31,9 @@ except ImportError:
 BACKEND_BASE_URL = "http://localhost:10215/api/v1"
 BACKEND_USERNAME = "root"
 BACKEND_PASSWORD = "123456"
-XF_APPID = "12fcd57c"
-XF_API_SECRET = "NmIwODUzZmY0OGNlMzg0ZTZmNzM3NzI1"
-XF_API_KEY = "46054bfc1b0d5da22981bb1af2896c63"
+XF_APPID = "82a9835b"
+XF_API_SECRET = "OTdiMmFmZDI1ZjM0ZjlmODQwYzAxODY4"
+XF_API_KEY = "a1d1ef36e1db50f361ae53fc3c55e234"
 XF_HOST_URL = "https://spark-api.xf-yun.com/v1/x1"
 
 
