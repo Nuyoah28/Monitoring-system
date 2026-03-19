@@ -6,8 +6,15 @@ Agent API 服务 - 提供HTTP接口供前端或其他服务调用
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from flask_sock import Sock
-from intelligent_agent import IntelligentAgent
+
+try:
+    from langgraph_agent import LangGraphIntelligentAgent as IntelligentAgent
+    AGENT_IMPL_NAME = "langgraph"
+except Exception:
+    from intelligent_agent import IntelligentAgent
+    AGENT_IMPL_NAME = "legacy"
 import json
+import hashlib
 import os
 import time
 import traceback
@@ -35,12 +42,26 @@ def _get_user_token(req, data: dict):
         user_token = data.get('token')
     return user_token
 
+def _build_conversation_key(req, user_token: str = None):
+    """构造会话 key，避免所有用户共享同一段上下文。"""
+    if user_token:
+        digest = hashlib.sha1(user_token.encode('utf-8')).hexdigest()[:12]
+        return f"user:{digest}"
+
+    headers = getattr(req, 'headers', {}) if req is not None else {}
+    forwarded_for = (headers.get('X-Forwarded-For') or '').split(',')[0].strip()
+    remote_addr = forwarded_for or getattr(req, 'remote_addr', None) or 'anonymous'
+    user_agent = headers.get('User-Agent', 'unknown')
+    digest = hashlib.sha1(f"{remote_addr}|{user_agent}".encode('utf-8')).hexdigest()[:12]
+    return f"anon:{digest}"
+
 def init_agent():
     """初始化Agent"""
     global agent
     try:
         print("正在初始化Agent...")
         agent = IntelligentAgent()
+        print(f"Agent implementation: {AGENT_IMPL_NAME}")
         print("✅ Agent初始化成功")
         return True
     except Exception as e:
@@ -113,8 +134,13 @@ def chat():
         
         # 从Header或Body获取用户token（前端用户JWT）
         user_token = _get_user_token(request, data)
+        conversation_key = _build_conversation_key(request, user_token)
 
-        response = agent.process_question(question, user_token=user_token)
+        response = agent.process_question(
+            question,
+            user_token=user_token,
+            conversation_key=conversation_key
+        )
         
         elapsed = time.time() - start_time
         print(f"📤 返回回答 (耗时: {elapsed:.2f}秒): {response[:100]}...")  # 只打印前100字符
@@ -166,6 +192,7 @@ def chat_stream():
                 return
 
             user_token = _get_user_token(request, data)
+            conversation_key = _build_conversation_key(request, user_token)
 
             # 发送开始信号
             yield f"data: {json.dumps({'type': 'start', 'question': question})}\n\n"
@@ -174,23 +201,20 @@ def chat_stream():
             start_time = time.time()
 
             q: SimpleQueue = SimpleQueue()
-            done_flag = threading.Event()
-            error_flag = threading.Event()
-            full_answer_parts = []
 
             def run_agent():
                 try:
                     agent.process_question(
                         question,
                         on_chunk=lambda c: q.put(c),
-                        user_token=user_token
+                        user_token=user_token,
+                        conversation_key=conversation_key,
+                        stream_mode='sse'
                     )
                 except Exception as e:
-                    error_flag.set()
-                    q.put(json.dumps({'type': 'error', 'message': str(e)}))
+                    q.put({'type': 'error', 'message': str(e)})
                 finally:
                     q.put(None)  # 结束标记
-                    done_flag.set()
 
             threading.Thread(target=run_agent, daemon=True).start()
 
@@ -199,10 +223,9 @@ def chat_stream():
                 chunk = q.get()
                 if chunk is None:
                     break
-                if isinstance(chunk, str) and chunk.startswith('{') and '"type":"error"' in chunk:
-                    yield f"data: {chunk}\n\n"
+                if isinstance(chunk, dict) and chunk.get('type') == 'error':
+                    yield f"data: {json.dumps(chunk)}\n\n"
                     break
-                full_answer_parts.append(chunk)
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
             # 发送完成信号
@@ -273,7 +296,12 @@ def chat_voice():
     if not question.strip():
         return jsonify({"code": "A1000", "message": "未识别到有效语音", "data": None}), 400
 
-    response = agent.process_question(question.strip(), user_token=user_token)
+    conversation_key = _build_conversation_key(request, user_token)
+    response = agent.process_question(
+        question.strip(),
+        user_token=user_token,
+        conversation_key=conversation_key
+    )
     result_data = {"question": question.strip(), "answer": response}
 
     if return_tts and response:
@@ -406,10 +434,14 @@ def gpt_ws(ws, token):
             
             try:
                 if agent:
+                    conversation_key = _build_conversation_key(request, token)
                     # 使用Agent处理，并通过回调发送chunk
                     agent.process_question(
                         question, 
-                        on_chunk=lambda c: ws.send(c)
+                        on_chunk=lambda c: ws.send(c),
+                        user_token=token,
+                        conversation_key=conversation_key,
+                        stream_mode='ws'
                     )
                 else:
                     ws.send("⚠️ Agent未初始化")
