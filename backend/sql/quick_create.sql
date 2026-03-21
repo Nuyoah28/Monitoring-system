@@ -1,9 +1,3 @@
--- MySQL dump 10.13  Distrib 8.1.0, for macos13.3 (arm64)
---
--- Host: 192.168.115.51    Database: Hospital_alarm_system
--- ------------------------------------------------------
--- Server version	8.0.33
-
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
@@ -14,7 +8,7 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-USE SweatPear;
+USE Sweatpear;
 
 --
 -- Table structure for table `alarm_info`
@@ -161,12 +155,11 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2024-04-03 11:22:23
--- 用户表：仅添加新数据，保留现有数据
 INSERT INTO user_info (id, user_name, password, phone, role) VALUES 
 (3, 'aaa', '42f641872ae4070ed059696b1df93394', '13800138000', 1),
 (4, 'bbb', '42f641872ae4070ed059696b1df93394', '13900139000', 1);
 
--- 案例类型表：删除现有数据并重新插入
+
 DELETE FROM case_type_info;
 INSERT INTO case_type_info (id, case_type_name) VALUES 
 (1, '进入危险区域'),
@@ -202,7 +195,6 @@ INSERT INTO monitor (id, name, area, leader, alarm_cnt, stream_link, danger_area
 (5, '2号楼电梯内摄像头', '2号楼电梯内', 'aaa', 6, 'rtmp://example.com/elevator1', 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 300, 300, 700, 700),
 (6, '4号楼楼道摄像头', '4号楼楼道', 'bbb', 2, 'rtmp://example.com/hallway1', 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 350, 350, 750, 750);
 
--- 告警信息表：删除现有数据并重新插入（关联到monitor和case_type）
 DELETE FROM alarm_info;
 INSERT INTO alarm_info (id, clip_link, monitor_id, case_type, warning_level, create_time, status, processing_content) VALUES 
 (1, 'xS5hpPA89A', 4, 3, 4, '2023-09-22 22:38:12', 0, NULL),

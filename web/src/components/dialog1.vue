@@ -77,6 +77,14 @@ const videoElement = ref<HTMLVideoElement | null>(null);
 let video: any = null;
 let flvPlayer: any = null; // 添加全局flvPlayer引用用于销毁
 
+const withNoCache = (url: string): string => {
+  if (!url) return url;
+  const [base, hash = ''] = url.split('#');
+  const connector = base.includes('?') ? '&' : '?';
+  const nextUrl = `${base}${connector}_t=${Date.now()}`;
+  return hash ? `${nextUrl}#${hash}` : nextUrl;
+};
+
 // 视频错误状态
 const videoLoadError = ref<boolean>(false);
 const videoErrorMessage = ref<string>('');
@@ -186,11 +194,12 @@ const getVideoData = (): void => {
     console.log('dialog', response?.data?.chartData);
     
     video = response?.data?.chartData || props.item.video;  // 将响应数据绑定到组件状态中，如果API返回undefined则使用传入的视频URL
+    const playUrl = withNoCache(video || props.item.video || '');
     if (flvjs.isSupported() && videoElement.value) {
       try {
         flvPlayer = flvjs.createPlayer({
           type: 'flv',
-          url: props.item.video || ''
+          url: playUrl
         }, {
           enableWorker: false,
           lazyLoad: false, // 改为false以避免某些问题
@@ -208,7 +217,7 @@ const getVideoData = (): void => {
           destroyFlvPlayer();
           // 尝试使用原生video标签播放
           if (videoElement.value) {
-            videoElement.value.src = props.item.video || '';
+            videoElement.value.src = playUrl;
             videoElement.value.load();
           }
         });
@@ -228,14 +237,14 @@ const getVideoData = (): void => {
         console.error('创建FLV播放器失败:', error);
         // 如果flv.js创建失败，尝试使用原生video标签
         if (videoElement.value) {
-          videoElement.value.src = props.item.video || '';
+          videoElement.value.src = playUrl;
           videoElement.value.load();
         }
       }
     } else {
       // 如果浏览器不支持flv.js，使用原生video标签
       if (videoElement.value) {
-        videoElement.value.src = props.item.video || '';
+        videoElement.value.src = playUrl;
         videoElement.value.load();
       }
     }
@@ -245,9 +254,10 @@ const getVideoData = (): void => {
       // 如果API调用失败，仍然尝试直接播放视频URL
       if (flvjs.isSupported() && videoElement.value && props.item.video) {
         try {
+          const fallbackPlayUrl = withNoCache(props.item.video);
           flvPlayer = flvjs.createPlayer({
             type: 'flv',
-            url: props.item.video
+            url: fallbackPlayUrl
           }, {
             enableWorker: false,
             lazyLoad: false,
@@ -265,20 +275,20 @@ const getVideoData = (): void => {
             destroyFlvPlayer();
             // 最后的备选方案：使用原生video标签
             if (videoElement.value) {
-              videoElement.value.src = props.item.video || '';
+              videoElement.value.src = fallbackPlayUrl;
               videoElement.value.load();
             }
           });
         } catch (err) {
           console.error('直接播放视频也失败了:', err);
           if (videoElement.value) {
-            videoElement.value.src = props.item.video || '';
+            videoElement.value.src = withNoCache(props.item.video || '');
             videoElement.value.load();
           }
         }
       } else if (videoElement.value) {
         // 不支持flv.js的情况下，使用原生video标签
-        videoElement.value.src = props.item.video || '';
+        videoElement.value.src = withNoCache(props.item.video || '');
         videoElement.value.load();
       }
   });
@@ -287,8 +297,15 @@ const getVideoData = (): void => {
 // 销毁flv播放器实例
 const destroyFlvPlayer = (): void => {
   if (flvPlayer) {
-    // 简单地将引用设为null，让浏览器垃圾回收机制处理
+    flvPlayer.unload?.();
+    flvPlayer.detachMediaElement?.();
+    flvPlayer.destroy?.();
     flvPlayer = null;
+  }
+  if (videoElement.value) {
+    videoElement.value.pause();
+    videoElement.value.removeAttribute('src');
+    videoElement.value.load();
   }
 };
 

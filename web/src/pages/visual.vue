@@ -35,8 +35,17 @@
             class="video-tile"
             @click="openFocus(tile)"
           >
-            <div class="tile-title">{{ tile.name }}</div>
-            <div class="tile-sub">{{ tile.streamUrl ? 'RTMP流已接入' : '未配置流地址' }}</div>
+            <video
+              :ref="(el) => setTileVideoRef(tile.name, el as HTMLVideoElement | null)"
+              class="tile-video"
+              muted
+              autoplay
+              playsinline
+            ></video>
+            <div class="tile-overlay">
+              <div class="tile-title">{{ tile.name }}</div>
+              <div class="tile-sub">{{ tile.streamUrl ? '实时画面' : '未配置流地址' }}</div>
+            </div>
           </div>
         </div>
       </article>
@@ -45,16 +54,7 @@
         <article class="card map-card">
           <h3>小区地图及其监测点</h3>
           <div class="map-square">
-            <div class="map-canvas">
-              <span
-                v-for="point in mapPoints"
-                :key="point.camera"
-                class="point"
-                :class="point.className"
-                :title="point.title"
-                @click="updateLinkedVideo(point.camera)"
-              ></span>
-            </div>
+            <MapPanZoom :points="mapPoints" @point-click="onMapPointClick" />
           </div>
         </article>
 
@@ -79,7 +79,17 @@
               <i class="close" @click.stop="removeTag(tag)">×</i>
             </span>
           </div>
-          <div class="linked-video">{{ linkedVideo }}</div>
+          <div class="linked-video">
+            <video
+              ref="linkedVideoRef"
+              class="linked-video-player"
+              muted
+              autoplay
+              playsinline
+            ></video>
+            <div class="linked-video-label">{{ linkedVideo }}</div>
+            <div v-if="!linkedStreamUrl" class="linked-video-empty">未配置联动视频流</div>
+          </div>
         </article>
       </div>
     </div>
@@ -184,22 +194,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '@/components/DashboardLayout.vue'
-import { useAlarmStore, type AlarmItem } from '@/stores/alarm'
+import { useAlarmStore } from '@/stores/alarm'
 import AlarmList from '@/components/alarmlist.vue'
 import PieChart1 from '@/components/piechart1.vue'
 import ChatPanel from '@/components/chat_panel.vue'
+import MapPanZoom from '@/components/MapPanZoom.vue'
 import axios from 'axios'
 import flvjs from 'flv.js'
-import { rtmpAddress } from '@/config/config'
+import { rtmpAddressList } from '@/config/config'
+import { S } from 'vue-router/dist/router-CWoNjPRp.mjs'
 
 interface MonitorStreamItem {
+  id?: number | string
   name: string
   department?: string
   status?: number | string
   streamUrl?: string
+}
+
+interface MapPointItem {
+  title: string
+  camera: string
+  className: string
+  streamUrl?: string
+  style?: {
+    left?: string
+    top?: string
+  }
 }
 
 const router = useRouter()
@@ -210,28 +234,95 @@ const focusText = ref('监控大屏')
 const focusStreamUrl = ref('')
 const focusVideoRef = ref<HTMLVideoElement | null>(null)
 let focusFlvPlayer: flvjs.Player | null = null
+const tileVideoRefs = new Map<string, HTMLVideoElement>()
+const tileFlvPlayers = new Map<string, flvjs.Player>()
 const linkedVideo = ref('联动视频：1号机位 - 北门实时画面')
+const linkedStreamUrl = ref('')
+const linkedVideoRef = ref<HTMLVideoElement | null>(null)
+let linkedFlvPlayer: flvjs.Player | null = null
 const monitorModalVisible = ref(false)
 const monitors = ref<MonitorStreamItem[]>([])
 const keyword = ref('')
-const alarms = ref<AlarmItem[]>([])
-// 详情展示暂不使用，保留以便后续扩展
-const selectedAlarm = ref<AlarmItem | null>(null)
 
-const kpis = ref([
-  { name: '今日告警', value: 0 },
-  { name: '待处理', value: 0, color: '#ff8d8d' },
-  { name: '近30天', value: 0 },
-  { name: '近一年', value: 0 },
-])
+const withNoCache = (url: string) => {
+  if (!url) return url
+  const [base, hash = ''] = url.split('#')
+  const connector = base.includes('?') ? '&' : '?'
+  const nextUrl = `${base}${connector}_t=${Date.now()}`
+  return hash ? `${nextUrl}#${hash}` : nextUrl
+}
+
+const kpis = computed(() => {
+  const list = alarmStore.getAlarmList || []
+  const now = new Date()
+  const nowTime = now.getTime()
+  const dayMs = 24 * 60 * 60 * 1000
+
+  const parseAlarmTime = (item: any) => {
+    const raw = item.date || item.time || item.createTime
+    if (!raw) return null
+    if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw
+
+    if (typeof raw === 'number') {
+      const date = new Date(raw)
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim()
+      if (!trimmed) return null
+      const normalized =
+        trimmed.includes('T') || trimmed.includes('/') ? trimmed : trimmed.replace(/-/g, '/')
+      const date = new Date(normalized)
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+
+    return null
+  }
+
+  const isToday = (date: Date) => {
+    return (
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate()
+    )
+  }
+
+  const today = list.filter(item => {
+    const date = parseAlarmTime(item)
+    return date ? isToday(date) : false
+  }).length
+
+  const recent30Days = list.filter(item => {
+    const date = parseAlarmTime(item)
+    if (!date) return false
+    const diff = nowTime - date.getTime()
+    return diff >= 0 && diff <= dayMs * 30
+  }).length
+
+  const recentYear = list.filter(item => {
+    const date = parseAlarmTime(item)
+    if (!date) return false
+    const diff = nowTime - date.getTime()
+    return diff >= 0 && diff <= dayMs * 365
+  }).length
+
+  const pending = list.filter(item => item.deal !== '完成' && item.status !== 1).length
+  return [
+    { name: '今日告警', value: today },
+    { name: '待处理', value: pending, color: '#ff8d8d' },
+    { name: '近30天', value: recent30Days },
+    { name: '近一年', value: recentYear },
+  ]
+})
 
 const cameraTiles = ref<MonitorStreamItem[]>([
-  { name: '1号机位 - 北门实时画面', streamUrl: rtmpAddress },
-  { name: '2号机位 - 车库入口实时画面', streamUrl: rtmpAddress },
-  { name: '3号机位 - 东侧步道实时画面', streamUrl: rtmpAddress },
+  { name: '1号机位 - 北门实时画面', streamUrl: rtmpAddressList[1] },
+  { name: '2号机位 - 车库入口实时画面', streamUrl: rtmpAddressList[2] },
+  { name: '3号机位 - 东侧步道实时画面', streamUrl: rtmpAddressList[3] },
 ])
 
-const mapPoints = ref([
+const mapPoints = ref<MapPointItem[]>([
   { title: '北门监测点', camera: '1号机位 - 北门实时画面', className: 'p1' },
   { title: '中庭监测点', camera: '3号机位 - 东侧步道实时画面', className: 'p2' },
   { title: '车库监测点', camera: '2号机位 - 车库入口实时画面', className: 'p3' },
@@ -246,29 +337,10 @@ const parking = ref([
   { name: '地面西侧剩余', value: 9 },
 ])
 
-const fetchAlarms = async () => {
-  const { data: res } = await axios.get('/alarm/query', {
-    params: { pageNum: 1, pageSize: 10 },
-  })
-  if (res.code !== '00000') return
-  const list: AlarmItem[] = res.data?.list || []
-  alarmStore.setAlarmList(list)
-  alarms.value = list.map(item => ({
-    ...item,
-    name: item.name || item.eventName || '未命名告警',
-    department: item.department || item.location || '未标注位置',
-    date: item.date || item.time || item.createTime || '--',
-    deal: item.deal || item.processingContent || item.statusText || '未处理',
-  }))
-
-  const today = list.length
-  const pending = list.filter(item => item.deal !== '完成' && item.status !== 1).length
-  kpis.value = [
-    { name: '今日告警', value: today },
-    { name: '待处理', value: pending, color: '#ff8d8d' },
-    { name: '近30天', value: res.data?.monthTotal ?? today },
-    { name: '近一年', value: res.data?.yearTotal ?? today },
-  ]
+const isDev = process.env.NODE_ENV !== 'production'
+const debugLog = (...args: any[]) => {
+  if (!isDev) return
+  console.log('[visual-debug]', ...args)
 }
 
 const fetchMonitors = async () => {
@@ -278,33 +350,85 @@ const fetchMonitors = async () => {
       axios.get('/monitor/map'),
     ])
 
+    let monitorList: MonitorStreamItem[] = []
+
     if (listRes.code === '00000') {
-      const monitorList: MonitorStreamItem[] = (listRes.data || []).map((item: any) => ({
+      monitorList = (listRes.data || []).map((item: any) => ({
+        id: item.id,
         name: item.name,
         department: item.department,
         status: item.status,
-        streamUrl: item.video || item.streamUrl || item.flvUrl || item.rtmpUrl || ''
+        streamUrl:rtmpAddressList[item.id],//根据id获取流地址
+        //streamUrl: item.video || item.streamUrl || item.flvUrl || item.rtmpUrl || ''
       }))
       monitors.value = monitorList
+      console.log('监控列表：', monitorList)
       if (monitorList.length) {
         cameraTiles.value = monitorList.slice(0, 3)
         if (monitorList[0]) {
           linkedVideo.value = '联动视频：' + monitorList[0].name
+          linkedStreamUrl.value = monitorList[0].streamUrl || ''
+          nextTick(() => {
+            if (linkedStreamUrl.value) {
+              initLinkedPlayer(linkedStreamUrl.value)
+            }
+          })
         }
+        nextTick(() => {
+          initTilePlayers()
+        })
       }
     }
 
     if (mapRes.code === '00000') {
-      const points: Array<{ name: string; location?: string; longitude?: number; latitude?: number }> = mapRes.data || []
+      const points: Array<{
+        id?: number | string
+        monitorId?: number | string
+        name: string
+        location?: string
+        longitude?: number
+        latitude?: number
+      }> = mapRes.data || []
       mapPoints.value = points.slice(0, 3).map((item, idx) => ({
+        ...(() => {
+          const key = item.monitorId ?? item.id
+          const matched =
+            monitorList.find(m => key !== undefined && m.id === key) ||
+            monitorList[idx] ||
+            monitorList.find(m => m.name === item.name) ||
+            monitorList.find(m => item.name && m.name.includes(item.name)) ||
+            monitorList.find(m => item.name && item.name.includes(m.name))
+          return {
+            camera: matched?.name || item.name || item.location || `监测点${idx + 1}`,
+            streamUrl: matched?.streamUrl || '',
+          }
+        })(),
         title: item.location || item.name,
-        camera: item.name,
         className: `p${idx + 1}`,
         style:
           item.longitude !== undefined && item.latitude !== undefined
             ? { left: `${item.longitude}%`, top: `${item.latitude}%` }
             : undefined,
       }))
+
+      debugLog(
+        'map points mapped',
+        mapPoints.value.map((point, idx) => ({
+          idx,
+          title: point.title,
+          camera: point.camera,
+          streamUrl: point.streamUrl,
+        }))
+      )
+      debugLog(
+        'monitor list mapped',
+        monitorList.map((item, idx) => ({
+          idx,
+          id: item.id,
+          name: item.name,
+          streamUrl: item.streamUrl,
+        }))
+      )
     }
   } catch (e) {
     // 静态降级
@@ -330,27 +454,131 @@ const destroyFocusPlayer = () => {
   }
 }
 
+const destroyLinkedPlayer = () => {
+  if (linkedFlvPlayer) {
+    linkedFlvPlayer.unload()
+    linkedFlvPlayer.destroy()
+    linkedFlvPlayer = null
+  }
+
+  const videoEl = linkedVideoRef.value
+  if (videoEl) {
+    videoEl.pause()
+    videoEl.removeAttribute('src')
+    videoEl.load()
+  }
+}
+
+const initLinkedPlayer = (url: string) => {
+  const videoEl = linkedVideoRef.value
+  if (!videoEl || !url) return
+  const playUrl = withNoCache(url)
+
+  destroyLinkedPlayer()
+
+  if (flvjs.isSupported() && url.includes('.flv')) {
+    linkedFlvPlayer = flvjs.createPlayer(
+      { type: 'flv', url: playUrl },
+      {
+        enableStashBuffer: false,
+        lazyLoad: false,
+        deferLoadAfterSourceOpen: false,
+        autoCleanupSourceBuffer: true,
+      } as any,
+    )
+    linkedFlvPlayer.attachMediaElement(videoEl)
+    linkedFlvPlayer.load()
+    linkedFlvPlayer.play().catch(() => {})
+    return
+  }
+
+  videoEl.src = playUrl
+  videoEl.play().catch(() => {})
+}
+
+const setTileVideoRef = (name: string, el: HTMLVideoElement | null) => {
+  if (el) {
+    tileVideoRefs.set(name, el)
+    return
+  }
+  tileVideoRefs.delete(name)
+}
+
+const destroyTilePlayers = () => {
+  tileFlvPlayers.forEach(player => {
+    player.unload()
+    player.destroy()
+  })
+  tileFlvPlayers.clear()
+
+  tileVideoRefs.forEach(videoEl => {
+    videoEl.pause()
+    videoEl.removeAttribute('src')
+    videoEl.load()
+  })
+}
+
+const initTilePlayers = () => {
+  destroyTilePlayers()
+
+  cameraTiles.value.forEach(tile => {
+    const videoEl = tileVideoRefs.get(tile.name)
+    const url = tile.streamUrl || ''
+    const playUrl = withNoCache(url)
+    if (!videoEl || !url) return
+
+    if (flvjs.isSupported() && url.includes('.flv')) {
+      const player = flvjs.createPlayer(
+        { type: 'flv', url: playUrl },
+        {
+          enableStashBuffer: false,
+          lazyLoad: false,
+          deferLoadAfterSourceOpen: false,
+          autoCleanupSourceBuffer: true,
+        } as any,
+      )
+      player.attachMediaElement(videoEl)
+      player.load()
+      player.play().catch(() => {})
+      tileFlvPlayers.set(tile.name, player)
+      return
+    }
+
+    videoEl.src = playUrl
+    videoEl.play().catch(() => {})
+  })
+}
+
 const initFocusPlayer = (url: string) => {
   const videoEl = focusVideoRef.value
   if (!videoEl || !url) return
+  const playUrl = withNoCache(url)
 
   destroyFocusPlayer()
 
   if (flvjs.isSupported() && url.includes('.flv')) {
-    focusFlvPlayer = flvjs.createPlayer({ type: 'flv', url })
+    focusFlvPlayer = flvjs.createPlayer(
+      { type: 'flv', url: playUrl },
+      {
+        enableStashBuffer: false,
+        lazyLoad: false,
+        deferLoadAfterSourceOpen: false,
+        autoCleanupSourceBuffer: true,
+      } as any,
+    )
     focusFlvPlayer.attachMediaElement(videoEl)
     focusFlvPlayer.load()
     focusFlvPlayer.play().catch(() => {})
     return
   }
 
-  videoEl.src = url
+  videoEl.src = playUrl
   videoEl.play().catch(() => {})
 }
 
 const openFocus = (camera: MonitorStreamItem) => {
   focusText.value = camera.name + '（大屏预览）'
-  focusStreamUrl.value = camera.streamUrl || rtmpAddress
+  focusStreamUrl.value = camera.streamUrl || rtmpAddressList[0]
   focusVisible.value = true
   nextTick(() => {
     if (focusStreamUrl.value) {
@@ -365,8 +593,47 @@ const closeFocus = () => {
   destroyFocusPlayer()
 }
 
-const updateLinkedVideo = (camera: string) => {
-  linkedVideo.value = '联动视频：' + camera
+const updateLinkedVideo = (camera: string, streamUrl?: string) => {
+  debugLog('updateLinkedVideo input', { camera, streamUrl })
+  const target =
+    monitors.value.find(item => item.name === camera) ||
+    monitors.value.find(item => item.name.includes(camera)) ||
+    monitors.value.find(item => camera.includes(item.name)) ||
+    cameraTiles.value.find(item => item.name === camera)
+
+  const displayName = target?.name || camera
+  linkedVideo.value = '联动视频：' + displayName
+  linkedStreamUrl.value = streamUrl || target?.streamUrl || ''
+
+  debugLog('updateLinkedVideo matched', {
+    displayName,
+    matchedName: target?.name,
+    matchedId: target?.id,
+    resolvedUrl: linkedStreamUrl.value,
+  })
+
+  if (!linkedStreamUrl.value) {
+    const fallback =
+      monitors.value.find(item => item.streamUrl) ||
+      cameraTiles.value.find(item => item.streamUrl)
+    if (fallback) {
+      linkedVideo.value = '联动视频：' + fallback.name
+      linkedStreamUrl.value = fallback.streamUrl || ''
+      debugLog('updateLinkedVideo fallback', {
+        fallbackName: fallback.name,
+        fallbackId: fallback.id,
+        fallbackUrl: fallback.streamUrl,
+      })
+    }
+  }
+
+  nextTick(() => {
+    if (linkedStreamUrl.value) {
+      initLinkedPlayer(linkedStreamUrl.value)
+      return
+    }
+    destroyLinkedPlayer()
+  })
 }
 
 const openMonitorModal = () => {
@@ -375,10 +642,6 @@ const openMonitorModal = () => {
 
 const closeMonitorModal = () => {
   monitorModalVisible.value = false
-}
-
-const selectAlarm = (alarm: AlarmItem) => {
-  selectedAlarm.value = alarm
 }
 
 const pushKeyword = async (value?: string) => {
@@ -397,14 +660,43 @@ const removeTag = (tag: string) => {
   keywordTags.value = keywordTags.value.filter(t => t !== tag)
 }
 
+const onMapPointClick = (point: MapPointItem) => {
+  debugLog('map point clicked', {
+    title: point.title,
+    camera: point.camera,
+    streamUrl: point.streamUrl,
+  })
+  updateLinkedVideo(point.camera || point.title, point.streamUrl)
+}
+
 onMounted(() => {
-  fetchAlarms()
   fetchMonitors()
+  nextTick(() => {
+    initTilePlayers()
+    if (!linkedStreamUrl.value && cameraTiles.value[0]?.streamUrl) {
+      linkedStreamUrl.value = cameraTiles.value[0].streamUrl || ''
+    }
+    if (linkedStreamUrl.value) {
+      initLinkedPlayer(linkedStreamUrl.value)
+    }
+  })
 })
 
 onUnmounted(() => {
   destroyFocusPlayer()
+  destroyTilePlayers()
+  destroyLinkedPlayer()
 })
+
+watch(
+  cameraTiles,
+  () => {
+    nextTick(() => {
+      initTilePlayers()
+    })
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>
@@ -496,6 +788,22 @@ onUnmounted(() => {
 .tile-title {
   font-weight: 600;
   text-align: center;
+}
+
+.tile-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: rgba(6, 18, 34, 0.75);
+}
+
+.tile-overlay {
+  position: absolute;
+  inset: auto 0 0;
+  background: linear-gradient(180deg, rgba(3, 10, 18, 0), rgba(3, 10, 18, 0.72));
+  padding: 24px 10px 8px;
 }
 
 .tile-sub {
@@ -684,6 +992,38 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   aspect-ratio: auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.linked-video-player {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: rgba(6, 18, 34, 0.75);
+}
+
+.linked-video-label {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(3, 10, 18, 0.62);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.linked-video-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--sub);
+  font-size: 12px;
+  pointer-events: none;
 }
 
 .pie-card {
@@ -825,6 +1165,8 @@ onUnmounted(() => {
 
 :deep(.monitor-grid .video-tile) {
   min-height: 168px;
+  position: relative;
+  overflow: hidden;
 }
 
 :deep(.map-canvas) {

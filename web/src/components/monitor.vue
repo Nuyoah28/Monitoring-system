@@ -235,10 +235,20 @@ const fontStyle = reactive<{color: string}[]>([
 
 const router = useRouter();
 
+const withNoCache = (url: string): string => {
+  if (!url) return url;
+  const [base, hash = ''] = url.split('#');
+  const connector = base.includes('?') ? '&' : '?';
+  const nextUrl = `${base}${connector}_t=${Date.now()}`;
+  return hash ? `${nextUrl}#${hash}` : nextUrl;
+};
+
 const initializeVideoPlayer = (videoUrl: string): void => {
   if (flvjs.isSupported()) {
     const videoElement = document.querySelector('video'); // 获取视频元素
+    const playUrl = withNoCache(videoUrl || rtmpAddress);
     if(videoElement && flvPlayer.value) {
+      flvPlayer.value.unload();
       flvPlayer.value.destroy(); // 先销毁之前的播放器实例
       flvPlayer.value = null; // 清空引用
     }
@@ -246,11 +256,14 @@ const initializeVideoPlayer = (videoUrl: string): void => {
     try {
       flvPlayer.value = flvjs.createPlayer({
         type: 'flv',
-        url: rtmpAddress,
+        url: playUrl,
       }, {
         enableWorker: false, // 禁用worker模式以减少复杂性
         enableStashBuffer: false, // 减少缓冲区以提高稳定性
         stashInitialSize: 128, // 设置初始缓冲区大小
+        lazyLoad: false,
+        deferLoadAfterSourceOpen: false,
+        autoCleanupSourceBuffer: true,
       });
       if(videoElement) {
         flvPlayer.value.attachMediaElement(videoElement);

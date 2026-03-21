@@ -204,12 +204,32 @@ body {
 
 .point {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #63b8ff;
-  box-shadow: 0 0 0 6px rgba(99, 184, 255, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 0 0 10px rgba(99, 184, 255, 0.24),
+    0 0 12px rgba(99, 184, 255, 0.85);
   cursor: pointer;
+  z-index: 3;
+  animation: pointPulse 1.8s ease-out infinite;
+  color: #63b8ff;
+}
+
+.point::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.7;
+  animation: pointRipple 1.8s ease-out infinite;
+}
+
+.point:hover {
+  transform: scale(1.15);
 }
 
 .point.p1 {
@@ -221,14 +241,45 @@ body {
   left: 48%;
   top: 50%;
   background: #53d5a5;
-  box-shadow: 0 0 0 6px rgba(83, 213, 165, 0.2);
+  box-shadow:
+    0 0 0 10px rgba(83, 213, 165, 0.24),
+    0 0 12px rgba(83, 213, 165, 0.85);
+  color: #53d5a5;
 }
 
 .point.p3 {
   left: 74%;
   top: 28%;
   background: #f8cb71;
-  box-shadow: 0 0 0 6px rgba(248, 203, 113, 0.2);
+  box-shadow:
+    0 0 0 10px rgba(248, 203, 113, 0.24),
+    0 0 12px rgba(248, 203, 113, 0.85);
+  color: #f8cb71;
+}
+
+@keyframes pointPulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+}
+
+@keyframes pointRipple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.75;
+  }
+  70% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
 }
 
 .slim-card {
@@ -359,7 +410,7 @@ input {
   align-items: center;
   justify-content: center;
   padding: 18px;
-  z-index: 20;
+  z-index: 12000;
 }
 
 .focus-shell {
