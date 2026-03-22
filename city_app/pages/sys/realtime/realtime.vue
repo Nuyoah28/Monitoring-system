@@ -254,25 +254,11 @@ export default {
     const info = uni.getWindowInfo();
     this.statusBarHeight = info.statusBarHeight || 20;
     this.safeAreaTop = info.safeArea.height;
-    let boxTop = 0;
-    let scrollTop = 0;
-    let boxHeight = 0;
     this.$nextTick(() => {
-      const query = uni.createSelectorQuery().in(this);
-      query
-        .select("#warnBox")
-        .boundingClientRect((data) => {
-          boxTop = data.top;
-          boxHeight = data.height;
-        })
-        .exec();
-      query
-        .select(".content")
-        .boundingClientRect((data) => {
-          scrollTop = data.top;
-        })
-        .exec();
-      this.scrollHeight = boxHeight - scrollTop + boxTop;
+      this.updateScrollHeight();
+      setTimeout(() => {
+        this.updateScrollHeight();
+      }, 80);
     });
 	
 	// 监听 WebSocket 发送的新报警事件
@@ -298,12 +284,37 @@ export default {
 	this.statusList= "nomore";
 	this.hisIsAll = false;
 	this.warnIsAll = false;
+    this.$nextTick(() => {
+      this.updateScrollHeight();
+    });
     this.getRealList();
   },
    // beforeDestroy() {
    //    clearInterval(this.dataFetchInterval); // 组件销毁前清除定时器
    //  },
   methods: {
+	buildTodayRange() {
+	  const now = new Date();
+	  const y = now.getFullYear();
+	  const m = String(now.getMonth() + 1).padStart(2, "0");
+	  const d = String(now.getDate()).padStart(2, "0");
+	  return {
+		startTime: `${y}-${m}-${d} 00:00:00`,
+		endTime: `${y}-${m}-${d} 23:59:59`,
+	  };
+	},
+	updateScrollHeight() {
+	  const query = uni.createSelectorQuery().in(this);
+	  query.select("#warnBox").boundingClientRect();
+	  query.select(".content").boundingClientRect();
+	  query.exec((res) => {
+		const box = res && res[0];
+		const content = res && res[1];
+		if (!box || !content) return;
+		const height = box.height - (content.top - box.top);
+		this.scrollHeight = Math.max(220, height);
+	  });
+	},
 	// startDataFetch() {
 	// 	this.dataFetchInterval = setInterval(() => {
 
@@ -365,7 +376,6 @@ export default {
         const data = {
           pageNum: this.pageNum,
           pageSize: this.pageSize,
-          status: 1,
         };
         if (this.caseType) {
           data.caseType = this.caseType;
@@ -393,10 +403,13 @@ export default {
       } else if (!this.choosen && !this.warnIsAll) {
         // console.log("0 more");
         this.pageNum++;
+        const range = this.buildTodayRange();
         const data = {
           pageNum: this.pageNum,
           pageSize: this.pageSize,
           status: 0,
+          startTime: range.startTime,
+          endTime: range.endTime,
         };
         // console.log(data);
         if (this.caseType) {
@@ -427,10 +440,13 @@ export default {
     },
     getRealList() {
 		this.statusList = 'loading'
+	  const range = this.buildTodayRange();
       const data = {
         pageNum: this.pageNum,
         pageSize: this.pageSize,
         status: 0,
+        startTime: range.startTime,
+        endTime: range.endTime,
       };
       if (this.caseType) {
         data.caseType = this.caseType;
@@ -456,7 +472,6 @@ export default {
       const data = {
         pageNum: this.pageNum,
         pageSize: this.pageSize,
-        status: 1,
       };
       if (this.caseType) {
         data.caseType = this.caseType;

@@ -22,66 +22,7 @@
           <u-icon name="setting" color="#666" size="44rpx"></u-icon>
         </view>
       </view>
-<!-- 	  <view class="map1" v-if="choosen === 1">
-	  	<Map></Map>
-	  </view> -->
-	  
-    <map
-        v-show="choosen !== 2"
-        style="flex: 1; width: 100%; position: relative"
-        longitude="8.152"
-        latitude="34.117"
-        :show-location="isShow"
-        id="map1"
-        :markers="markers"
-        @tap="showDetail = false"
-        @markertap="showMarker"
-      >
-        <cover-view class="status" @tap="test">
-          <cover-view
-            style="height: 40px; line-height: 40px; margin-bottom: 5px"
-          >
-            摄像头总数：{{ total }}
-          </cover-view>
-          <cover-view style="height: 40px; line-height: 40px">
-            正在工作的设备：{{ working }}
-          </cover-view>
-        </cover-view>
-        <cover-view class="detail" v-if="showDetail">
-          <cover-view class="left">
-            <cover-view class="title">
-              {{ markersDetail[index].name }}
-            </cover-view>
-            <cover-view class="iconAndStatus">
-              <cover-view class="icon">
-                <cover-image
-                  src="../../../static/monitor.png"
-                  alt=""
-                ></cover-image>
-              </cover-view>
-              <cover-view
-                class="statuses"
-                :class="markersDetail[index].running ? 'running' : 'stop'"
-              >
-                状态：{{ markersDetail[index].running ? "在线" : "离线" }}
-              </cover-view>
-            </cover-view>
-          </cover-view>
-          <cover-view class="right">
-            <cover-view style="line-height: 20px"
-              >监测到危险情况数：{{
-                markersDetail[index].alarmCnt
-              }}</cover-view
-            >
-            <cover-view style="line-height: 20px"
-              >监测区域：{{ markersDetail[index].area }}</cover-view
-            >
-            <cover-view style="line-height: 20px"
-              >负责人：{{ markersDetail[index].leader }}</cover-view
-            >
-          </cover-view>
-        </cover-view>
-      </map>
+      <MonitorMap v-show="choosen !== 2" :monitorList="warnData" />
       <scroll-view
         scroll-y="true"
         v-show="choosen === 2"
@@ -146,9 +87,10 @@
 
 <script>
 import Edit from "./components/edit.vue";
+import MonitorMap from "./components/monitorMap.vue";
 // import Map from "./components/map.vue"
 export default {
-  components: { Edit },
+  components: { Edit, MonitorMap },
   data() {
     return {
       showEdit: false,
@@ -299,16 +241,12 @@ export default {
   },
   onShow(){
 	  this.getMonitor();
-	  this.getMap();
   },
   watch:{
 	  choosen:{
 		  handler(newVal){
 			  console.log(newVal)
-			  if(newVal === 1){
-				  // console.log('hi')
-				  this.getMap();
-			  }else{
+			  if(newVal === 2){
 				  this.getMonitor()
 			  }
 		  }

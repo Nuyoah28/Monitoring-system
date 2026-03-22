@@ -4,20 +4,14 @@
       <div>
         <h1>智慧社区安防系统 </h1>
       </div>
+      <div class="pill">当前天气：多云 26C / 湿度58% / AQI 72</div>
       <div class="pill">值班状态：<span style="color:var(--ok);">在线</span></div>
       <div class="pill">{{ nowTime }}</div>
       <div class="top-user" @click="$emit('open-profile')" style="cursor:pointer">
         <div class="avatar">安防</div>
-        <div class="meta">张三<br />社区安防值班员 / 视频调度</div>
+        <div class="meta">张三 - 社区安防值班员</div>
       </div>
     </header>
-
-    <div class="status-grid">
-      <div class="pill">算法端：运行中</div>
-      <div class="pill">摄像头在线：24 / 26</div>
-      <div class="pill">今日处置完成率：81%</div>
-      <div class="pill">当前天气：多云 26C / 湿度58% / AQI 72</div>
-    </div>
 
     <section class="grid">
       <slot />
@@ -62,15 +56,47 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+.dash {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.head {
+  grid-template-columns: 1fr auto auto auto auto;
   gap: 8px;
 }
 
+.top-user {
+  position: static;
+  justify-self: end;
+  min-width: auto;
+  grid-template-columns: 36px auto;
+  gap: 6px;
+  padding: 4px 6px;
+}
+
+.top-user .meta {
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.top-user .avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 11px;
+}
+
 @media (max-width: 1240px) {
-  .status-grid {
+  .head {
     grid-template-columns: 1fr;
+  }
+
+  .top-user {
+    position: static;
   }
 }
 </style>

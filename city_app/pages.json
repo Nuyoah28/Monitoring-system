@@ -4,14 +4,6 @@
 	},
 	"pages": [
 		{
-			"path": "pages/sys/start/start",
-			"style": {
-				"navigationBarTitleText": "",
-				"enablePullDownRefresh": false,
-				"navigationStyle": "custom"
-			}
-		},
-		{
 			"path": "pages/sys/login/index",
 			"style": {
 				"navigationBarTitleText": "登录",
@@ -109,14 +101,14 @@
 	  "selectedColor": "#007AFF",
 	  "backgroundColor": "#EBF5FF",
 	  "borderStyle": "white",
-	  "height": "56px", // 固定tabBar高度，给文字留空间（建议50-60px）
-	  "iconWidth": "20px", // 缩小图标宽度（原24无单位，需加px）
-	  "fontSize": "10px", // 文字大小
-	  "spacing": "2px", // 图标与文字间距
+	  "height": "56px", 
+	  "iconWidth": "20px",
+	  "fontSize": "10px", 
+	  "spacing": "2px",
 	  "list": [
 	    {
 	      "pagePath": "pages/sys/realtime/realtime",
-	      "text": "警报信息", // 必须保留text字段
+	      "text": "警报信息", 
 	      "iconPath": "static/tabBar/realTime.png",
 	      "selectedIconPath": "static/chosenTabBar/realtime.png"
 	    },

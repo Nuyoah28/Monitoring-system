@@ -1,19 +1,42 @@
 <template>
-	<view class="main" :style="{ minHeight: safeHeight + 'px', paddingTop: statusBarHeight + 'px' }">
+	<view class="main" :class="{ 'drawer-open': showSessionList }" :style="{ minHeight: safeHeight + 'px', paddingTop: statusBarHeight + 'px', '--status-bar-height': statusBarHeight + 'px' }">
 		<view class="header">
 			<view class="topNav">
-				<view class="choosen">
-					<span>智慧助手</span>
+				<view class="choosen" @tap="toggleSessionList">
+					<image class="session-tag" src="../../../static/messagelist.png"></image>
 				</view>
 			</view>
-			<view class="setting-btn" @click="jump">
-				<u-icon name="setting" color="#666" size="44rpx"></u-icon>
-			</view>
-		</view>
-		<view class="body">
-			<view class="title">
+			<view class="header-title">
 				<span>AI助手</span>
 			</view>
+			<view class="setting-btn" @tap="jump">
+				<image class="setting-tag" src="../../../static/settings.png"></image>
+			</view>
+		</view>
+		<view class="session-drawer" :class="{ open: showSessionList }" @touchmove.stop.prevent>
+			<view class="session-panel" @click.stop>
+				<view class="session-panel-head">
+					<text class="session-panel-title">消息列表</text>
+					<view class="session-new" @tap="startNewSession">新建会话</view>
+				</view>
+				<scroll-view class="session-scroll" scroll-y>
+					<view
+						class="session-item"
+						:class="item.id === currentSessionId ? 'active' : ''"
+						v-for="item in sortedSessions"
+						:key="item.id"
+						@tap="switchSession(item.id)"
+						@longpress.stop="onSessionLongPress(item.id)"
+						@longtap.stop="onSessionLongPress(item.id)"
+					>
+						<view class="session-name">{{ getSessionTitle(item) }}</view>
+						<view class="session-time">{{ formatSessionTime(item.updatedAt) }}</view>
+					</view>
+				</scroll-view>
+			</view>
+			<view class="session-peek" @tap="showSessionList = false"></view>
+		</view>
+		<view class="body" :style="bodyStyle">
 			<scroll-view :scroll-top="scrollTop" class="scroll" scroll-y @scroll="recordHeight" :style="{ height: scrollHeight + 'px' }">
 				<view class="chat">
 					<view id="msgbar" v-for="(item, index) in textList" :key="index" :class="index%2 === 1 ? 'left' : 'right'">
@@ -86,12 +109,23 @@ import Vue from 'vue';
 				isTtsPlaying: false,
 				recorderManager: null,
 				innerAudioContext: null,
+				showSessionList: false,
+				sessions: [],
+				currentSessionId: '',
+				sessionLongPressLock: false,
 			}
 		},
 		onShow() {
 			const info = uni.getWindowInfo();
 			this.safeHeight = info.safeArea.height;
 			this.statusBarHeight = info.statusBarHeight || 20;
+			this.loadSessionCache();
+			if (!this.sessions.length) {
+				this.startNewSession();
+			} else {
+				const defaultId = this.currentSessionId || this.sessions[0].id;
+				this.switchSession(defaultId, false);
+			}
 			this.createWs();
 		},
 		beforeDestroy() {
@@ -108,9 +142,120 @@ import Vue from 'vue';
 						uni.showToast({ title: '语音功能异常', icon: 'none' });
 					}
 				};
-			}
+			},
+			sortedSessions() {
+				return [...this.sessions].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+			},
+			bodyStyle() {
+				return {
+					transform: this.showSessionList ? 'translateX(80%)' : 'translateX(0)',
+				};
+			},
 		},
 		methods:{
+			loadSessionCache() {
+				try {
+					const cache = uni.getStorageSync('aiSessionCache');
+					if (!cache) return;
+					const parsed = typeof cache === 'string' ? JSON.parse(cache) : cache;
+					if (parsed && Array.isArray(parsed.sessions)) {
+						this.sessions = parsed.sessions;
+						this.currentSessionId = parsed.currentSessionId || '';
+					}
+				} catch (e) {}
+			},
+			saveSessionCache() {
+				try {
+					uni.setStorageSync('aiSessionCache', {
+						sessions: this.sessions,
+						currentSessionId: this.currentSessionId,
+					});
+				} catch (e) {}
+			},
+			toggleSessionList() {
+				this.showSessionList = !this.showSessionList;
+			},
+			startNewSession() {
+				const id = String(Date.now());
+				this.sessions.unshift({
+					id,
+					title: '新会话',
+					updatedAt: Date.now(),
+					messages: [],
+				});
+				this.currentSessionId = id;
+				this.textList = [];
+				this.showSessionList = false;
+				this.saveSessionCache();
+			},
+			switchSession(id, closePanel = true) {
+				if (this.sessionLongPressLock) return;
+				const target = this.sessions.find((item) => item.id === id);
+				if (!target) return;
+				this.currentSessionId = id;
+				this.textList = Array.isArray(target.messages) ? [...target.messages] : [];
+				if (closePanel) this.showSessionList = false;
+				this.$nextTick(() => this.toBottom());
+				this.saveSessionCache();
+			},
+			onSessionLongPress(id) {
+				this.sessionLongPressLock = true;
+				setTimeout(() => {
+					this.sessionLongPressLock = false;
+				}, 260);
+				uni.showModal({
+					title: '删除会话',
+					content: '确认删除该聊天会话吗？',
+					confirmColor: '#e15656',
+					success: (res) => {
+						if (res.confirm) this.deleteSession(id);
+					}
+				});
+			},
+			deleteSession(id) {
+				const index = this.sessions.findIndex((item) => item.id === id);
+				if (index < 0) return;
+				const removedIsCurrent = this.sessions[index].id === this.currentSessionId;
+				this.sessions.splice(index, 1);
+				if (!this.sessions.length) {
+					this.startNewSession();
+					return;
+				}
+				if (removedIsCurrent) {
+					const next = this.sortedSessions[0];
+					if (next) this.switchSession(next.id, false);
+				}
+				this.saveSessionCache();
+			},
+			getSessionTitle(session) {
+				if (!session || !Array.isArray(session.messages) || !session.messages.length) return session && session.title ? session.title : '新会话';
+				const first = (session.messages[0] || '').replace(/\s+/g, ' ').trim();
+				if (!first) return session.title || '新会话';
+				return first.length > 12 ? first.slice(0, 12) + '...' : first;
+			},
+			formatSessionTime(ts) {
+				if (!ts) return '';
+				const date = new Date(ts);
+				const m = String(date.getMonth() + 1).padStart(2, '0');
+				const d = String(date.getDate()).padStart(2, '0');
+				const h = String(date.getHours()).padStart(2, '0');
+				const min = String(date.getMinutes()).padStart(2, '0');
+				return `${m}-${d} ${h}:${min}`;
+			},
+			refreshCurrentSession() {
+				const index = this.sessions.findIndex((item) => item.id === this.currentSessionId);
+				if (index < 0) return;
+				const messages = [...this.textList];
+				const first = (messages[0] || '').replace(/\s+/g, ' ').trim();
+				const title = first ? (first.length > 12 ? first.slice(0, 12) + '...' : first) : '新会话';
+				Vue.set(this.sessions, index, {
+					...this.sessions[index],
+					title,
+					updatedAt: Date.now(),
+					messages,
+				});
+				this.saveSessionCache();
+			},
 			// 将 Markdown 转为富文本可用的 HTML，去掉符号并保留排版
 			mdToHtml(str) {
 				if (str == null || typeof str !== 'string') return ''
@@ -160,6 +305,7 @@ import Vue from 'vue';
 						this.answerText += res.data;
 					}
 					Vue.set(this.textList , this.textList.length-1 , this.answerText)
+					this.refreshCurrentSession();
 					if(res.data === "[DONE]") {
 						this.isDisabled = false;
 						// 文字回复也播放语音（与 Web 端体验一致）
@@ -215,6 +361,7 @@ import Vue from 'vue';
 					this.text = "";
 					// this.isDisabled = true;
 					this.isLoading = true;
+					this.refreshCurrentSession();
 				}	
 			},
 			getAnswer(ask){
@@ -223,6 +370,7 @@ import Vue from 'vue';
 				this.textList.push(this.answerText);
 				this.toBottom();
 				this.count ++ ;
+				this.refreshCurrentSession();
 				// 发送消息
 				let data = ask;
 				this.websocket.send(JSON.stringify(data));
@@ -377,6 +525,7 @@ import Vue from 'vue';
 							const { question: recognized, answer } = data.data;
 							this.textList.push(recognized || '(语音)');
 							this.textList.push(answer || '');
+							this.refreshCurrentSession();
 							this.toBottom();
 							if (answer && answer.trim()) this.requestTtsAndPlay(answer.trim());
 						} catch (e) {
@@ -459,14 +608,19 @@ import Vue from 'vue';
 
 <style lang="scss">
 	.main {
-		// border: 2px solid red;
 		width: 100%;
 		margin: 0 auto;
 		position: absolute;
 		bottom: 0;
+		left: 0;
+		overflow: hidden;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		background:
+			radial-gradient(1200rpx 520rpx at 12% -5%, rgba(89, 171, 255, 0.3) 0%, rgba(89, 171, 255, 0) 70%),
+			radial-gradient(1000rpx 460rpx at 92% 8%, rgba(0, 210, 255, 0.2) 0%, rgba(0, 210, 255, 0) 72%),
+			linear-gradient(180deg, #deedfb 0%, #ebf5ff 46%, #f4f9ff 100%);
 		// justify-content: center;
 		// .inner {
 		// 	border: 2px solid blue;
@@ -475,6 +629,8 @@ import Vue from 'vue';
 		// 	flex-direction: column;
 		//  justify-content: space-around;
 			.header {
+				position: relative;
+				z-index: 20;
 				width: 100%;
 				display: flex;
 				justify-content: space-between;
@@ -482,57 +638,165 @@ import Vue from 'vue';
 				padding: 0 40rpx;
 				box-sizing: border-box;
 				height: 100rpx;
-				margin-bottom: 20rpx;
+				margin-bottom: 8rpx;
 
 				.topNav {
 					.choosen {
-						span {
-							font-size: 36rpx;
-							color: #1A2A3A;
-							font-weight: bold;
+						position: relative;
+						z-index: 1200;
+						background: rgba(255, 255, 255, 0.7);
+						border: 1px solid rgba(0, 122, 255, 0.15);
+						padding: 10rpx;
+						border-radius: 18rpx;
+						box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.08);
+						display: flex;
+						align-items: center;
+						justify-content: center;
+						.session-tag {
+							width: 44rpx;
+							height: 44rpx;
+							object-fit: contain;
 						}
+					}
+				}
+				.header-title {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					margin-top: 2rpx;
+					span {
+						color: #51678f;
+						font-size: 40rpx;
+						font-weight: 700;
+						font-family: "Novecento wide", "半展开", "粗体";
+						letter-spacing: 4rpx;
+						transform: translateY(-2rpx);
 					}
 				}
 				.setting-btn {
 					width: 60rpx;
 					height: 60rpx;
-					background: rgba(0, 0, 0, 0.05);
-					backdrop-filter: blur(5px);
+					background: transparent;
+					border: none;
 					border-radius: 50%;
 					display: flex;
 					justify-content: center;
 					align-items: center;
+					box-shadow: none;
+					.setting-tag {
+						width: 48rpx;
+						height: 48rpx;
+						object-fit: contain;
+					}
 				}
+			}
+			.session-drawer {
+				position: fixed;
+				left: 0;
+				top: calc(100rpx + var(--status-bar-height, 0px));
+				width: 100%;
+				height: calc(100% - 100rpx - var(--status-bar-height, 0px));
+				z-index: 1100;
+				display: flex;
+				pointer-events: none;
+			}
+			.session-drawer.open {
+				pointer-events: auto;
+			}
+			.session-panel {
+				width: 80%;
+				height: 100%;
+				background: rgba(245, 250, 255, 0.98);
+				border-right: 1px solid rgba(38, 108, 232, 0.18);
+				box-shadow: 12rpx 0 30rpx rgba(16, 60, 130, 0.16);
+				display: flex;
+				flex-direction: column;
+				transform: translateX(-100%);
+				transition: transform 260ms ease;
+				overflow: hidden;
+			}
+			.session-drawer.open .session-panel {
+				transform: translateX(0);
+			}
+			.session-peek {
+				width: 20%;
+				height: 100%;
+				background: linear-gradient(90deg, rgba(233, 242, 255, 0.06) 0%, rgba(233, 242, 255, 0.28) 45%, rgba(233, 242, 255, 0.56) 100%);
+				backdrop-filter: blur(2px);
+				opacity: 0;
+				transition: opacity 260ms ease;
+			}
+			.session-drawer.open .session-peek {
+				opacity: 1;
+			}
+			.session-panel-head {
+				height: 86rpx;
+				padding: 0 24rpx;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				border-bottom: 1px solid rgba(0, 122, 255, 0.12);
+				background: linear-gradient(180deg, rgba(230, 241, 255, 0.95) 0%, rgba(240, 247, 255, 0.98) 100%);
+			}
+			.session-panel-title {
+				font-size: 30rpx;
+				font-weight: 700;
+				color: #1f3760;
+			}
+			.session-new {
+				height: 54rpx;
+				line-height: 54rpx;
+				padding: 0 18rpx;
+				border-radius: 27rpx;
+				font-size: 24rpx;
+				font-weight: 600;
+				color: #215fca;
+				background: rgba(86, 144, 255, 0.16);
+			}
+			.session-scroll {
+				flex: 1;
+				min-height: 180rpx;
+			}
+			.session-item {
+				padding: 18rpx 24rpx;
+				display: flex;
+				flex-direction: column;
+				gap: 8rpx;
+				border-bottom: 1px solid rgba(0, 122, 255, 0.08);
+				transition: background 0.2s ease;
+			}
+			.session-item:active {
+				background: rgba(88, 147, 255, 0.1);
+			}
+			.session-item.active {
+				background: linear-gradient(90deg, rgba(88, 147, 255, 0.16) 0%, rgba(88, 147, 255, 0.06) 100%);
+			}
+			.session-name {
+				font-size: 28rpx;
+				font-weight: 600;
+				color: #243a5e;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.session-time {
+				font-size: 22rpx;
+				color: #7990b3;
 			}
 			.body {
 				position: absolute;
+				z-index: 10;
 				bottom: 0;
 				width: 100%;
 				height: 93%;
-				background-color: #E9EEFF;
-				border-radius: 50rpx 50rpx 0 0rpx;
+				background: transparent;
+				border-radius: 0;
 				display: flex;
 				flex-direction: column;
 				align-items: center;
 				justify-content: flex-start;
-				.title {
-					width: 80%;
-					height: 7%;
-					border: 2px solid #8891b5;
-					border-top: 0;
-					border-left: 0;
-					border-right: 0;
-					display: flex;
-					justify-content:center;
-					align-items: center;
-					margin-bottom: 20rpx;
-					span {
-						color: #747EA1;
-						font-size: 40rpx;
-						font-weight: 700;
-						font-family: "Novecento wide", "半展开", "粗体";
-					}
-				}
+				box-shadow: none;
+				transition: transform 260ms ease;
 				.scroll {
 					flex: 1;
 					min-height: 0;
@@ -540,21 +804,16 @@ import Vue from 'vue';
 					box-sizing: border-box;
 					overflow: hidden;
 					.chat {
-						// width: 98%;
-						// height: 79%;	
-						background-color: #E9EEFF;
-						// border: 2px solid red;
+						background: transparent;
 						display: flex;
 						flex-direction: column;
 						align-items: center;
 						justify-content: flex-start;
+						padding: 6rpx 0 12rpx;
 						///////LEFT//////
 						.left {
-							
 							width: 95%;
-							// height: 10%;
-							// border: 2px solid green;
-							margin-bottom: 15rpx;
+							margin-bottom: 18rpx;
 							display: flex;
 							flex-direction: row;
 							align-items: flex-start;
@@ -563,6 +822,7 @@ import Vue from 'vue';
 								height: 100rpx;
 								background-color: #fff;
 								border-radius: 50%;
+								box-shadow: 0 10rpx 24rpx rgba(0, 40, 100, 0.12);
 								image {
 									width: 100%;
 									height: 100%;
@@ -570,20 +830,19 @@ import Vue from 'vue';
 								}
 							}
 							.msg {
-								// width: 70%;
 								margin-top: 15rpx;
 								max-width: 70%;
-								// height: 80%;
-								background-color: white;
+								background: rgba(255, 255, 255, 0.9);
 								margin-left: 20rpx;
 								box-sizing: border-box;
-								padding: 5px 10px;
-								border-radius: 20rpx;
+								padding: 16rpx 20rpx;
+								border-radius: 24rpx;
+								border: 1px solid rgba(0, 122, 255, 0.12);
+								box-shadow: 0 8rpx 20rpx rgba(14, 52, 110, 0.08);
 								view {
-									// width: 96%;
 									word-break:break-all;
 									word-wrap:break-word;
-									// border: 2px solid red;
+									color: #22395d;
 								}
 								.msg-rich {
 									word-break: break-all;
@@ -606,9 +865,7 @@ import Vue from 'vue';
 						//////RIGHT/////
 						.right {
 							width: 95%;
-							// height: 10%;
-							// border: 2px solid green;
-							margin-bottom: 15rpx;
+							margin-bottom: 18rpx;
 							display: flex;
 							flex-direction: row-reverse;
 							align-items: flex-start;
@@ -617,6 +874,7 @@ import Vue from 'vue';
 								height: 100rpx;
 								background-color: #fff;
 								border-radius: 50%;
+								box-shadow: 0 10rpx 24rpx rgba(0, 40, 100, 0.12);
 								image {
 									width: 100%;
 									height: 100%;
@@ -624,20 +882,18 @@ import Vue from 'vue';
 								}
 							}
 							.msg {
-								// width: 70%;
 								margin-top: 15rpx;
 								max-width: 70%;
-								// height: 80%;
-								background-color: white;
+								background: linear-gradient(135deg, #3f78ff 0%, #5b9cff 100%);
 								margin-right: 20rpx;
 								box-sizing: border-box;
-								padding: 5px 10px;
-								border-radius: 20rpx;
+								padding: 16rpx 20rpx;
+								border-radius: 24rpx;
+								box-shadow: 0 10rpx 24rpx rgba(32, 87, 185, 0.24);
 								view {
-									// width: 96%;
 									word-break:break-all;
 									word-wrap:break-word;
-									// border: 2px solid red;
+									color: #ffffff;
 								}
 								.msg-rich {
 									word-break: break-all;
@@ -663,7 +919,8 @@ import Vue from 'vue';
 					width: 100%;
 					flex-shrink: 0;
 					padding: 16rpx 24rpx 24rpx;
-					background-color: #DDE4FF;
+					background: linear-gradient(180deg, rgba(225, 236, 255, 0.9) 0%, rgba(214, 228, 255, 0.98) 100%);
+					border-top: 1px solid rgba(0, 122, 255, 0.12);
 					display: flex;
 					flex-direction: column;
 					align-items: center;
@@ -676,11 +933,13 @@ import Vue from 'vue';
 					height: 88rpx;
 					display: flex;
 					align-items: center;
-					background-color: #fff;
+					background-color: rgba(255, 255, 255, 0.95);
 					border-radius: 44rpx;
 					overflow: hidden;
 					padding: 0 8rpx 0 28rpx;
 					box-sizing: border-box;
+					border: 1px solid rgba(0, 122, 255, 0.14);
+					box-shadow: 0 10rpx 26rpx rgba(21, 69, 140, 0.12);
 				}
 				.input-inner {
 					flex: 1;
@@ -698,7 +957,7 @@ import Vue from 'vue';
 					height: 72rpx;
 					min-width: 72rpx;
 					border-radius: 50%;
-					background-color: #E0E6FF;
+					background-color: #e6eeff;
 					display: flex;
 					justify-content: center;
 					align-items: center;
@@ -731,7 +990,7 @@ import Vue from 'vue';
 					padding: 0 28rpx;
 					margin-left: 12rpx;
 					border-radius: 36rpx;
-					background-color: #5a6ab8;
+					background: linear-gradient(90deg, #2f73ff 0%, #4d8dff 100%);
 					display: flex;
 					justify-content: center;
 					align-items: center;
@@ -750,7 +1009,7 @@ import Vue from 'vue';
 				}
 				.voice-tip {
 					font-size: 24rpx;
-					color: #747EA1;
+					color: #5f759a;
 				}
 				.tts-bar {
 					display: flex;

@@ -63,18 +63,13 @@ export default {
         websocket.connect(userId);
       }
       
-      setTimeout(() => {
-        // console.log('hi')
-        uni.switchTab({
-          url: "/pages/sys/dateWatcher/dateWatcher",
-        });
-      }, 2000);
+      uni.switchTab({
+        url: "/pages/sys/dateWatcher/dateWatcher",
+      });
     } else {
-      setTimeout(() => {
-        uni.redirectTo({
-          url: "/pages/sys/login/index",
-        });
-      }, 2000);
+      uni.redirectTo({
+        url: "/pages/sys/login/index",
+      });
     }
   },
   onShow: function () {

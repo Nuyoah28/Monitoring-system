@@ -7,8 +7,8 @@
     
     <view class="login-container">
       <view class="header">
-        <text class="title">城市智眼</text>
-        <view class="mainTitle">基于深度学习和边缘计算的智慧城市安防系统</view>
+        <text class="title">社区智眼</text>
+        <view class="mainTitle">基于深度学习和边缘计算的智慧社区安防系统</view>
       </view>
 
       <view class="glass-card logContent">
@@ -27,7 +27,7 @@
               class="input custom-input"
               type="text"
               v-model="username"
-              placeholder="请输入用户名/手机号"
+              placeholder="请输入用户名"
               placeholder-style="color:#A0B2D4"
             />
           </view>
@@ -199,7 +199,7 @@ export default {
 .loginBox {
   min-height: 100vh;
   width: 100vw;
-  background: transparent; /* 承接 App.vue 的赛博清晨渐变 */
+  background: transparent;
   position: relative;
   overflow: hidden;
   display: flex;
@@ -207,136 +207,152 @@ export default {
   justify-content: center;
   align-items: center;
   box-sizing: border-box;
-  padding: 40rpx 0;
+  padding: 56rpx 0;
   
   .bg-shape {
     position: absolute;
     border-radius: 50%;
-    filter: blur(80px);
+    filter: blur(88px);
     z-index: 0;
-    opacity: 0.3; /* 降低透明度，配合亮色背景 */
-    animation: floating 10s infinite ease-in-out alternate;
+    opacity: 0.28;
+    animation: floating 11s infinite ease-in-out alternate;
   }
   .shape-1 {
-    width: 600rpx;
-    height: 600rpx;
-    background: rgba(0, 122, 255, 0.3);
-    top: -10%;
-    left: -20%;
+    width: 620rpx;
+    height: 620rpx;
+    background: rgba(0, 122, 255, 0.26);
+    top: -16%;
+    left: -22%;
   }
   .shape-2 {
-    width: 500rpx;
-    height: 500rpx;
+    width: 560rpx;
+    height: 560rpx;
     background: rgba(0, 210, 255, 0.2);
-    bottom: 10%;
-    right: -10%;
+    bottom: 4%;
+    right: -18%;
     animation-delay: -3s;
   }
   .shape-3 {
-    width: 400rpx;
-    height: 400rpx;
-    background: rgba(100, 150, 255, 0.2);
-    top: 40%;
-    left: 40%;
+    width: 430rpx;
+    height: 430rpx;
+    background: rgba(100, 150, 255, 0.16);
+    top: 56%;
+    left: 32%;
     animation-delay: -6s;
   }
 
   .login-container {
     width: 90%;
-    max-width: 700rpx;
+    max-width: 710rpx;
     z-index: 2;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     margin: auto;
+    animation: fade-up 380ms ease;
+    transform: translateY(25vh);
   }
 
   .header {
     text-align: center;
-    margin-bottom: 60rpx;
+    margin-bottom: 54rpx;
     width: 100%;
+    transform: translateY(-30rpx);
     
     .title {
-      color: #1A2A3A; /* 深色文字 */
-      font-size: 80rpx;
+      color: #1A2A3A;
+      font-size: 74rpx;
       font-weight: 900;
-      letter-spacing: 12rpx;
-      text-shadow: 0 4rpx 20rpx rgba(0, 122, 255, 0.1);
+      letter-spacing: 8rpx;
+      text-shadow: 0 6rpx 20rpx rgba(0, 122, 255, 0.08);
       display: block;
+      line-height: 1.1;
     }
     
     .mainTitle {
-      margin-top: 24rpx;
-      color: #5672b9; /* 科技蓝 */
-      font-size: 26rpx;
-      letter-spacing: 2rpx;
+      margin-top: 20rpx;
+      color: #5a74ab;
+      font-size: 24rpx;
+      letter-spacing: 1rpx;
       font-weight: 600;
       position: relative;
       display: inline-block;
-      padding: 0 30rpx;
+      padding: 0 24rpx;
       
       &::before, &::after {
         content: '';
         position: absolute;
         top: 50%;
-        width: 40rpx;
+        width: 34rpx;
         height: 1px;
         background: rgba(0, 122, 255, 0.2);
       }
-      &::before { left: -20rpx; }
-      &::after { right: -20rpx; }
+      &::before { left: -16rpx; }
+      &::after { right: -16rpx; }
     }
   }
 
-  /* 亮色拟态白玻璃卡片 */
   .glass-card {
     width: 100%;
-    background: rgba(255, 255, 255, 0.5); /* 提升透明度更显通透 */
+    background: rgba(255, 255, 255, 0.58);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 16rpx 60rpx rgba(100, 150, 200, 0.1);
-    border-radius: 40rpx;
-    padding: 60rpx 50rpx;
+    border: 1px solid rgba(255, 255, 255, 0.86);
+    box-shadow: 0 16rpx 60rpx rgba(57, 96, 156, 0.12);
+    border-radius: 38rpx;
+    padding: 54rpx 42rpx;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: "";
+      position: absolute;
+      width: 360rpx;
+      height: 360rpx;
+      right: -180rpx;
+      top: -220rpx;
+      background: radial-gradient(circle, rgba(86, 150, 255, 0.16) 0%, rgba(86, 150, 255, 0) 68%);
+      pointer-events: none;
+    }
     
     .card-title {
       color: #1A2A3A;
-      font-size: 48rpx;
+      font-size: 42rpx;
       font-weight: bold;
-      letter-spacing: 6rpx;
-      margin-bottom: 50rpx;
+      letter-spacing: 5rpx;
+      margin-bottom: 42rpx;
     }
 
     .form-group {
       width: 100%;
       display: flex;
       flex-direction: column;
-      gap: 36rpx;
+      gap: 28rpx;
     }
 
     .input-item {
       display: flex;
       align-items: center;
       width: 100%;
-      height: 100rpx;
+      height: 96rpx;
       background: rgba(255, 255, 255, 0.9);
       border-radius: 20rpx;
       transition: all 0.3s ease;
       overflow: hidden;
-      border: 1px solid rgba(0, 122, 255, 0.1);
+      border: 1px solid rgba(0, 122, 255, 0.11);
       
       &:focus-within {
-        border-color: #007aff;
-        box-shadow: 0 0 15rpx rgba(0, 122, 255, 0.1);
+        border-color: rgba(0, 122, 255, 0.56);
+        box-shadow: 0 0 0 4rpx rgba(0, 122, 255, 0.07);
       }
 
       .iconBox {
-        width: 100rpx;
+        width: 90rpx;
         height: 100%;
         display: flex;
         justify-content: center;
@@ -346,28 +362,33 @@ export default {
       .custom-input {
         flex: 1;
         height: 100%;
-        font-size: 30rpx;
+        font-size: 29rpx;
         color: #1A2A3A;
         border: none;
         outline: none;
         background: transparent;
         padding-right: 30rpx;
       }
+
+      .svg-icon {
+        width: 34rpx;
+        height: 34rpx;
+      }
     }
 
     .modern-btn {
       width: 100%;
-      height: 100rpx;
+      height: 94rpx;
       background: linear-gradient(90deg, #007aff 0%, #00d2ff 100%);
       color: #ffffff;
-      font-size: 34rpx;
+      font-size: 32rpx;
       font-weight: bold;
-      letter-spacing: 4rpx;
-      border-radius: 50rpx;
+      letter-spacing: 3rpx;
+      border-radius: 47rpx;
       display: flex;
       justify-content: center;
       align-items: center;
-      box-shadow: 0 10rpx 30rpx rgba(0, 122, 255, 0.3);
+      box-shadow: 0 10rpx 30rpx rgba(0, 122, 255, 0.24);
       transition: transform 0.1s;
       
       &:active {
@@ -379,7 +400,7 @@ export default {
     }
 
     .term-box {
-      margin-top: -10rpx;
+      margin-top: -6rpx;
     }
     .deal-wrapper {
       display: flex;
@@ -387,10 +408,10 @@ export default {
       justify-content: center;
     }
     .deal {
-      font-size: 24rpx;
+      font-size: 23rpx;
       color: #1A2A3A;
       margin-left: 8rpx;
-      opacity: 0.7;
+      opacity: 0.74;
       
       .link {
         color: #007aff;
@@ -402,7 +423,7 @@ export default {
   }
 
   .footer-more {
-    margin-top: 60rpx;
+    margin-top: 48rpx;
     width: 100%;
     
     .text-line {
@@ -417,9 +438,9 @@ export default {
         background-color: rgba(0, 122, 255, 0.1);
       }
       .word {
-        font-size: 20rpx;
+        font-size: 19rpx;
         color: rgba(26, 42, 58, 0.4);
-        letter-spacing: 2rpx;
+        letter-spacing: 1.5rpx;
       }
     }
   }
@@ -449,5 +470,16 @@ export default {
 @keyframes floating {
   0% { transform: translate(0, 0) rotate(0deg); }
   100% { transform: translate(30rpx, 50rpx) rotate(15deg); }
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(16rpx);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
