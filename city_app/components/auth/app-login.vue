@@ -1,10 +1,9 @@
 <template>
   <view class="loginBox">
-    <!-- 背景流光动画层 -->
     <view class="bg-shape shape-1"></view>
     <view class="bg-shape shape-2"></view>
     <view class="bg-shape shape-3"></view>
-    
+
     <view class="login-container">
       <view class="header">
         <text class="title">社区智眼</text>
@@ -13,11 +12,10 @@
 
       <view class="glass-card logContent">
         <text class="card-title">LOGIN</text>
-        
+
         <view class="form-group">
           <view class="input-item">
             <view class="iconBox">
-              <!-- Inline SVG for User/Phone icon -->
               <svg class="svg-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M20 21C20 18.2386 16.4183 16 12 16C7.58172 16 4 18.2386 4 21" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -31,10 +29,9 @@
               placeholder-style="color:#A0B2D4"
             />
           </view>
-          
+
           <view class="input-item">
             <view class="iconBox">
-              <!-- Inline SVG for Lock icon -->
               <svg class="svg-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="5" y="11" width="14" height="10" rx="2" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M8 11V7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7V11" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -49,11 +46,11 @@
               placeholder-style="color:#A0B2D4"
             />
           </view>
-          
+
           <view class="input-item" style="border: none; background: transparent; padding: 0;">
             <button class="btn modern-btn" @tap="jump">登录</button>
           </view>
-          
+
           <view class="input-item term-box" style="border: none; background: transparent; justify-content: center;">
             <checkbox-group @change="checked = !checked">
               <label class="deal-wrapper">
@@ -78,7 +75,7 @@
         </view>
       </view>
     </view>
-    
+
     <u-modal
       :show="isShow"
       :closeOnClickOverlay="true"
@@ -123,12 +120,33 @@
 import websocket from '@/common/websocket.js';
 
 export default {
+  props: {
+    loginApi: {
+      type: String,
+      required: true,
+    },
+    successUrl: {
+      type: String,
+      required: true,
+    },
+    appType: {
+      type: String,
+      required: true,
+    },
+    enableWebsocket: {
+      type: Boolean,
+      default: false,
+    },
+    useSwitchTab: {
+      type: Boolean,
+      default: false,
+    },
+  },
   data() {
     return {
       isShow: false,
-      which: 0,
-      password: "",
-      username: "",
+      password: '',
+      username: '',
       checked: false,
     };
   },
@@ -139,9 +157,9 @@ export default {
     jump() {
       if (!this.checked) {
         uni.showToast({
-          title: "请仔细阅读并勾选用户协议与隐私政策",
+          title: '请仔细阅读并勾选用户协议与隐私政策',
           duration: 2000,
-          icon: "none",
+          icon: 'none',
         });
         return;
       }
@@ -150,46 +168,53 @@ export default {
         userName: this.username,
         password: this.password,
       };
-      
+
       uni.showLoading({ title: '登录中...' });
-      
-      uni.$http.post("/api/v1/user/login", data).then(({ data }) => {
-        uni.hideLoading();
-        if (data.code === "A1000") {
-          uni.$showMsg(data.message);
-          return;
-        }
-        if (data.code === "00000") {
+      uni.$http
+        .post(this.loginApi, data)
+        .then(({ data }) => {
+          if (data.code === 'A1000') {
+            uni.$showMsg(data.message);
+            return;
+          }
+          if (data.code !== '00000') {
+            uni.$showMsg(data.message || '登录失败');
+            return;
+          }
+
+          const userData = data.data || {};
+          uni.setStorageSync('phone', this.username);
+          uni.setStorageSync('username', userData.name || this.username);
+          uni.setStorageSync('userId', userData.id || '');
+          uni.setStorageSync('token', userData.token || '');
+          uni.setStorageSync('appType', this.appType);
+
+          if (this.enableWebsocket && userData.id) {
+            websocket.connect(userData.id);
+          }
+
           uni.showToast({
-            title: "登录成功",
-            duration: 1500,
-            icon: "success",
+            title: '登录成功',
+            duration: 1200,
+            icon: 'success',
             success: () => {
-              uni.setStorageSync("phone", this.username);
-              uni.setStorageSync("username", data.data.name);
-              // 保存用户ID用于WebSocket连接
-              uni.setStorageSync("userId", data.data.id);
-              uni.setStorage({
-                key: "token",
-                data: data.data.token,
-                success: () => {
-                  // 登录成功后连接WebSocket接收实时报警
-                  websocket.connect(data.data.id);
-                  uni.switchTab({
-                    url: "/pages/sys/dateWatcher/dateWatcher",
-                  });
-                },
-              });
+              if (this.useSwitchTab) {
+                uni.switchTab({ url: this.successUrl });
+                return;
+              }
+              uni.reLaunch({ url: this.successUrl });
             },
           });
-        }
-      }).catch(err => {
-         uni.hideLoading();
-         uni.showToast({
-           title: "网络请求失败，请稍后重试",
-           icon: "none"
-         });
-      });
+        })
+        .catch(() => {
+          uni.showToast({
+            title: '网络请求失败，请稍后重试',
+            icon: 'none',
+          });
+        })
+        .finally(() => {
+          uni.hideLoading();
+        });
     },
   },
 };
@@ -208,7 +233,7 @@ export default {
   align-items: center;
   box-sizing: border-box;
   padding: 56rpx 0;
-  
+
   .bg-shape {
     position: absolute;
     border-radius: 50%;
@@ -259,7 +284,7 @@ export default {
     margin-bottom: 54rpx;
     width: 100%;
     transform: translateY(-30rpx);
-    
+
     .title {
       color: #1A2A3A;
       font-size: 74rpx;
@@ -269,7 +294,7 @@ export default {
       display: block;
       line-height: 1.1;
     }
-    
+
     .mainTitle {
       margin-top: 20rpx;
       color: #5a74ab;
@@ -279,8 +304,9 @@ export default {
       position: relative;
       display: inline-block;
       padding: 0 24rpx;
-      
-      &::before, &::after {
+
+      &::before,
+      &::after {
         content: '';
         position: absolute;
         top: 50%;
@@ -288,8 +314,12 @@ export default {
         height: 1px;
         background: rgba(0, 122, 255, 0.2);
       }
-      &::before { left: -16rpx; }
-      &::after { right: -16rpx; }
+      &::before {
+        left: -16rpx;
+      }
+      &::after {
+        right: -16rpx;
+      }
     }
   }
 
@@ -310,7 +340,7 @@ export default {
     overflow: hidden;
 
     &::before {
-      content: "";
+      content: '';
       position: absolute;
       width: 360rpx;
       height: 360rpx;
@@ -319,7 +349,7 @@ export default {
       background: radial-gradient(circle, rgba(86, 150, 255, 0.16) 0%, rgba(86, 150, 255, 0) 68%);
       pointer-events: none;
     }
-    
+
     .card-title {
       color: #1A2A3A;
       font-size: 42rpx;
@@ -345,7 +375,7 @@ export default {
       transition: all 0.3s ease;
       overflow: hidden;
       border: 1px solid rgba(0, 122, 255, 0.11);
-      
+
       &:focus-within {
         border-color: rgba(0, 122, 255, 0.56);
         box-shadow: 0 0 0 4rpx rgba(0, 122, 255, 0.07);
@@ -390,7 +420,7 @@ export default {
       align-items: center;
       box-shadow: 0 10rpx 30rpx rgba(0, 122, 255, 0.24);
       transition: transform 0.1s;
-      
+
       &:active {
         transform: scale(0.98);
       }
@@ -412,7 +442,7 @@ export default {
       color: #1A2A3A;
       margin-left: 8rpx;
       opacity: 0.74;
-      
+
       .link {
         color: #007aff;
         font-weight: bold;
@@ -425,13 +455,13 @@ export default {
   .footer-more {
     margin-top: 48rpx;
     width: 100%;
-    
+
     .text-line {
       display: flex;
       justify-content: center;
       align-items: center;
       gap: 20rpx;
-      
+
       .line {
         height: 1px;
         width: 60rpx;
@@ -446,30 +476,32 @@ export default {
   }
 }
 
-/* 协议模态框内部样式 */
 .modal-content {
   padding: 30rpx 40rpx;
   color: #333333;
   line-height: 1.6;
   font-size: 28rpx;
-  
+
   h4 {
     font-size: 32rpx;
     font-weight: bold;
     color: #007aff;
     margin: 30rpx 0 15rpx 0;
   }
-  
+
   p {
     margin-bottom: 16rpx;
     text-align: justify;
   }
 }
 
-/* 背景流动动画 */
 @keyframes floating {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  100% { transform: translate(30rpx, 50rpx) rotate(15deg); }
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  100% {
+    transform: translate(30rpx, 50rpx) rotate(15deg);
+  }
 }
 
 @keyframes fade-up {

@@ -87,7 +87,7 @@ export default {
         key: "token",
         success: () => {
           uni.reLaunch({
-            url: "/pages/sys/login/index",
+            url: "/pages/manage/login/index",
           });
         },
       });

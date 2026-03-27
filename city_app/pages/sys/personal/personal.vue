@@ -156,7 +156,7 @@ export default {
           uni.removeStorageSync("token");
           uni.removeStorageSync("userId");
           uni.reLaunch({
-            url: "/pages/sys/login/index",
+            url: "/pages/manage/login/index",
           });
         },
       });

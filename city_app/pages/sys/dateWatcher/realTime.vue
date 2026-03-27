@@ -79,7 +79,7 @@ export default {
           uni.showToast({ title: "登录失效，请重新登录！", icon: "none" });
           uni.removeStorage({
             key: "token",
-            success: () => uni.reLaunch({ url: "/pages/sys/login/index" }),
+            success: () => uni.reLaunch({ url: "/pages/manage/login/index" }),
           });
         }
         if (res.data.code === "00000") {

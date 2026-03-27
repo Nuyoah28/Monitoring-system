@@ -1,16 +1,16 @@
 <template>
-	<view class="main" :class="{ 'drawer-open': showSessionList }" :style="{ minHeight: safeHeight + 'px', paddingTop: statusBarHeight + 'px', '--status-bar-height': statusBarHeight + 'px' }">
+	<view class="main" :class="{ 'drawer-open': showSessionList, 'owner-app': isOwnerApp }" :style="{ minHeight: safeHeight + 'px', paddingTop: statusBarHeight + 'px', '--status-bar-height': statusBarHeight + 'px' }">
 		<view class="header">
 			<view class="topNav">
 				<view class="choosen" @tap="toggleSessionList">
-					<image class="session-tag" src="../../../static/messagelist.png"></image>
+					<image class="session-tag" src="/static/messagelist.png"></image>
 				</view>
 			</view>
 			<view class="header-title">
 				<span>AI助手</span>
 			</view>
 			<view class="setting-btn" @tap="jump">
-				<image class="setting-tag" src="../../../static/settings.png"></image>
+				<image class="setting-tag" src="/static/settings.png"></image>
 			</view>
 		</view>
 		<view class="session-drawer" :class="{ open: showSessionList }" @touchmove.stop.prevent>
@@ -41,7 +41,7 @@
 				<view class="chat">
 					<view id="msgbar" v-for="(item, index) in textList" :key="index" :class="index%2 === 1 ? 'left' : 'right'">
 						<view class="avatar">
-							<image :src="index % 2 === 0 ? '../../../static/AIuser.png' : '../../../static/ai.png' "></image>
+							<image :src="index % 2 === 0 ? '/static/AIuser.png' : '/static/ai.png' "></image>
 						</view>
 						<view class="msg">
 							<rich-text v-if="index % 2 === 1" class="msg-rich" :nodes="mdToHtml(item)"></rich-text>
@@ -80,14 +80,19 @@
 				</view>
 			</view>
 		</view>
+		<owner-tabbar v-if="isOwnerApp" current="ai" />
 	</view>
 </template>
 
 <script>
-import wsRequest from '../../../api/websocket.js'
-import { AI_HTTP_URL, AI_WS_URL } from '../../../common/config.js'
+import wsRequest from '@/api/websocket.js'
+import { AI_HTTP_URL, AI_WS_URL } from '@/common/config.js'
 import Vue from 'vue';
+	import OwnerTabbar from '@/components/navigation/owner-tabbar.vue';
 	export default {
+		components: {
+			OwnerTabbar,
+		},
 		data() {
 			return {
 				isDisabled:false,
@@ -132,6 +137,9 @@ import Vue from 'vue';
 
 		},
 		computed: {
+			isOwnerApp() {
+				return uni.getStorageSync('appType') === 'owner';
+			},
 			voiceClickHandler() {
 				const self = this;
 				return function() {
@@ -1037,6 +1045,13 @@ import Vue from 'vue';
 				}
 			}
 		// }
+	}
+	.main.owner-app {
+		.body {
+			.down {
+				padding-bottom: calc(130rpx + env(safe-area-inset-bottom));
+			}
+		}
 	}
 	.loading {
 		// border: 2px solid red;

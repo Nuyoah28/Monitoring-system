@@ -4,9 +4,72 @@
 	},
 	"pages": [
 		{
-			"path": "pages/sys/login/index",
+			"path": "pages/portal/index",
+			"style": {
+				"navigationBarTitleText": "选择端",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/manage/login/index",
 			"style": {
 				"navigationBarTitleText": "登录",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/owner/login/index",
+			"style": {
+				"navigationBarTitleText": "登录",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/owner/home/index",
+			"style": {
+				"navigationBarTitleText": "主页功能",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/owner/ai/index",
+			"style": {
+				"navigationBarTitleText": "AI助手",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/owner/personal/index",
+			"style": {
+				"navigationBarTitleText": "个人中心",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/owner/features/visitor/index",
+			"style": {
+				"navigationBarTitleText": "访客登记",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/owner/features/notice/index",
+			"style": {
+				"navigationBarTitleText": "物业通知",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/owner/features/repair/index",
+			"style": {
+				"navigationBarTitleText": "报修入口",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/owner/features/parking/index",
+			"style": {
+				"navigationBarTitleText": "空闲车位引导",
 				"navigationStyle": "custom"
 			}
 		},
@@ -30,9 +93,9 @@
 			}
 		},
 		{
-			"path": "pages/sys/home/home",
+			"path": "pages/manage/ai/index",
 			"style": {
-				"navigationBarTitleText": "",
+				"navigationBarTitleText": "AI助手",
 				"enablePullDownRefresh": false,
 				"navigationStyle": "custom"
 			}
@@ -125,7 +188,7 @@
 	      "selectedIconPath": "static/chosenTabBar/chart.png"
 	    },
 	    {
-	      "pagePath": "pages/sys/home/home",
+	      "pagePath": "pages/manage/ai/index",
 	      "text": "智能分析",
 	      "iconPath": "static/tabBar/GPT.png",
 	      "selectedIconPath": "static/chosenTabBar/GPT.png"

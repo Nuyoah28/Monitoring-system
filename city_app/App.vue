@@ -21,10 +21,16 @@ export default {
         uni.onPushMessage((res) => {
           // console.log(res);
           if (res.type === "click") {
-            // console.log("hi");
-            uni.switchTab({
-              url: "/pages/sys/realtime/realtime",
-            });
+            const currentAppType = uni.getStorageSync("appType");
+            if (currentAppType === "owner") {
+              uni.switchTab({
+                url: "/pages/owner/home/index",
+              });
+            } else {
+              uni.reLaunch({
+                url: "/pages/sys/realtime/realtime",
+              });
+            }
           } else if (res.type === "receive") {
             if (check === 0) {
               check = 1;
@@ -53,31 +59,39 @@ export default {
     }
     // #endif
     
-    // 检查用户是否已登录
     const token = uni.getStorageSync("token");
     const userId = uni.getStorageSync("userId");
-    
-    if (token) {
-      // 已登录：自动连接 WebSocket
-      if (userId) {
-        websocket.connect(userId);
-      }
-      
-      uni.switchTab({
-        url: "/pages/sys/dateWatcher/dateWatcher",
-      });
-    } else {
+    const appType = uni.getStorageSync("appType");
+
+    if (!token) {
       uni.redirectTo({
-        url: "/pages/sys/login/index",
+        url: "/pages/portal/index",
       });
+      return;
     }
+
+    if (appType === "owner") {
+      uni.switchTab({
+        url: "/pages/owner/home/index",
+      });
+      return;
+    }
+
+    if (userId) {
+      websocket.connect(userId);
+    }
+
+    uni.reLaunch({
+      url: "/pages/sys/dateWatcher/dateWatcher",
+    });
   },
   onShow: function () {
     // console.log("App Show");
     // App 从后台切回前台时，检查 WebSocket 连接状态
     const token = uni.getStorageSync("token");
     const userId = uni.getStorageSync("userId");
-    if (token && userId && !websocket.getStatus()) {
+    const appType = uni.getStorageSync("appType");
+    if (appType !== "owner" && token && userId && !websocket.getStatus()) {
       websocket.connect(userId);
     }
   },
