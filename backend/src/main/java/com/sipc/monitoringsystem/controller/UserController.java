@@ -47,7 +47,23 @@ public class UserController {
         loginRes.setId(user.getId());
         return CommonResult.success(loginRes);
     }
-
+    @PostMapping("/owner/login")
+    @Pass
+    public CommonResult<LoginRes> ownerLogin(@Valid @RequestBody LoginParam loginParam) {
+        String token = userService.login(loginParam.getUserName(), loginParam.getPassword());
+        if (token == null) {
+            return CommonResult.fail("用户名或密码错误");
+        }
+        User user = JwtUtils.getUserByToken(token);
+        user = userService.getById(user.getId());
+        LoginRes loginRes = new LoginRes();
+        loginRes.setName(user.getUserName());
+        loginRes.setPhone(user.getPhone());
+        loginRes.setRole(user.getRole());
+        loginRes.setToken(token);
+        loginRes.setId(user.getId());
+        return CommonResult.success(loginRes);
+    }
 
     @Pass
     @PostMapping("/register")

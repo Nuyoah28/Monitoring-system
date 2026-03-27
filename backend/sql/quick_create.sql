@@ -136,6 +136,13 @@ CREATE TABLE `user_info` (
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+create table `system_message`(
+  `id` int not null auto_increment,
+  `message` varchar(255) not null,
+  `timestamp` datetime not null,
+  primary key(`id`)
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_general_ci;
+
 --
 -- Dumping data for table `user_info`
 --

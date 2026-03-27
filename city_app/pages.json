@@ -4,7 +4,7 @@
 	},
 	"pages": [
 		{
-			"path": "pages/portal/index",
+			"path": "pages/shared/select/index",
 			"style": {
 				"navigationBarTitleText": "选择端",
 				"navigationStyle": "custom"
@@ -74,7 +74,7 @@
 			}
 		},
 		{
-			"path": "pages/sys/realtime/realtime",
+			"path": "pages/manage/realtime/realtime",
 			"style": {
 				"navigationBarTitleText": "",
 				"enablePullDownRefresh": false,
@@ -85,7 +85,7 @@
 			}
 		},
 		{
-			"path": "pages/sys/dateWatcher/dateWatcher",
+			"path": "pages/manage/dateWatcher/dateWatcher",
 			"style": {
 				"navigationBarTitleText": "",
 				"enablePullDownRefresh": false,
@@ -101,7 +101,7 @@
 			}
 		},
 		{
-			"path": "pages/sys/controls/controls",
+			"path": "pages/manage/controls/controls",
 			"style": {
 				"navigationBarTitleText": "",
 				"enablePullDownRefresh": false,
@@ -112,7 +112,7 @@
 			}
 		},
 		{
-			"path": "pages/sys/personal/personal",
+			"path": "pages/manage/personal/personal",
 			"style": {
 				"navigationBarTitleText": "",
 				"enablePullDownRefresh": false,
@@ -123,7 +123,7 @@
 			}
 		},
 		{
-			"path": "pages/sys/personal/setting/setting",
+			"path": "pages/manage/personal/setting/setting",
 			"style": {
 				"navigationBarTitleText": "",
 				"enablePullDownRefresh": false,
@@ -134,7 +134,7 @@
 			}
 		},
 		{
-			"path": "pages/sys/personal/edit/edit",
+			"path": "pages/manage/personal/edit/edit",
 			"style": {
 				"navigationBarTitleText": "",
 				"enablePullDownRefresh": false,
@@ -170,19 +170,19 @@
 	  "spacing": "2px",
 	  "list": [
 	    {
-	      "pagePath": "pages/sys/realtime/realtime",
+	      "pagePath": "pages/manage/realtime/realtime",
 	      "text": "警报信息", 
 	      "iconPath": "static/tabBar/realTime.png",
 	      "selectedIconPath": "static/chosenTabBar/realtime.png"
 	    },
 	    {
-	      "pagePath": "pages/sys/controls/controls",
+	      "pagePath": "pages/manage/controls/controls",
 	      "text": "设备控制",
 	      "iconPath": "static/tabBar/contorl.png",
 	      "selectedIconPath": "static/chosenTabBar/control.png"
 	    },
 	    {
-	      "pagePath": "pages/sys/dateWatcher/dateWatcher",
+	      "pagePath": "pages/manage/dateWatcher/dateWatcher",
 	      "text": "数据统计",
 	      "iconPath": "static/tabBar/chart.png",
 	      "selectedIconPath": "static/chosenTabBar/chart.png"
@@ -194,7 +194,7 @@
 	      "selectedIconPath": "static/chosenTabBar/GPT.png"
 	    },
 	    {
-	      "pagePath": "pages/sys/personal/personal",
+	      "pagePath": "pages/manage/personal/personal",
 	      "text": "个人中心",
 	      "iconPath": "static/tabBar/personal.png",
 	      "selectedIconPath": "static/chosenTabBar/personal.png"

@@ -83,13 +83,11 @@ export default {
       uni.navigateBack();
     },
     exit() {
-      uni.removeStorage({
-        key: "token",
-        success: () => {
-          uni.reLaunch({
-            url: "/pages/manage/login/index",
-          });
-        },
+      uni.removeStorageSync("token");
+      uni.removeStorageSync("userId");
+      uni.removeStorageSync("appType");
+      uni.reLaunch({
+        url: "/pages/shared/select/index",
       });
     },
     clear() {

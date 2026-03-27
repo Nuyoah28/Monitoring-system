@@ -25,7 +25,7 @@
           </view>
         </view>
         <view class="command">
-          <view class="items" @tap="jump('/pages/sys/personal/edit/edit')">
+          <view class="items" @tap="jump('/pages/manage/personal/edit/edit')">
             <view class="left">
               <view class="img">
                 <image
@@ -155,8 +155,9 @@ export default {
           if (!res.confirm) return;
           uni.removeStorageSync("token");
           uni.removeStorageSync("userId");
+          uni.removeStorageSync("appType");
           uni.reLaunch({
-            url: "/pages/manage/login/index",
+            url: "/pages/shared/select/index",
           });
         },
       });

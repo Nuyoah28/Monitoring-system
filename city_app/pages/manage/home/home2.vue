@@ -143,7 +143,7 @@ import UnityModelViewer from '../../../components/UnityModelViewer.vue'
 			},
 			jump() {
 			  uni.navigateTo({
-			    url: "/pages/sys/personal/setting/setting",
+			    url: "/pages/manage/personal/setting/setting",
 			  });
 			},
 			send(){

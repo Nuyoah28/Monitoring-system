@@ -511,7 +511,7 @@ export default {
     },
     jump() {
       uni.navigateTo({
-        url: "/pages/sys/personal/setting/setting",
+        url: "/pages/manage/personal/setting/setting",
       });
     },
     startMove(e, item) {

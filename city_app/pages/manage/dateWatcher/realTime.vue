@@ -77,10 +77,10 @@ export default {
       uni.$http.get("/api/v1/alarm/realtime").then((res) => {
         if (res.data.code === "D0400") {
           uni.showToast({ title: "登录失效，请重新登录！", icon: "none" });
-          uni.removeStorage({
-            key: "token",
-            success: () => uni.reLaunch({ url: "/pages/manage/login/index" }),
-          });
+          uni.removeStorageSync("token");
+          uni.removeStorageSync("userId");
+          uni.removeStorageSync("appType");
+          uni.reLaunch({ url: "/pages/shared/select/index" });
         }
         if (res.data.code === "00000") {
           this.upTotal = res.data.data.alarmTotal || {};	

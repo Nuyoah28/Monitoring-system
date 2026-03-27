@@ -35,7 +35,7 @@ export default {
       uni.removeStorageSync('token');
       uni.removeStorageSync('userId');
       uni.removeStorageSync('appType');
-      uni.reLaunch({ url: '/pages/portal/index' });
+      uni.reLaunch({ url: '/pages/shared/select/index' });
     },
   },
 };

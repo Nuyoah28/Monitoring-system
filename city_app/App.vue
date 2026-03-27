@@ -28,7 +28,7 @@ export default {
               });
             } else {
               uni.reLaunch({
-                url: "/pages/sys/realtime/realtime",
+                url: "/pages/manage/realtime/realtime",
               });
             }
           } else if (res.type === "receive") {
@@ -65,7 +65,7 @@ export default {
 
     if (!token) {
       uni.redirectTo({
-        url: "/pages/portal/index",
+        url: "/pages/shared/select/index",
       });
       return;
     }
@@ -82,7 +82,7 @@ export default {
     }
 
     uni.reLaunch({
-      url: "/pages/sys/dateWatcher/dateWatcher",
+      url: "/pages/manage/dateWatcher/dateWatcher",
     });
   },
   onShow: function () {
