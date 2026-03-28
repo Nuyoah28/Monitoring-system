@@ -1870,7 +1870,8 @@ class IntelligentAgent:
                 if result:
                     data_parts.append(f"【{tool_name}】\n{result}")
             except Exception as exc:
-                data_parts.append(f"【{tool_name}】\n执行失败：{exc}")
+                print(f"工具执行失败: {tool_name}: {exc}")
+                data_parts.append(f"【{tool_name}】\n工具执行失败，请稍后重试。")
 
         data_summary = "\n\n".join(data_parts)
 
@@ -1916,7 +1917,7 @@ class IntelligentAgent:
             return answer
         except Exception as exc:
             print(f"AI 响应生成失败: {exc}")
-            fallback = data_summary or f"抱歉，AI 服务暂时不可用。错误信息：{exc}"
+            fallback = data_summary or "抱歉，智能助手暂时不可用，请稍后重试。"
             if not data_summary:
                 fallback = self._build_local_service_fallback(question)
             if on_chunk:

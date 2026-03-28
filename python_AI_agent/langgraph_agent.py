@@ -41,6 +41,13 @@ class LangGraphIntelligentAgent(IntelligentAgent):
         self._tool_node = ToolNode(self._tools)
         self._graph = self._build_graph()
 
+    def _execute_tool_safely(self, tool_name: str, params: Dict, ctx: RequestContext) -> str:
+        try:
+            return self._execute_tool(tool_name, params, ctx) or ""
+        except Exception as exc:
+            print(f"工具执行失败: {tool_name}: {exc}")
+            return "工具执行失败，请稍后重试。"
+
     def _build_tools(self):
         @tool("get_alarm_list")
         def get_alarm_list(
@@ -60,7 +67,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
                 "page_size": page_size,
                 "time_text": time_text,
             }
-            return self._execute_tool("get_alarm_list", params, ctx) or ""
+            return self._execute_tool_safely("get_alarm_list", params, ctx)
 
         @tool("get_alarm_count")
         def get_alarm_count(
@@ -78,7 +85,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
                 "warning_levels": warning_levels or [],
                 "time_text": time_text,
             }
-            return self._execute_tool("get_alarm_count", params, ctx) or ""
+            return self._execute_tool_safely("get_alarm_count", params, ctx)
 
         @tool("get_alarm_history")
         def get_alarm_history(
@@ -87,7 +94,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
         ) -> str:
             """查询近几天的告警趋势统计。"""
             ctx = state["ctx"]
-            return self._execute_tool("get_alarm_history", {"defer": defer}, ctx) or ""
+            return self._execute_tool_safely("get_alarm_history", {"defer": defer}, ctx)
 
         @tool("get_realtime_alarm")
         def get_realtime_alarm(
@@ -95,7 +102,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
         ) -> str:
             """查询实时告警概况。"""
             ctx = state["ctx"]
-            return self._execute_tool("get_realtime_alarm", {}, ctx) or ""
+            return self._execute_tool_safely("get_realtime_alarm", {}, ctx)
 
         @tool("get_alarm_detail")
         def get_alarm_detail(
@@ -104,7 +111,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
         ) -> str:
             """按告警 ID 查询告警详情。"""
             ctx = state["ctx"]
-            return self._execute_tool("get_alarm_detail", {"alarm_id": alarm_id}, ctx) or ""
+            return self._execute_tool_safely("get_alarm_detail", {"alarm_id": alarm_id}, ctx)
 
         @tool("update_alarm_status")
         def update_alarm_status(
@@ -120,7 +127,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
                 "status": status,
                 "processing_content": processing_content,
             }
-            return self._execute_tool("update_alarm_status", params, ctx) or ""
+            return self._execute_tool_safely("update_alarm_status", params, ctx)
 
         @tool("get_monitor_list")
         def get_monitor_list(
@@ -128,7 +135,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
         ) -> str:
             """查询当前用户可访问的监控点列表。"""
             ctx = state["ctx"]
-            return self._execute_tool("get_monitor_list", {}, ctx) or ""
+            return self._execute_tool_safely("get_monitor_list", {}, ctx)
 
         @tool("get_monitor_detail")
         def get_monitor_detail(
@@ -142,7 +149,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
                 "monitor_id": monitor_id,
                 "monitor_name": monitor_name,
             }
-            return self._execute_tool("get_monitor_detail", params, ctx) or ""
+            return self._execute_tool_safely("get_monitor_detail", params, ctx)
 
         @tool("get_weather_newest")
         def get_weather_newest(
@@ -156,7 +163,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
                 "monitor_id": monitor_id,
                 "monitor_name": monitor_name,
             }
-            return self._execute_tool("get_weather_newest", params, ctx) or ""
+            return self._execute_tool_safely("get_weather_newest", params, ctx)
 
         @tool("get_weather_history")
         def get_weather_history(
@@ -172,7 +179,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
                 "monitor_name": monitor_name,
                 "time_text": time_text,
             }
-            return self._execute_tool("get_weather_history", params, ctx) or ""
+            return self._execute_tool_safely("get_weather_history", params, ctx)
 
         @tool("update_detection_prompts")
         def update_detection_prompts(
@@ -181,7 +188,7 @@ class LangGraphIntelligentAgent(IntelligentAgent):
         ) -> str:
             """更新开放世界检测目标列表。"""
             ctx = state["ctx"]
-            return self._execute_tool("update_detection_prompts", {"prompts": prompts}, ctx) or ""
+            return self._execute_tool_safely("update_detection_prompts", {"prompts": prompts}, ctx)
 
         return [
             get_alarm_list,

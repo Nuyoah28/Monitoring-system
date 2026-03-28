@@ -267,6 +267,9 @@ const emitAssistantPreview = (text: string): void => {
   scrollToBottom();
 };
 
+const PUBLIC_AGENT_ERROR_MESSAGE = '抱歉，智能助手暂时不可用，请稍后重试。';
+const PUBLIC_VOICE_ERROR_MESSAGE = '抱歉，语音服务暂时不可用，请稍后重试。';
+
 const cleanupRecording = (): void => {
   if (processor) {
     processor.disconnect();
@@ -456,7 +459,7 @@ const handleSsePayload = (assistantMessage: ChatMessage, payload: any): void => 
   }
 
   if (payload?.type === 'error') {
-    assistantMessage.content = assistantMessage.content || `处理失败：${payload.message || '未知错误'}`;
+    assistantMessage.content = assistantMessage.content || PUBLIC_AGENT_ERROR_MESSAGE;
     emitAssistantPreview(assistantMessage.content.trim());
   }
 };
@@ -537,7 +540,7 @@ const sendQuestion = async (draftQuestion?: string, options: SendQuestionOptions
     }
   } catch (error: any) {
     if (error?.name !== 'AbortError') {
-      assistantMessage.content = `网络异常或服务不可用：${error?.message || '请稍后重试'}`;
+      assistantMessage.content = PUBLIC_AGENT_ERROR_MESSAGE;
       emitAssistantPreview(assistantMessage.content);
     }
   } finally {
@@ -637,10 +640,10 @@ const sendVoiceToAgent = async (wavBlob: Blob): Promise<void> => {
       updateVoiceState('idle');
     }
   } catch (error: any) {
-    recognizedMessage.content = `语音识别失败：${error?.message || '请稍后重试'}`;
+    recognizedMessage.content = PUBLIC_VOICE_ERROR_MESSAGE;
     recognizedMessage.pending = false;
-    appendMessage({ role: 'assistant', content: '当前无法完成语音提问，请稍后再试或改用文字输入。' });
-    emitAssistantPreview('当前无法完成语音提问，请稍后再试或改用文字输入。');
+    appendMessage({ role: 'assistant', content: '抱歉，当前无法完成语音提问，请稍后重试或改用文字输入。' });
+    emitAssistantPreview('抱歉，当前无法完成语音提问，请稍后重试或改用文字输入。');
     setStreaming(false);
   }
 };

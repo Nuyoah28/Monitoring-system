@@ -32,6 +32,9 @@ CORS(app)
 # 全局Agent实例
 agent = None
 
+PUBLIC_AGENT_ERROR_MESSAGE = "抱歉，智能助手暂时不可用，请稍后重试。"
+PUBLIC_VOICE_ERROR_MESSAGE = "抱歉，语音服务暂时不可用，请稍后重试。"
+
 def _get_user_token(req, data: dict):
     """从Header或Body获取用户token（前端用户JWT）"""
     user_token = None
@@ -161,7 +164,7 @@ def chat():
         traceback.print_exc()
         return jsonify({
             "code": "A1000",
-            "message": f"处理失败: {error_msg}",
+            "message": PUBLIC_AGENT_ERROR_MESSAGE,
             "data": None
         }), 500
 
@@ -212,7 +215,7 @@ def chat_stream():
                         stream_mode='sse'
                     )
                 except Exception as e:
-                    q.put({'type': 'error', 'message': str(e)})
+                    q.put({'type': 'error', 'message': PUBLIC_AGENT_ERROR_MESSAGE})
                 finally:
                     q.put(None)  # 结束标记
 
@@ -235,7 +238,7 @@ def chat_stream():
         except Exception as e:
             error_msg = str(e)
             print(f"❌ 流式处理失败: {error_msg}")
-            yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': PUBLIC_AGENT_ERROR_MESSAGE})}\n\n"
 
     return Response(
         stream_with_context(generate()),
@@ -297,11 +300,16 @@ def chat_voice():
         return jsonify({"code": "A1000", "message": "未识别到有效语音", "data": None}), 400
 
     conversation_key = _build_conversation_key(request, user_token)
-    response = agent.process_question(
-        question.strip(),
-        user_token=user_token,
-        conversation_key=conversation_key
-    )
+    try:
+        response = agent.process_question(
+            question.strip(),
+            user_token=user_token,
+            conversation_key=conversation_key
+        )
+    except Exception as e:
+        print(f"Voice chat failed: {e}")
+        traceback.print_exc()
+        return jsonify({"code": "A1000", "message": PUBLIC_AGENT_ERROR_MESSAGE, "data": None}), 500
     result_data = {"question": question.strip(), "answer": response}
 
     if return_tts and response:
@@ -448,7 +456,7 @@ def gpt_ws(ws, token):
             except Exception as e:
                 error_msg = f"❌ 处理出错: {str(e)}"
                 print(error_msg)
-                ws.send(error_msg)
+                ws.send(PUBLIC_AGENT_ERROR_MESSAGE)
             
             # 发送结束标记 (Home.vue line 94: if(res.data !== "[DONE]"))
             ws.send("[DONE]")
