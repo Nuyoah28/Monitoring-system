@@ -1,75 +1,103 @@
 <template>
   <view class="feature-page">
-    <view class="bg-shape bg-1"></view>
-    <view class="bg-shape bg-2"></view>
-
     <view class="top-bar">
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
       </view>
-      <view class="top-title">车位车辆统计</view>
-      <view class="ghost-btn" @tap="loadSpaces">刷新</view>
+      <view class="top-title">物业通知管理</view>
+      <view class="ghost-btn" @tap="loadNotices">刷新</view>
+    </view>
+
+    <view class="panel form-panel">
+      <view class="panel-title">发布通知</view>
+      <view class="form-item">
+        <view class="label">通知内容</view>
+        <textarea
+          v-model="form.message"
+          class="textarea"
+          maxlength="300"
+          placeholder="请输入物业通知内容"
+        />
+      </view>
+      <view class="submit-btn" @tap="saveNotice">发布通知</view>
     </view>
 
     <view class="panel list-panel">
-      <view class="panel-title">车位车辆统计</view>
-      <view v-if="!spaces.length" class="empty">暂无车位数据。</view>
-      <view v-for="item in spaces" :key="item.id" class="record-card">
-        <view class="record-head">
-          <view class="name">{{ item.location || '未知区域' }}</view>
-        </view>
-        <view class="meta">总车位：{{ item.totalSpaces || 0 }}</view>
-        <view class="meta">车辆数量：{{ parseOccupiedCount(item.occupiedVehicle) }}</view>
+      <view class="panel-title">通知记录</view>
+      <view v-if="!list.length" class="empty">当前暂无通知。</view>
+      <view v-for="item in list" :key="item.id" class="record-card">
+        <view class="name">{{ item.message || '未命名通知' }}</view>
+        <view class="meta">发布时间：{{ formatTime(item.timestamp) }}</view>
       </view>
     </view>
   </view>
 </template>
 
 <script>
-const SUCCESS_CODE = '00000';
+const SUCCESS_CODE = '00000'
 
 export default {
   data() {
     return {
-      spaces: [],
-    };
+      form: {
+        message: '',
+      },
+      list: [],
+    }
   },
   onShow() {
-    this.loadSpaces();
+    this.loadNotices()
   },
   methods: {
     isSuccess(res) {
-      return String(res && res.code) === SUCCESS_CODE;
-    },
-    parseOccupiedCount(value) {
-      if (value === null || value === undefined) return 0;
-      const text = `${value}`.trim();
-      if (!text) return 0;
-      if (/^\d+$/.test(text)) return Number(text);
-      return text.split(/[,，\s]+/).filter(Boolean).length;
+      return String(res && res.code) === SUCCESS_CODE
     },
     goBack() {
-      const pages = getCurrentPages();
-      if (pages.length > 1) {
-        uni.navigateBack();
-        return;
-      }
-      uni.reLaunch({ url: '/pages/owner/home/index' });
+      uni.navigateBack()
     },
-    async loadSpaces() {
+    formatTime(value) {
+      if (!value) return '--'
+      if (typeof value === 'string') return value.replace('T', ' ').slice(0, 19)
+      return `${value}`
+    },
+    async loadNotices() {
       try {
-        const { data: res } = await uni.$http.get('/api/v1/parking-space/list');
+        const { data: res } = await uni.$http.get('/api/v1/system/message/getMessage')
         if (!this.isSuccess(res)) {
-          uni.$showMsg(res.message || '加载车位信息失败');
-          return;
+          uni.$showMsg(res.message || '加载通知失败')
+          return
         }
-        this.spaces = Array.isArray(res.data) ? res.data : [];
+        const arr = Array.isArray(res.data) ? res.data : []
+        this.list = arr.sort((a, b) => {
+          const ta = new Date(a.timestamp || 0).getTime()
+          const tb = new Date(b.timestamp || 0).getTime()
+          return tb - ta
+        })
       } catch (e) {
-        uni.$showMsg('网络异常，请稍后重试');
+        uni.$showMsg('网络异常，请稍后重试')
+      }
+    },
+    async saveNotice() {
+      const message = this.form.message.trim()
+      if (!message) {
+        uni.$showMsg('请填写通知内容')
+        return
+      }
+      try {
+        const { data: res } = await uni.$http.post('/api/v1/system/message/addMessage', { message })
+        if (!this.isSuccess(res)) {
+          uni.$showMsg(res.message || '发布通知失败')
+          return
+        }
+        uni.showToast({ title: '发布成功', icon: 'success' })
+        this.form.message = ''
+        this.loadNotices()
+      } catch (e) {
+        uni.$showMsg('网络异常，请稍后重试')
       }
     },
   },
-};
+}
 </script>
 
 <style lang="scss" scoped>
@@ -77,38 +105,6 @@ export default {
   min-height: 100vh;
   padding: 26rpx 24rpx 32rpx;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #eef8ff 0%, #f8fbff 54%, #ffffff 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.bg-shape {
-  position: absolute;
-  border-radius: 999rpx;
-  filter: blur(66rpx);
-  z-index: 0;
-}
-
-.bg-1 {
-  width: 380rpx;
-  height: 380rpx;
-  background: rgba(0, 184, 216, 0.2);
-  right: -140rpx;
-  top: -100rpx;
-}
-
-.bg-2 {
-  width: 440rpx;
-  height: 440rpx;
-  background: rgba(72, 130, 255, 0.14);
-  left: -160rpx;
-  bottom: -180rpx;
-}
-
-.top-bar,
-.panel {
-  position: relative;
-  z-index: 2;
 }
 
 .top-bar {
@@ -167,28 +163,19 @@ export default {
   margin-bottom: 14rpx;
 }
 
-.form-row {
-  display: flex;
-  justify-content: space-between;
-}
-
-.half {
-  width: 48%;
-}
-
 .label {
   font-size: 23rpx;
   color: #4e647e;
   margin-bottom: 8rpx;
 }
 
-.ipt {
+.textarea {
   width: 100%;
-  height: 76rpx;
+  min-height: 160rpx;
   border-radius: 16rpx;
   background: #f4f9ff;
   border: 1px solid #d9e9fb;
-  padding: 0 18rpx;
+  padding: 14rpx 18rpx;
   box-sizing: border-box;
   font-size: 26rpx;
   color: #1d2f44;
@@ -223,25 +210,15 @@ export default {
   margin-bottom: 12rpx;
 }
 
-.record-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8rpx;
-}
-
 .name {
   font-size: 28rpx;
   color: #17314c;
   font-weight: 700;
-}
-
-.delete {
-  font-size: 22rpx;
-  color: #e45e5e;
+  line-height: 1.5;
 }
 
 .meta {
+  margin-top: 8rpx;
   font-size: 23rpx;
   color: #54708f;
   line-height: 1.5;

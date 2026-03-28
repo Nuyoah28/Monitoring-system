@@ -5,17 +5,14 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.res.BlankRes;
 import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
-import com.sipc.monitoringsystem.model.po.User.User;
 import com.sipc.monitoringsystem.service.SystemMessageService;
-import com.sipc.monitoringsystem.service.UserService;
-import com.sipc.monitoringsystem.util.JwtUtils;
-import com.sipc.monitoringsystem.util.TokenThreadLocalUtil;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -26,17 +23,12 @@ import lombok.extern.slf4j.Slf4j;
 public class MessageController {
     @Autowired
     SystemMessageService systemMessageService;
-    @Autowired
-    UserService userService;
 
     @PostMapping("/addMessage")
-    public CommonResult<BlankRes> addMessage(SystemMessage message){
-        User tokenUser = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
-        User user = userService.getById(tokenUser.getId());
-        if (user == null) {
-            user = tokenUser;
+    public CommonResult<BlankRes> addMessage(@RequestBody SystemMessage message){
+        if (message == null || message.getMessage() == null || message.getMessage().trim().isEmpty()) {
+            return CommonResult.fail("消息内容不能为空");
         }
-        //TODO: if not manager, return fail
         if(!systemMessageService.addMessage(message)){
             return CommonResult.fail("添加消息失败");
         }

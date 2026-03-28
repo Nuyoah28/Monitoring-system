@@ -85,9 +85,24 @@
 			}
 		},
 		{
+			"path": "pages/manage/realtime/detail",
+			"style": {
+				"navigationBarTitleText": "报警详情",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/manage/statistics/index",
+			"style": {
+				"navigationBarTitleText": "数据统计",
+				"enablePullDownRefresh": false,
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/manage/dateWatcher/dateWatcher",
 			"style": {
-				"navigationBarTitleText": "",
+				"navigationBarTitleText": "物业管理",
 				"enablePullDownRefresh": false,
 				"navigationStyle": "custom"
 			}
@@ -145,6 +160,34 @@
 			}
 		},
 		{
+			"path": "pages/manage/property/visitor/index",
+			"style": {
+				"navigationBarTitleText": "访客登记管理",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/manage/property/notice/index",
+			"style": {
+				"navigationBarTitleText": "物业通知管理",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/manage/property/repair/index",
+			"style": {
+				"navigationBarTitleText": "报修工单管理",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/manage/property/parking/index",
+			"style": {
+				"navigationBarTitleText": "车位检测管理",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "components/UnityModelViewer",
 			"style": {
 				"navigationBarTitleText": "",
@@ -183,7 +226,7 @@
 	    },
 	    {
 	      "pagePath": "pages/manage/dateWatcher/dateWatcher",
-	      "text": "数据统计",
+	      "text": "物业管理",
 	      "iconPath": "static/tabBar/chart.png",
 	      "selectedIconPath": "static/chosenTabBar/chart.png"
 	    },

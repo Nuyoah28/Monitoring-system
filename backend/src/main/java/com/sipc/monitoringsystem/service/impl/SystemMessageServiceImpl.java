@@ -8,10 +8,18 @@ import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
 import com.sipc.monitoringsystem.service.SystemMessageService;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
+
 @Service
 public class SystemMessageServiceImpl extends ServiceImpl<SystemMessageDao, SystemMessage> implements SystemMessageService {
     @Override
     public boolean addMessage(SystemMessage message) {
+        if (message == null) {
+            return false;
+        }
+        if (message.getTimestamp() == null) {
+            message.setTimestamp(new Timestamp(System.currentTimeMillis()));
+        }
         if(!this.save(message)){
             return false;
         }

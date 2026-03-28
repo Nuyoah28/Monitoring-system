@@ -16,6 +16,7 @@ public class TimeMetaObjectHandler implements MetaObjectHandler {
     public void insertFill(org.apache.ibatis.reflection.MetaObject metaObject) {
         this.setFieldValByName("createTime",new Timestamp(System.currentTimeMillis()), metaObject);
         this.setFieldValByName("updateTime", new Timestamp(System.currentTimeMillis()), metaObject);
+        this.setFieldValByName("timestamp", new Timestamp(System.currentTimeMillis()), metaObject);
     }
 
     @Override

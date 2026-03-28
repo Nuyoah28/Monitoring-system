@@ -1,195 +1,130 @@
 <template>
-  <view class="main">
-    <view class="inner" v-if="isShow">
-      
-      <!-- 重新设计的顶部导航栏 -->
-      <view class="header-nav" :style="{ paddingTop: statusBarHeight + 'px' }">
-        <view class="top-tabs">
-          <view
-            class="tab-item"
-            :class="{ active: choosen === 1 }"
-            @click="chooseOne()"
-          >
-            <text class="tab-text">数据总览</text>
-            <view class="indicator" v-if="choosen === 1"></view>
-          </view>
-          
-          <view
-            class="tab-item"
-            :class="{ active: choosen === 2 }"
-            @click="chooseTwo()"
-          >
-            <text class="tab-text">历史数据</text>
-            <view class="indicator" v-if="choosen === 2"></view>
-          </view>
-        </view>
-        
-        <!-- 使用 u-icon 替换原本的本地设置按钮图片 -->
-        <view class="setting-btn" @click="jump">
-          <u-icon name="setting" color="#666" size="44rpx"></u-icon>
-        </view>
+  <view class="property-page">
+    <view class="header" :style="{ paddingTop: statusBarHeight + 'px' }">
+      <view>
+        <view class="title">物业管理</view>
+        <view class="sub">点击板块进入具体功能页面</view>
+      </view>
+      <view class="setting-btn" @tap="jumpSetting">
+        <u-icon name="setting" color="#666" size="44rpx"></u-icon>
+      </view>
+    </view>
+
+    <view class="grid">
+      <view class="feature-card" @tap="goFeature('/pages/manage/property/visitor/index')">
+        <view class="feature-name">访客登记管理</view>
+        <view class="feature-desc">新增、查看和删除访客登记</view>
       </view>
 
-      <view class="content-scroll-area">
-        <real-time v-if="!(choosen - 1)"></real-time>
-        <history-data v-if="choosen - 1"></history-data>
+      <view class="feature-card" @tap="goFeature('/pages/manage/property/notice/index')">
+        <view class="feature-name">物业通知管理</view>
+        <view class="feature-desc">发布并查看面向业主的通知</view>
       </view>
-      
+
+      <view class="feature-card" @tap="goFeature('/pages/manage/property/repair/index')">
+        <view class="feature-name">报修工单管理</view>
+        <view class="feature-desc">仅查看和删除工单，不提供录入</view>
+      </view>
+
+      <view class="feature-card" @tap="goFeature('/pages/manage/property/parking/index')">
+        <view class="feature-name">车位检测管理</view>
+        <view class="feature-desc">新增、查看和删除车位检测记录</view>
+      </view>
     </view>
   </view>
 </template>
 
 <script>
-import realTime from "./realTime.vue";
-import historyData from "./historyData.vue";
 export default {
-  components: { realTime, historyData },
   data() {
     return {
-      statusBarHeight: 0, // 新增状态栏高度以防遮挡
-      selected: false,
-      choosen: 1,
-	  isShow:true,
-    };
+      statusBarHeight: 0,
+    }
   },
   onLoad() {
-    const info = uni.getWindowInfo();
-    // 只获取设备顶部状态栏高度，H5 和小程序下保证导航条不被刘海遮挡
-    this.statusBarHeight = info.statusBarHeight || 20; 
-  },
-  onShow(){
-	  this.isShow = true
-  },
-  onHide(){
-	  this.isShow = false
+    const info = uni.getWindowInfo()
+    this.statusBarHeight = info.statusBarHeight || 20
   },
   methods: {
-    chooseOne() {
-      this.choosen = 1;
-      this.$forceUpdate();
-    },
-    chooseTwo() {
-      this.choosen = 2;
-      this.$forceUpdate();
-    },
-    jump() {
+    jumpSetting() {
       uni.navigateTo({
-        url: "/pages/manage/personal/setting/setting",
-      });
+        url: '/pages/manage/personal/setting/setting',
+      })
+    },
+    goFeature(url) {
+      uni.navigateTo({ url })
     },
   },
-};
+}
 </script>
 
 <style lang="scss" scoped>
-.main {
-  width: 100vw;
-  /* 承接全局赛博清晨背景 */
-  background: transparent;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
+.property-page {
+  min-height: 100vh;
+  padding: 0 24rpx 30rpx;
+  box-sizing: border-box;
+}
+
+.header {
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22rpx;
+}
 
-  .inner {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  /* 现代化的顶部透明导航条，融入深色背景 */
-  .header-nav {
-    width: 100%;
-    /* 采用自适应高度以留足 padding 收容空间 */
-    min-height: 100rpx;
-    background-color: transparent; 
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 40rpx;
-    box-sizing: border-box;
-    z-index: 10;
-    margin-bottom: 20rpx;
-    margin-top: 20rpx; /* 在顶部额外预留空气间距防止设备贴边 */
-    flex-shrink: 0; /* 绝对不要被压缩 */
-    
-    .top-tabs {
-      display: flex;
-      gap: 50rpx;
-      height: 80rpx; /* 固定内部元素高度保证对齐 */
-      align-items: center;
-      
-      .tab-item {
-        position: relative;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        
-        .tab-text {
-          font-size: 32rpx;
-          color: rgba(26, 42, 58, 0.6); /* 浅色背景下改用深色文字 */
-          font-weight: 500;
-          transition: all 0.3s;
-        }
-        
-        &.active {
-          .tab-text {
-            color: #1A2A3A; /* 高亮深海蓝 */
-            font-size: 36rpx;
-            font-weight: bold;
-          }
-        }
-        
-        .indicator {
-          position: absolute;
-          bottom: 0;
-          width: 40rpx;
-          height: 8rpx;
-          /* 科技蓝高亮底线 */
-          background: linear-gradient(90deg, #00d2ff, #007aff);
-          border-radius: 4rpx;
-          animation: slideIn 0.3s ease;
-        }
-      }
-    }
-    
-    .setting-btn {
-      width: 60rpx;
-      height: 60rpx;
-      background: rgba(0, 0, 0, 0.05); /* 浅色背景下的微暗玻璃感 */
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      transition: background 0.2s;
-      
-      &:active {
-        background: rgba(0, 0, 0, 0.1);
-      }
-    }
-  }
+.title {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #1a2a3a;
+}
 
-  .content-scroll-area {
-    flex: 1;
-    width: 100%;
-    min-height: 0; /* 关键：允许 flex 子元素自由滚动而不撑破父容器 */
-    overflow: hidden; 
-    display: flex;
-    flex-direction: column;
+.sub {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: rgba(26, 42, 58, 0.62);
+}
+
+.setting-btn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 32rpx;
+  background: rgba(255, 255, 255, 0.88);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 8rpx 20rpx rgba(32, 74, 126, 0.1);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+}
+
+.feature-card {
+  min-height: 196rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8rpx 20rpx rgba(62, 95, 150, 0.08);
+  padding: 24rpx 20rpx;
+  box-sizing: border-box;
+
+  &:active {
+    transform: scale(0.98);
   }
 }
 
-@keyframes slideIn {
-  from { opacity: 0; transform: scaleX(0.5); }
-  to { opacity: 1; transform: scaleX(1); }
+.feature-name {
+  font-size: 30rpx;
+  color: #1a2a3a;
+  font-weight: 700;
+}
+
+.feature-desc {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.45;
+  color: rgba(26, 42, 58, 0.62);
 }
 </style>

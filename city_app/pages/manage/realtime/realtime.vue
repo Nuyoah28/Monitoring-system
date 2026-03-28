@@ -18,6 +18,10 @@
             <span>历史事件</span>
           </view>
         </view>
+        <view class="stats-btn" @tap="goStatistics">
+          <u-icon name="bar-chart" color="#007AFF" size="34rpx"></u-icon>
+          <text>数据统计</text>
+        </view>
         <view class="setting-btn" @click="jump">
           <u-icon name="setting" color="#666" size="44rpx"></u-icon>
         </view>
@@ -81,7 +85,7 @@
           @touchend="stopMove($event, item)"
           :style="{ transform: 'translateX(' + item.moveX + 'px)' }"
         >
-          <view class="details" :class="item.moveX === 0 ? 'bor' : ''">
+          <view class="details" :class="item.moveX === 0 ? 'bor' : ''" @tap.stop="openDetail(item)">
             <view class="deviceName">
               {{ item.name }}
             </view>
@@ -150,19 +154,6 @@
       </scroll-view>
       <u-modal
         style="position: absolute"
-        :show="showVideo"
-        :closeOnClickOverlay="true"
-        @close="showVideo = false"
-        @confirm="showVideo = false"
-        width="348px"
-      >
-        <check
-          v-if="showVideo"
-          :warnData="choosen === 0 ? warnData[index] : historyData[index]"
-        ></check>
-      </u-modal>
-      <u-modal
-        style="position: absolute"
         :show="showDeal"
         :closeOnClickOverlay="true"
         @close="showDeal = false"
@@ -196,11 +187,9 @@
 </template>
 
 <script>
-import check from "./components/check.vue";
 import edit from "./components/edit.vue";
 export default {
   components: {
-    check,
     edit,
   },
   data() {
@@ -241,7 +230,6 @@ export default {
         "../../../static/20230910-194834.png",
         "../../../static/attention.png",
       ],
-      showVideo: false,
       showDeal: false,
       content: "",
       id: null,
@@ -514,6 +502,11 @@ export default {
         url: "/pages/manage/personal/setting/setting",
       });
     },
+    goStatistics() {
+      uni.navigateTo({
+        url: "/pages/manage/statistics/index",
+      });
+    },
     startMove(e, item) {
       this.startX = e.touches[0].clientX;
     },
@@ -533,9 +526,18 @@ export default {
       else item.moveX = 0;
     },
     check(index) {
-      this.index = index;
-      this.showVideo = true;
+      const item = this.choosen ? this.historyData[index] : this.warnData[index];
       this.resetX(index);
+      this.openDetail(item);
+    },
+    openDetail(item) {
+      if (!item || !item.id) {
+        uni.$showMsg("报警ID缺失，无法查看详情");
+        return;
+      }
+      uni.navigateTo({
+        url: `/pages/manage/realtime/detail?id=${item.id}`,
+      });
     },
     deal(index) {
       this.index = index;
@@ -634,14 +636,15 @@ export default {
   flex-direction: column;
   background: transparent;
 
-  .title {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 5rpx;
-    padding-bottom: 0rpx;
-    height: 100rpx;
+    .title {
+      width: 100%;
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 16rpx;
+      margin-bottom: 5rpx;
+      padding-bottom: 0rpx;
+      height: 100rpx;
     
     .topNav {
       display: flex;
@@ -685,6 +688,25 @@ export default {
       justify-content: center;
       align-items: center;
       cursor: pointer;
+      margin-left: auto;
+    }
+
+    .stats-btn {
+      height: 60rpx;
+      padding: 0 20rpx;
+      border-radius: 30rpx;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(0, 122, 255, 0.18);
+      display: flex;
+      align-items: center;
+      gap: 8rpx;
+      box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.08);
+
+      text {
+        font-size: 24rpx;
+        color: #007AFF;
+        font-weight: 700;
+      }
     }
   }
 
