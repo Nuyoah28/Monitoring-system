@@ -247,3 +247,32 @@ values (1, 25.5, 60.0, '多云', '2023-09-22 10:00:00'),
 (3, 24.5, 63.0, '大雨', '2023-09-22 22:00:00'),
 (4, 28.5, 47.0, '晴', '2023-09-22 23:00:00'),
 (5, 29.8, 42.0, '中雨', '2023-09-23 00:00:00');
+
+DROP TABLE IF EXISTS `device_repair_info`;
+CREATE TABLE `device_repair_info` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `device_name` varchar(100) NOT NULL COMMENT '设备名称',
+  `location` varchar(100) NOT NULL COMMENT '位置',
+  `report_time` datetime NOT NULL COMMENT '报修时间',
+  `repair_detail` text NOT NULL COMMENT '报修信息详情',
+  `publisher` varchar(50) NOT NULL COMMENT '发布者',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='设备报修信息表';
+
+DROP TABLE IF EXISTS `parking_space_info`;
+CREATE TABLE `parking_space_info` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `location` varchar(100) NOT NULL COMMENT '车位位置',
+  `occupied_vehicle` varchar(100) DEFAULT NULL COMMENT '占用车辆',
+  `total_spaces` int NOT NULL COMMENT '总车位数',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='车位信息表';
+
+DROP TABLE IF EXISTS `visitor_info`;
+CREATE TABLE `visitor_info` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `visitor_name` varchar(50) NOT NULL COMMENT '访客姓名',
+  `visit_time` datetime NOT NULL COMMENT '到访时间',
+  `plate_number` varchar(20) DEFAULT NULL COMMENT '车牌号',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='访客表';

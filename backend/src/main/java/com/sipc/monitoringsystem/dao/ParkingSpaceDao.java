@@ -1,10 +1,9 @@
 package com.sipc.monitoringsystem.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
+import com.sipc.monitoringsystem.model.po.Parking.ParkingSpaceInfo;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
-public interface SystemMessageDao extends BaseMapper<SystemMessage> {
-    
+public interface ParkingSpaceDao extends BaseMapper<ParkingSpaceInfo> {
 }
