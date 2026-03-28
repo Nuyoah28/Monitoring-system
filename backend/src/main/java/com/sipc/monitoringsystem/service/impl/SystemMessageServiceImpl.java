@@ -8,8 +8,11 @@ import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
 import com.sipc.monitoringsystem.service.SystemMessageService;
 import org.springframework.stereotype.Service;
 
+<<<<<<< Updated upstream
 import java.sql.Timestamp;
 
+=======
+>>>>>>> Stashed changes
 @Service
 public class SystemMessageServiceImpl extends ServiceImpl<SystemMessageDao, SystemMessage> implements SystemMessageService {
     @Override

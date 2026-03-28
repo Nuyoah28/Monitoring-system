@@ -95,10 +95,6 @@
     </div>
 
   <div class="col right-col">
-    <article class="card agent-chat-card">
-      <h3>AI智能助手</h3>
-      <ChatPanel layout="inline" />
-    </article>
 
       <article class="card env-chart-card">
         <h3>环境质量折线图</h3>
@@ -200,7 +196,6 @@ import DashboardLayout from '@/components/DashboardLayout.vue'
 import { useAlarmStore } from '@/stores/alarm'
 import AlarmList from '@/components/alarmlist.vue'
 import PieChart1 from '@/components/piechart1.vue'
-import ChatPanel from '@/components/chat_panel.vue'
 import MapPanZoom from '@/components/MapPanZoom.vue'
 import axios from 'axios'
 import flvjs from 'flv.js'
@@ -915,14 +910,6 @@ watch(
   box-shadow: 0 5px 10px rgba(0, 0, 0, 0.16);
 }
 
-.agent-chat-card {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .right-col {
   gap: 6px;
 }
@@ -1047,10 +1034,6 @@ watch(
   margin-top: 0;
 }
 
-.right-col .agent-chat-card + .env-chart-card {
-  margin-top: 0;
-}
-
 .env-chart-card :deep(.chart-wrap) {
   padding: 0 6px 4px;
   position: relative;
@@ -1074,55 +1057,6 @@ watch(
   background: rgba(18, 42, 68, 0.4);
   padding: 2px 6px;
   border-radius: 6px;
-}
-
-.agent-chat-card :deep(.chat-panel.inline) {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-  --panel-bg: linear-gradient(145deg, rgba(52, 89, 129, 0.9), rgba(35, 67, 103, 0.92));
-  --panel-border: rgba(132, 178, 226, 0.34);
-  --assistant-bubble: rgba(58, 98, 141, 0.88);
-  --user-bubble: rgba(75, 120, 168, 0.88);
-  --text-main: #e8f3ff;
-  --text-muted: #b9d3ee;
-  --accent: #8ac9ff;
-}
-
-.agent-chat-card :deep(.chat-panel.inline .chat-header) {
-  display: none;
-}
-
-.agent-chat-card :deep(.chat-panel.inline .chat-messages) {
-  flex: 1;
-  min-height: 0;
-  max-height: calc(100% - 4.2rem);
-  overflow-y: auto;
-  background: rgba(36, 70, 107, 0.62);
-  border-color: rgba(128, 173, 219, 0.28);
-}
-
-.agent-chat-card :deep(.chat-panel.inline .chat-messages::-webkit-scrollbar) {
-  width: 8px;
-}
-
-.agent-chat-card :deep(.chat-panel.inline .chat-messages::-webkit-scrollbar-thumb) {
-  background: rgba(138, 185, 229, 0.7);
-  border-radius: 999px;
-}
-
-.agent-chat-card :deep(.chat-panel.inline .chat-content) {
-  border-color: rgba(147, 188, 229, 0.24);
-  box-shadow: 0 2px 8px rgba(8, 24, 42, 0.2);
-}
-
-.agent-chat-card :deep(.chat-panel.inline .chat-message.user .chat-content) {
-  color: #f3f9ff;
-}
-
-.agent-chat-card :deep(.chat-panel.inline .chat-message.assistant .chat-content) {
-  color: #e8f3ff;
 }
 
 :deep(.dash) {
