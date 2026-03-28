@@ -483,6 +483,10 @@ const initLinkedPlayer = (url: string) => {
     )
     linkedFlvPlayer.attachMediaElement(videoEl)
     linkedFlvPlayer.load()
+    linkedFlvPlayer.on(flvjs.Events.ERROR, (errType, errDetail) => {
+      console.error('Linked FLV Player Error:', errType, errDetail)
+      destroyLinkedPlayer()
+    })
     linkedFlvPlayer.play().catch(() => {})
     return
   }
@@ -534,6 +538,12 @@ const initTilePlayers = () => {
       )
       player.attachMediaElement(videoEl)
       player.load()
+      player.on(flvjs.Events.ERROR, (errType, errDetail) => {
+        console.error(`Tile FLV Player Error (${tile.name}):`, errType, errDetail)
+        player.unload()
+        player.destroy()
+        tileFlvPlayers.delete(tile.name)
+      })
       player.play().catch(() => {})
       tileFlvPlayers.set(tile.name, player)
       return

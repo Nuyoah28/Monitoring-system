@@ -1,20 +1,18 @@
 package com.sipc.monitoringsystem.service.impl;
 
-import java.util.List;
-
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sipc.monitoringsystem.dao.SystemMessageDao;
 import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
 import com.sipc.monitoringsystem.service.SystemMessageService;
 import org.springframework.stereotype.Service;
 
-<<<<<<< Updated upstream
 import java.sql.Timestamp;
+import java.util.List;
 
-=======
->>>>>>> Stashed changes
 @Service
-public class SystemMessageServiceImpl extends ServiceImpl<SystemMessageDao, SystemMessage> implements SystemMessageService {
+public class SystemMessageServiceImpl extends ServiceImpl<SystemMessageDao, SystemMessage>
+        implements SystemMessageService {
+
     @Override
     public boolean addMessage(SystemMessage message) {
         if (message == null) {
@@ -23,14 +21,11 @@ public class SystemMessageServiceImpl extends ServiceImpl<SystemMessageDao, Syst
         if (message.getTimestamp() == null) {
             message.setTimestamp(new Timestamp(System.currentTimeMillis()));
         }
-        if(!this.save(message)){
-            return false;
-        }
-        return true;
+        return this.save(message);
     }
+
     @Override
-    public List<SystemMessage> getMessage(SystemMessage message){
-        //return all messages
+    public List<SystemMessage> getMessage(SystemMessage message) {
         return this.list();
     }
 }
