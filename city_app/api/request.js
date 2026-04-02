@@ -17,6 +17,8 @@ $http.baseUrl = API_BASE_URL;
 // $http.baseUrl = "http://192.168.3.135:10215";
 // $http.baseUrl = "http://192.168.68.31:10215";
 
+let requestCount = 0;
+
 $http.beforeRequest = function (options) {
     let token = uni.getStorageSync('token')
     // console.log("token!!!!1",token);
@@ -27,10 +29,18 @@ $http.beforeRequest = function (options) {
         }
     }
     options.header = header
-    uni.showLoading({
-        title: '加载中'
-    })
+    if (requestCount === 0) {
+        uni.showLoading({
+            title: '加载中',
+            mask: true
+        })
+    }
+    requestCount++;
 }
 $http.afterRequest = function () {
-    uni.hideLoading();
+    requestCount--;
+    if (requestCount <= 0) {
+        requestCount = 0;
+        uni.hideLoading();
+    }
 }
