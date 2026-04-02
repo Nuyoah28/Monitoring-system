@@ -127,6 +127,34 @@
 			}
 		},
 		{
+			"path": "pages/manage/monitor/index",
+			"style": {
+				"navigationBarTitleText": "监控列表",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/manage/monitor/video",
+			"style": {
+				"navigationBarTitleText": "监控视频",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/manage/monitor/map",
+			"style": {
+				"navigationBarTitleText": "监控地图",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/manage/environment/index",
+			"style": {
+				"navigationBarTitleText": "环境质量检测",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/manage/personal/personal",
 			"style": {
 				"navigationBarTitleText": "",
@@ -213,32 +241,20 @@
 	  "spacing": "2px",
 	  "list": [
 	    {
-	      "pagePath": "pages/manage/realtime/realtime",
-	      "text": "警报信息", 
+	      "pagePath": "pages/manage/controls/controls",
+	      "text": "首页", 
 	      "iconPath": "static/tabBar/realTime.png",
 	      "selectedIconPath": "static/chosenTabBar/realtime.png"
 	    },
 	    {
-	      "pagePath": "pages/manage/controls/controls",
-	      "text": "设备控制",
+	      "pagePath": "pages/manage/monitor/index",
+	      "text": "监控",
 	      "iconPath": "static/tabBar/contorl.png",
 	      "selectedIconPath": "static/chosenTabBar/control.png"
 	    },
 	    {
-	      "pagePath": "pages/manage/dateWatcher/dateWatcher",
-	      "text": "物业管理",
-	      "iconPath": "static/tabBar/chart.png",
-	      "selectedIconPath": "static/chosenTabBar/chart.png"
-	    },
-	    {
-	      "pagePath": "pages/manage/ai/index",
-	      "text": "智能分析",
-	      "iconPath": "static/tabBar/GPT.png",
-	      "selectedIconPath": "static/chosenTabBar/GPT.png"
-	    },
-	    {
 	      "pagePath": "pages/manage/personal/personal",
-	      "text": "个人中心",
+	      "text": "我的",
 	      "iconPath": "static/tabBar/personal.png",
 	      "selectedIconPath": "static/chosenTabBar/personal.png"
 	    }

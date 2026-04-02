@@ -9,7 +9,7 @@
           v-for="(item, index) in scrollList"
           :key="'roll-' + index"
           class="item"
-          :style="itemlist1[getcolor(item.eventName)]"
+          :style="getItemStyle(item)"
           @click="showDetail(item)"
         >
           <div class="item-main">
@@ -133,6 +133,33 @@ const itemlist1 = [
         'backgroundColor': '#85929E'
     }
 ];
+
+const severityColor = (level: number) => {
+    if (level >= 3) {
+        return {
+            backgroundColor: '#ffe1e1',
+            borderColor: 'rgba(231, 76, 60, 0.5)'
+        }
+    }
+    if (level === 2) {
+        return {
+            backgroundColor: '#fff2db',
+            borderColor: 'rgba(248, 189, 145, 0.5)'
+        }
+    }
+    return {
+        backgroundColor: '#e9f5ff',
+        borderColor: 'rgba(122, 189, 216, 0.5)'
+    }
+}
+
+const getItemStyle = (item: any) => {
+    const level = Number(item?.level)
+    if (!Number.isNaN(level)) {
+        return severityColor(level)
+    }
+    return itemlist1[getcolor(item.eventName)]
+}
 
 const getcolor = (type: string): number => {
     // 处理各种算法推过来的准确中文名 (兼容 NTU-60 映射和 Mamba-YOLO 名称)

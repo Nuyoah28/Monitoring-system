@@ -2,6 +2,9 @@
   <view style="height: 100vh; width: 100vw; position: relative">
     <view class="warnBox" id="warnBox" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="title">
+        <view class="back-btn" @tap="goBack">
+          <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
+        </view>
         <view class="topNav">
           <view
             class="left"
@@ -17,10 +20,6 @@
           >
             <span>历史事件</span>
           </view>
-        </view>
-        <view class="stats-btn" @tap="goStatistics">
-          <u-icon name="bar-chart" color="#007AFF" size="34rpx"></u-icon>
-          <text>数据统计</text>
         </view>
         <view class="setting-btn" @click="jump">
           <u-icon name="setting" color="#666" size="44rpx"></u-icon>
@@ -502,10 +501,12 @@ export default {
         url: "/pages/manage/personal/setting/setting",
       });
     },
-    goStatistics() {
-      uni.navigateTo({
-        url: "/pages/manage/statistics/index",
-      });
+    goBack() {
+      if (getCurrentPages().length > 1) {
+        uni.navigateBack();
+      } else {
+        uni.switchTab({ url: "/pages/manage/controls/controls" });
+      }
     },
     startMove(e, item) {
       this.startX = e.touches[0].clientX;
@@ -638,8 +639,9 @@ export default {
 
     .title {
       width: 100%;
+      position: relative;
       display: flex;
-      justify-content: flex-start;
+      justify-content: center;
       align-items: center;
       gap: 16rpx;
       margin-bottom: 5rpx;
@@ -680,6 +682,10 @@ export default {
     .setting-btn {
       width: 60rpx;
       height: 60rpx;
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
       background: rgba(0, 0, 0, 0.05);
       backdrop-filter: blur(5px);
       -webkit-backdrop-filter: blur(5px);
@@ -688,26 +694,24 @@ export default {
       justify-content: center;
       align-items: center;
       cursor: pointer;
-      margin-left: auto;
     }
 
-    .stats-btn {
+    .back-btn {
+      width: 60rpx;
       height: 60rpx;
-      padding: 0 20rpx;
-      border-radius: 30rpx;
-      background: rgba(255, 255, 255, 0.82);
-      border: 1px solid rgba(0, 122, 255, 0.18);
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 50%;
       display: flex;
+      justify-content: center;
       align-items: center;
-      gap: 8rpx;
       box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.08);
-
-      text {
-        font-size: 24rpx;
-        color: #007AFF;
-        font-weight: 700;
-      }
+      cursor: pointer;
     }
+
   }
 
   /* 筛选器区域：亮色玻璃感 */

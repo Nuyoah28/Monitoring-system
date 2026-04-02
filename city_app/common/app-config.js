@@ -1,10 +1,10 @@
 export const APP_CONFIG = {
   manage: {
     loginApi: '/api/v1/user/login',
-    successUrl: '/pages/manage/dateWatcher/dateWatcher',
+    successUrl: '/pages/manage/controls/controls',
     appType: 'manage',
     enableWebsocket: true,
-    useSwitchTab: false,
+    useSwitchTab: true,
   },
   owner: {
     loginApi: '/api/v1/user/login',

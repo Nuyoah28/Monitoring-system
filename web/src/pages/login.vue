@@ -71,7 +71,7 @@ const login = (): void => {
             userStore.setUserInfo(username.value, res.data.data.name, res.data.data.id, res.data.data.token)
             // 同步到 sessionStorage 以实现持久化
             userStore.syncToSessionStorage()
-            router.push('/visual');
+            router.push('/agent');
         }
     }).catch((error: any) => {
         console.error('Login error:', error);

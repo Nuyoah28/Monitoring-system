@@ -63,7 +63,11 @@ export default {
   },
   methods: {
     goBackToAlarm() {
-      uni.switchTab({
+      if (getCurrentPages().length > 1) {
+        uni.navigateBack()
+        return
+      }
+      uni.navigateTo({
         url: '/pages/manage/realtime/realtime',
       })
     },

@@ -27,8 +27,8 @@ export default {
                 url: "/pages/owner/home/index",
               });
             } else {
-              uni.reLaunch({
-                url: "/pages/manage/realtime/realtime",
+              uni.switchTab({
+                url: "/pages/manage/monitor/index",
               });
             }
           } else if (res.type === "receive") {
@@ -81,8 +81,8 @@ export default {
       websocket.connect(userId);
     }
 
-    uni.reLaunch({
-      url: "/pages/manage/dateWatcher/dateWatcher",
+    uni.switchTab({
+      url: "/pages/manage/controls/controls",
     });
   },
   onShow: function () {

@@ -94,6 +94,12 @@ let resizeObserver: ResizeObserver | null = null;
 let lastMotionKey = '';
 let greetingAudio: HTMLAudioElement | null = null;
 
+const handleWindowResize = (): void => {
+  if (renderMode.value === 'live2d') {
+    syncLive2DLayout();
+  }
+};
+
 const stopGreetingAudio = (): void => {
   if (greetingAudio) {
     greetingAudio.pause();
@@ -377,6 +383,9 @@ const initLive2D = async (): Promise<void> => {
     runtimeNotice.value = '';
 
     syncLive2DLayout();
+    window.requestAnimationFrame(() => {
+      syncLive2DLayout();
+    });
     startLipSyncLoop();
     await playLive2DMotionForStatus(props.status);
 
@@ -505,10 +514,12 @@ watch(
 );
 
 onMounted(() => {
+  window.addEventListener('resize', handleWindowResize);
   void initViewport();
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleWindowResize);
   destroyLive2D();
   stopGreetingAudio();
   if ('speechSynthesis' in window) {

@@ -232,13 +232,13 @@ onBeforeUnmount(() => {
     radial-gradient(circle at 84% 74%, rgba(83, 213, 165, 0.12), transparent 28%),
     linear-gradient(180deg, rgba(8, 28, 51, 0.97), rgba(7, 20, 38, 0.92));
   position: relative;
-  min-height: 0;
+  min-height: 100%;
   height: 100%;
 }
 
 .stage-shell {
   position: relative;
-  min-height: clamp(25.5rem, 49vh, 33rem);
+  min-height: 100%;
   height: 100%;
   border-radius: 28px;
   overflow: hidden;
@@ -247,6 +247,10 @@ onBeforeUnmount(() => {
   box-shadow:
     inset 0 0 0 1px rgba(126, 197, 255, 0.07),
     0 24px 48px rgba(2, 11, 24, 0.32);
+}
+
+.stage-shell :deep(.digital-human-viewport) {
+  z-index: 5;
 }
 
 .stage-shell::before,
@@ -567,7 +571,7 @@ onBeforeUnmount(() => {
   }
 
   .stage-shell {
-    min-height: 24.8rem;
+    min-height: 24rem;
   }
 
   .agent-copy {
@@ -577,7 +581,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 760px) {
   .stage-shell {
-    min-height: 21rem;
+    min-height: 20rem;
   }
 
   .agent-copy {

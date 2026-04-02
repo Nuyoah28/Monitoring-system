@@ -28,7 +28,7 @@
         </view>
     </view>
 
-    <view class="info-panel">
+    <view class="info-panel" v-if="!compact">
       <view class="point-title">{{ currentPoint.name }} 监控信息</view>
       <view class="point-row">
         <text class="key">状态</text>
@@ -55,6 +55,10 @@ export default {
     monitorList: {
       type: Array,
       default: () => [],
+    },
+    compact: {
+      type: Boolean,
+      default: false,
     },
   },
   data() {

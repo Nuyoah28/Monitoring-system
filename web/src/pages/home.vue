@@ -38,7 +38,7 @@ const goBack = () => {
 }
 
 const goAgent = () => {
-  router.push('/agent')
+  router.push('/visual')
 }
 </script>
 
