@@ -1,65 +1,238 @@
-# 智能监控系统 AI Agent
+# 智行护卫 AI Agent
 
-直接运行agent_api.py文件即可启动agent服务 开放在5000端口
+当前后端已经统一成 `ReAct + Skill Registry` 架构，支持多用户上下文记忆、多线程并发和实时语音链路。
 
-前端悬浮窗可拖动询问 
+## 快速开始
 
-支持实时流式回复
-
-**语音功能**：命令行输入 `v` 可麦克风说话识别后提问；API 提供 `POST /chat/voice` 上传 WAV 或 base64 音频，可选返回 TTS 语音。需安装：`pip install SpeechRecognition sounddevice edge-tts`（见 `requirements.txt`）。
-
-```
+```bash
+cd python_AI_agent
+pip install -r requirements.txt
 python agent_api.py
 ```
 
-LLM 驱动的 Tool-Calling agent
-# 运行流程
-AI先识别问题选择所需的tools和参数，向后端发送请求获取数据，之后根据数据和用户问题给出答案与建议
+默认启动在 `5000` 端口。
 
-# 创新点介绍
-项目创新点
+## 目录说明
 
-本项目面向智慧安防监控场景，设计了一套“规则引导 + 大模型理解 + 工具执行 + 稳定兜底”的智能体架构。与普通问答机器人不同，它不是只做开放式聊天，而是能够真正连接监控系统业务，实现“能理解、能查询、能操作、能连续对话”的闭环服务。
+核心入口：
 
-面向业务闭环的智能体设计
-本项目将告警查询、告警处置、监控点检索、天气查询、检测目标下发等真实业务能力封装为标准化工具，智能体不仅能回答问题，还能直接完成业务操作，实现从“问答”到“执行”的升级。
+- `python_AI_agent/agent_api.py`
+- `python_AI_agent/intelligent_agent.py`
 
-LangGraph 编排的可控智能决策
-项目采用 LangGraph 对智能体流程进行图式编排，将“上下文理解、工具路由、工具执行、结果生成、异常兜底”拆分为独立节点，避免传统单轮大模型调用不稳定、不可控的问题，提升了系统的可解释性与工程可靠性。
+核心流程：
 
-支持上下文记忆与上一轮引用
-系统支持同一用户的短时会话记忆，可理解“那昨天呢”“上一个告警”“把刚才那个标已处理”等连续表达，使交互方式更接近真实助手，提升使用自然度与效率。
+- `python_AI_agent/agent_core/react_agent.py`
+- `python_AI_agent/agent_core/planner.py`
+- `python_AI_agent/agent_core/prompts.py`
+- `python_AI_agent/agent_core/memory.py`
+- `python_AI_agent/agent_core/backend_client.py`
+- `python_AI_agent/agent_core/skill_support.py`
 
-高鲁棒性的多级兜底机制
-当外部大模型服务异常、网络波动或授权失败时，智能体不会直接失效，而是自动切换到本地数据整理、后端知识接口或静态应答模式，保证系统在比赛演示和实际部署中的稳定运行。
+Skill 目录：
 
-面向不同用户的会话隔离
-系统按用户身份构建独立会话上下文，不同用户之间的提问、数据权限和历史状态互不干扰，保证了多用户场景下的安全性与一致性。
+- `python_AI_agent/skills/`
 
-功能介绍
+统一配置：
 
-本项目的智能体是“智行护卫”监控系统中的智能交互中枢，主要具备以下功能：
+- `python_AI_agent/agent_config.json`
+- `python_AI_agent/agent_config.example.json`
 
-智能问答与能力介绍
-能够回答“你是谁”“你能做什么”等系统能力类问题，并引导用户使用监控、告警、天气、检测等功能。
+## 当前能力
 
-告警信息查询与统计
-支持用自然语言查询未处理告警、指定类型告警、指定时间段告警数量及列表，例如“今天有多少条未处理告警”“查看高等级告警”。
+- 告警查询、统计、详情、状态更新
+- 监控点信息与天气查询
+- 检测目标下发
+- 多用户上下文记忆
+- 多线程并发处理
+- 实时语音链路
 
-告警详情查看与状态处置
-支持查询具体告警详情，并可直接执行状态更新操作，例如“查看告警101详情”“把刚才那个标已处理”。
+## 配置说明
 
-监控点信息与天气查询
-支持查询监控点列表、监控点详情、最新天气及历史天气信息，例如“1号监控点最新天气”“那昨天呢”。
+统一配置文件：
 
-上下文连续对话
-能够结合上一轮对话内容自动补全用户意图，减少重复输入，提高交互效率。
+- `python_AI_agent/agent_config.json`
 
-开放世界检测目标下发
-支持通过自然语言更新检测目标，将用户输入转换为后端可执行参数，为智能识别和监测任务提供动态配置能力。
+配置示例：
 
-异常容错与稳定服务
-当大模型不可用时，系统仍可基于本地规则和业务数据提供回答，保证核心功能不中断。
+- `python_AI_agent/agent_config.example.json`
 
-一句话概括
-本项目创新性地将大模型智能体与安防监控业务深度融合，构建了一个“可理解、可执行、可追踪、可兜底”的智慧监控助手。
+### backend
+
+后端接口登录与请求地址：
+
+```json
+{
+  "backend": {
+    "base_url": "http://localhost:10215/api/v1",
+    "username": "root",
+    "password": "123456"
+  }
+}
+```
+
+### runtime
+
+运行期参数：
+
+```json
+{
+  "runtime": {
+    "max_history_messages": 6,
+    "max_alarm_fetch_pages": 30,
+    "alarm_page_size": 100,
+    "memory_ttl_seconds": 7200,
+    "max_agent_workers": 16
+  }
+}
+```
+
+### ai
+
+当前支持两类 provider：
+
+- `spark`
+- `openai_compatible`
+
+腾讯云 DeepSeek 示例：
+
+```json
+{
+  "ai": {
+    "active_provider": "openai_compatible",
+    "providers": {
+      "openai_compatible": {
+        "enabled": true,
+        "type": "openai_compatible",
+        "base_url": "https://api.lkeap.cloud.tencent.com/v1",
+        "api_key": "你的腾讯云 DeepSeek Key",
+        "model": "deepseek-v3.2",
+        "temperature": 0.5,
+        "max_tokens": 2048
+      }
+    }
+  }
+}
+```
+
+可替换模型名示例：
+
+- `deepseek-v3.2`
+- `deepseek-v3.1-terminus`
+- `deepseek-v3-0324`
+- `deepseek-r1-0528`
+
+兼容说明：
+
+- 默认从 `agent_config.json` 读取配置
+- 也可以用环境变量 `AGENT_CONFIG_PATH` 指向另一份配置文件
+- 为兼容旧部署，`AGENT_AI_CONFIG_PATH` 仍可作为旧环境变量别名使用
+
+## 如何更换 AI
+
+主配置文件：
+
+- `python_AI_agent/agent_config.json`
+
+最常改的字段：
+
+- `ai.active_provider`
+- `ai.providers.openai_compatible.base_url`
+- `ai.providers.openai_compatible.api_key`
+- `ai.providers.openai_compatible.model`
+
+## 如何更换系统提示词
+
+系统提示词集中在：
+
+- `python_AI_agent/agent_core/prompts.py`
+
+最常改的是这几个位置：
+
+- `ANSWER_SYSTEM_PROMPT`
+- `TOOL_SELECTION_TEMPLATE`
+- `build_local_capability_answer()`
+
+建议：
+
+- 改回答风格时优先修改 `ANSWER_SYSTEM_PROMPT`
+- 改 tool 选择行为时优先修改 `TOOL_SELECTION_TEMPLATE`
+- 不要在提示词里暴露内部 skill 名给最终用户
+
+## 如何新增 Skill
+
+skill 采用自动发现机制：
+
+- `python_AI_agent/skills/registry.py`
+
+只要在 `skills/` 下新增 Python 文件，并提供 `build_skill()`，系统启动时就会自动加载。
+
+常见新增步骤：
+
+1. 在 `python_AI_agent/agent_core/backend_client.py` 中补后端接口调用
+2. 在 `python_AI_agent/agent_core/skill_support.py` 中补业务整理逻辑
+3. 在 `python_AI_agent/skills/` 下新增 skill 文件
+4. 如果想提高命中率，再去 `python_AI_agent/agent_core/constants.py` 和 `python_AI_agent/agent_core/planner.py` 补规则路由
+
+skill 模板：
+
+```python
+from __future__ import annotations
+
+from skills.base import AgentSkill, SkillRuntime
+
+
+class GetXxxSkill(AgentSkill):
+    name = "get_xxx"
+    description = "查询 xxx 信息。"
+    parameters = {
+        "id": "可选，业务 ID",
+    }
+
+    def run(self, params: dict, runtime: SkillRuntime) -> str:
+        return runtime.support.handle_get_xxx(runtime.request_context, params)
+
+
+def build_skill() -> AgentSkill:
+    return GetXxxSkill()
+```
+
+## 如何删除 Skill
+
+建议按这个顺序处理：
+
+1. 删除 `python_AI_agent/skills/` 下对应的 skill 文件
+2. 删除 `python_AI_agent/agent_core/planner.py` 中对这个 skill 的显式引用
+3. 删除 `python_AI_agent/agent_core/constants.py` 中只服务于这个 skill 的关键词
+4. 视情况删除 `python_AI_agent/agent_core/skill_support.py` 和 `python_AI_agent/agent_core/backend_client.py` 中对应的辅助方法
+
+## 上下文记忆
+
+记忆主要在：
+
+- `python_AI_agent/agent_core/memory.py`
+- `python_AI_agent/agent_core/skill_support.py`
+
+当前机制：
+
+- 按 `user_token` / `conversation_key` 隔离不同用户
+- 保存最近几轮对话和最近一次 skill 状态
+
+因此系统能理解：
+
+- “那昨天呢”
+- “上一个告警”
+- “把刚才那个标已处理”
+
+## 验证方式
+
+语法检查：
+
+```bash
+python -m compileall python_AI_agent
+```
+
+运行后可测试：
+
+- `POST /chat`
+- `POST /chat/stream`
+- `POST /chat/voice`

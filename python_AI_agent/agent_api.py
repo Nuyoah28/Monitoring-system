@@ -3,24 +3,23 @@ Agent API 服务 - 提供HTTP接口供前端或其他服务调用
 可以集成到Spring Boot后端，或作为独立服务运行
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from flask_sock import Sock
 
-try:
-    from langgraph_agent import LangGraphIntelligentAgent as IntelligentAgent
-    AGENT_IMPL_NAME = "langgraph"
-except Exception:
-    from intelligent_agent import IntelligentAgent
-    AGENT_IMPL_NAME = "legacy"
+from agent_core.config import SETTINGS
+from intelligent_agent import IntelligentAgent
 import json
 import hashlib
-import os
 import time
 import traceback
 import threading
 import uuid
 from queue import SimpleQueue
+
+AGENT_IMPL_NAME = "react"
 app = Flask(__name__)
 # 长文本 TTS 音频缓存：id -> mp3_bytes，POST 生成后通过短 URL 播放，避免 GET 长度限制
 _tts_audio_cache = {}
@@ -31,6 +30,10 @@ CORS(app)
 
 # 全局Agent实例
 agent = None
+agent_executor = ThreadPoolExecutor(
+    max_workers=SETTINGS.max_agent_workers,
+    thread_name_prefix="agent-worker",
+)
 
 PUBLIC_AGENT_ERROR_MESSAGE = "抱歉，智能助手暂时不可用，请稍后重试。"
 PUBLIC_VOICE_ERROR_MESSAGE = "抱歉，语音服务暂时不可用，请稍后重试。"
@@ -139,11 +142,12 @@ def chat():
         user_token = _get_user_token(request, data)
         conversation_key = _build_conversation_key(request, user_token)
 
-        response = agent.process_question(
+        response = agent_executor.submit(
+            agent.process_question,
             question,
             user_token=user_token,
-            conversation_key=conversation_key
-        )
+            conversation_key=conversation_key,
+        ).result()
         
         elapsed = time.time() - start_time
         print(f"📤 返回回答 (耗时: {elapsed:.2f}秒): {response[:100]}...")  # 只打印前100字符
@@ -212,14 +216,14 @@ def chat_stream():
                         on_chunk=lambda c: q.put(c),
                         user_token=user_token,
                         conversation_key=conversation_key,
-                        stream_mode='sse'
+                        stream_mode='sse',
                     )
                 except Exception as e:
                     q.put({'type': 'error', 'message': PUBLIC_AGENT_ERROR_MESSAGE})
                 finally:
                     q.put(None)  # 结束标记
 
-            threading.Thread(target=run_agent, daemon=True).start()
+            agent_executor.submit(run_agent)
 
             # 逐条发送chunk
             while True:
@@ -301,11 +305,12 @@ def chat_voice():
 
     conversation_key = _build_conversation_key(request, user_token)
     try:
-        response = agent.process_question(
+        response = agent_executor.submit(
+            agent.process_question,
             question.strip(),
             user_token=user_token,
-            conversation_key=conversation_key
-        )
+            conversation_key=conversation_key,
+        ).result()
     except Exception as e:
         print(f"Voice chat failed: {e}")
         traceback.print_exc()
@@ -444,13 +449,14 @@ def gpt_ws(ws, token):
                 if agent:
                     conversation_key = _build_conversation_key(request, token)
                     # 使用Agent处理，并通过回调发送chunk
-                    agent.process_question(
+                    agent_executor.submit(
+                        agent.process_question,
                         question, 
                         on_chunk=lambda c: ws.send(c),
                         user_token=token,
                         conversation_key=conversation_key,
-                        stream_mode='ws'
-                    )
+                        stream_mode='ws',
+                    ).result()
                 else:
                     ws.send("⚠️ Agent未初始化")
             except Exception as e:

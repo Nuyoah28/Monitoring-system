@@ -1,0 +1,37 @@
+{
+  "backend": {
+    "base_url": "http://localhost:10215/api/v1",
+    "username": "root",
+    "password": "123456"
+  },
+  "runtime": {
+    "max_history_messages": 6,
+    "max_alarm_fetch_pages": 30,
+    "alarm_page_size": 100,
+    "memory_ttl_seconds": 7200,
+    "max_agent_workers": 16
+  },
+  "ai": {
+    "active_provider": "openai_compatible",
+    "providers": {
+      "spark": {
+        "enabled": false,
+        "type": "spark",
+        "app_id": "",
+        "api_key": "",
+        "api_secret": "",
+        "host_url": "https://spark-api.xf-yun.com/v1/x1",
+        "domain": "x1"
+      },
+      "openai_compatible": {
+        "enabled": true,
+        "type": "openai_compatible",
+        "base_url": "https://api.lkeap.cloud.tencent.com/v1",
+        "api_key": "sk-kmMrIiYSFgserbReAxyxAdA92qYuJgJVbtK7FDuq25zESh4Z",
+        "model": "deepseek-v3.2",
+        "temperature": 0.5,
+        "max_tokens": 2048
+      }
+    }
+  }
+}
