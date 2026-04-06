@@ -1,6 +1,9 @@
 <template>
   <view class="env-page" :style="{ paddingTop: statusBarHeight + 'px' }">
     <view class="title-row">
+      <view class="back-btn" @tap="goBack">
+        <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
+      </view>
       <text class="title">环境质量检测</text>
     </view>
 
@@ -60,6 +63,13 @@ export default {
     this.initData();
   },
   methods: {
+    goBack() {
+      if (getCurrentPages().length > 1) {
+        uni.navigateBack();
+      } else {
+        uni.switchTab({ url: '/pages/manage/controls/controls' });
+      }
+    },
     async initData() {
       const { data } = await uni.$http.get('/api/v1/monitor');
       this.monitors = (data && data.data) || [];
@@ -95,6 +105,21 @@ export default {
 
 .title-row {
   margin: 10rpx 0 18rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.back-btn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 32rpx;
+  background: rgba(255, 255, 255, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 20rpx rgba(32, 74, 126, 0.1);
+  flex-shrink: 0;
 }
 
 .title {

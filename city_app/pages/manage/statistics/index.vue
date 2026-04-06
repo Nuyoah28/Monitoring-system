@@ -25,13 +25,34 @@
           </view>
         </view>
 
-        <view class="setting-btn" @click="jump">
-          <u-icon name="setting" color="#666" size="44rpx"></u-icon>
+        <!-- 月份切换 -->
+        <view class="month-picker-btn" @tap="showMonthPicker = true">
+          <text class="month-btn-text">{{ selectedMonth }}月</text>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1470d8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         </view>
       </view>
 
+      <!-- u-picker 隐藏容器 -->
+      <view style="position: absolute; width: 0; height: 0; overflow: hidden;">
+        <u-picker
+          :show="showMonthPicker"
+          :columns="monthColumns"
+          keyName="label"
+          title="选择年月"
+          :showToolbar="true"
+          @confirm="onMonthConfirm"
+          @cancel="showMonthPicker = false"
+        ></u-picker>
+      </view>
+
       <view class="content-scroll-area">
-        <real-time v-if="!(choosen - 1)"></real-time>
+        <real-time
+          v-if="!(choosen - 1)"
+          :year="selectedYear"
+          :month="selectedMonth"
+        ></real-time>
         <history-data v-if="choosen - 1"></history-data>
       </view>
     </view>
@@ -45,12 +66,26 @@ import historyData from '../dateWatcher/historyData.vue'
 export default {
   components: { realTime, historyData },
   data() {
+    const now = new Date();
+    // 生成近 12 个月供选择
+    const yearCols = [];
+    const monthCols = [];
+    for (let y = now.getFullYear() - 1; y <= now.getFullYear(); y++) {
+      yearCols.push({ label: `${y}年`, value: y });
+    }
+    for (let m = 1; m <= 12; m++) {
+      monthCols.push({ label: `${m}月`, value: m });
+    }
     return {
       statusBarHeight: 0,
       choosen: 1,
       isShow: true,
+      showMonthPicker: false,
+      selectedYear: now.getFullYear(),
+      selectedMonth: now.getMonth() + 1,
+      monthColumns: [yearCols, monthCols],
     }
-  },
+  },  
   onLoad() {
     const info = uni.getWindowInfo()
     this.statusBarHeight = info.statusBarHeight || 20
@@ -79,10 +114,10 @@ export default {
       this.choosen = 2
       this.$forceUpdate()
     },
-    jump() {
-      uni.navigateTo({
-        url: '/pages/manage/personal/setting/setting',
-      })
+    onMonthConfirm(e) {
+      this.selectedYear  = e.value[0].value;
+      this.selectedMonth = e.value[1].value;
+      this.showMonthPicker = false;
     },
   },
 }
@@ -176,22 +211,27 @@ export default {
       flex-shrink: 0;
     }
 
-    .setting-btn {
-      width: 60rpx;
-      height: 60rpx;
-      background: rgba(0, 0, 0, 0.05);
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      transition: background 0.2s;
+    .month-picker-btn {
       margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6rpx;
+      background: rgba(20, 112, 216, 0.08);
+      border: 1.5rpx solid rgba(20, 112, 216, 0.2);
+      border-radius: 999rpx;
+      padding: 10rpx 20rpx;
+      transition: all 0.15s;
 
       &:active {
-        background: rgba(0, 0, 0, 0.1);
+        background: rgba(20, 112, 216, 0.15);
+        transform: scale(0.97);
       }
+    }
+
+    .month-btn-text {
+      font-size: 28rpx;
+      font-weight: 700;
+      color: #1470d8;
     }
   }
 

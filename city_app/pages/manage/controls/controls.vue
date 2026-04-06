@@ -1,76 +1,161 @@
 <template>
   <view class="home-page" :style="{ paddingTop: statusBarHeight + 'px' }">
+
+    <!-- ───── Hero ───── -->
     <view class="hero-card">
       <view class="hero-left">
         <view class="hero-title">智慧安防</view>
         <view class="hero-sub">管理端控制台</view>
+        <view class="hero-switch" @tap="jumpSetting">
+          <!-- switch icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 16V4m0 0L3 8m4-4 4 4"/><path d="M17 8v12m0 0 4-4m-4 4-4-4"/>
+          </svg>
+          <text>切换身份</text>
+        </view>
       </view>
-      <view class="hero-badge" @tap="jumpSetting">切换</view>
+      <view class="hero-deco">
+        <!-- shield icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+          <circle cx="40" cy="40" r="40" fill="rgba(20,112,216,0.08)"/>
+          <path d="M40 12 L62 22 L62 42 C62 55 52 64 40 68 C28 64 18 55 18 42 L18 22 Z"
+                fill="rgba(20,112,216,0.12)" stroke="#1470d8" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M31 40 l6 6 12-12" stroke="#1470d8" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </view>
     </view>
 
+    <!-- ───── Quick Grid ───── -->
     <view class="quick-grid">
       <view class="quick-item" @tap="goPage('/pages/manage/statistics/index')">
-        <view class="quick-icon">警</view>
+        <view class="quick-icon quick-icon--red">
+          <!-- bell / alert icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </view>
         <text>警情统计</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/ai/index')">
-        <view class="quick-icon">A</view>
-        <text>AI</text>
+        <view class="quick-icon quick-icon--purple">
+          <!-- sparkles / AI icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </view>
+        <text>AI 助手</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/property/parking/index')">
-        <view class="quick-icon">位</view>
-        <text>车位</text>
+        <view class="quick-icon quick-icon--blue">
+          <!-- parking / car icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/>
+          </svg>
+        </view>
+        <text>车位引导</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/environment/index')">
-        <view class="quick-icon">环</view>
-        <text>环境</text>
+        <view class="quick-icon quick-icon--green">
+          <!-- leaf / environment icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+          </svg>
+        </view>
+        <text>环境检测</text>
       </view>
     </view>
 
+    <!-- ───── Map Card ───── -->
     <view class="section-card map-card" @tap="goPage('/pages/manage/monitor/map')">
       <view class="section-head">
         <text class="section-title">监控地图</text>
-        <text class="map-link">查看摄像头 ></text>
+        <view class="map-link-row">
+          <view class="live-dot"></view>
+          <text class="map-link">实时 · 查看摄像头 ›</text>
+        </view>
       </view>
       <view class="map-wrap">
         <MonitorMap :monitorList="monitorList" :compact="true" />
       </view>
     </view>
 
+    <!-- ───── Alert Card ───── -->
     <view class="section-card alert-card">
       <view class="section-head">
         <text class="section-title">待处理警情</text>
-        <view class="all-link" @tap="goPage('/pages/manage/realtime/realtime')">全部警情 ></view>
+        <view class="all-link" @tap="goPage('/pages/manage/realtime/realtime')">全部警情 ›</view>
       </view>
 
-      <view class="level-overview">
-        <view class="level-box urgent">
-          <text class="level-name">紧急</text>
-          <text class="level-count">{{ levelCount.urgent }}</text>
+      <!-- Level Tabs -->
+      <view class="level-tabs">
+        <view
+          class="level-tab"
+          :class="['level-tab--urgent', activeLevel === 'urgent' ? 'is-active' : '']"
+          @tap="activeLevel = 'urgent'"
+        >
+          <view class="level-tab__inner">
+            <text class="level-tab__label">紧急</text>
+            <view class="level-tab__badge level-tab__badge--urgent" :class="levelCount.urgent > 0 ? 'is-pulse' : ''">
+              {{ levelCount.urgent }}
+            </view>
+          </view>
+          <view class="level-tab__bar level-tab__bar--urgent"></view>
         </view>
-        <view class="level-box serious">
-          <text class="level-name">严重</text>
-          <text class="level-count">{{ levelCount.serious }}</text>
+        <view
+          class="level-tab"
+          :class="['level-tab--serious', activeLevel === 'serious' ? 'is-active' : '']"
+          @tap="activeLevel = 'serious'"
+        >
+          <view class="level-tab__inner">
+            <text class="level-tab__label">严重</text>
+            <view class="level-tab__badge level-tab__badge--serious">{{ levelCount.serious }}</view>
+          </view>
+          <view class="level-tab__bar level-tab__bar--serious"></view>
         </view>
-        <view class="level-box normal">
-          <text class="level-name">一般</text>
-          <text class="level-count">{{ levelCount.normal }}</text>
+        <view
+          class="level-tab"
+          :class="['level-tab--normal', activeLevel === 'normal' ? 'is-active' : '']"
+          @tap="activeLevel = 'normal'"
+        >
+          <view class="level-tab__inner">
+            <text class="level-tab__label">一般</text>
+            <view class="level-tab__badge level-tab__badge--normal">{{ levelCount.normal }}</view>
+          </view>
+          <view class="level-tab__bar level-tab__bar--normal"></view>
         </view>
       </view>
 
+      <!-- Alert List -->
       <view class="alert-list">
-        <view class="alert-item" v-for="item in displayAlerts" :key="item.id" @tap="goDetail(item.id)">
-          <view class="dot" :class="levelClass(item)"></view>
+        <view
+          class="alert-item"
+          :class="'alert-item--' + levelClass(item)"
+          v-for="item in displayAlerts"
+          :key="item.id"
+          @tap="goDetail(item.id)"
+        >
+          <view class="alert-stripe" :class="'alert-stripe--' + levelClass(item)"></view>
           <view class="alert-main">
             <view class="alert-title-row">
               <text class="alert-title">{{ item.eventName || item.name || '未知警情' }}</text>
-              <text class="level-tag" :class="levelClass(item)">{{ levelText(item) }}</text>
+              <view class="level-tag" :class="'level-tag--' + levelClass(item)">{{ levelText(item) }}</view>
             </view>
-            <view class="alert-meta">{{ item.department || '-' }} · {{ item.date || '-' }}</view>
+            <view class="alert-meta">
+              <text>{{ item.department || '-' }}</text>
+              <text class="meta-dot">·</text>
+              <text>{{ item.date || '-' }}</text>
+            </view>
           </view>
+          <view class="alert-arrow">›</view>
         </view>
 
-        <view class="empty" v-if="!displayAlerts.length">暂无待处理警情</view>
+        <view class="empty" v-if="!displayAlerts.length">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#b0bec5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <text>暂无待处理警情</text>
+        </view>
       </view>
     </view>
   </view>
@@ -86,21 +171,29 @@ export default {
       statusBarHeight: 0,
       monitorList: [],
       alarms: [],
+      activeLevel: 'urgent',
     };
   },
   computed: {
-    displayAlerts() {
-      return this.alarms.slice(0, 10);
-    },
     levelCount() {
       const data = { urgent: 0, serious: 0, normal: 0 };
-      this.displayAlerts.forEach((item) => {
+      this.alarms.forEach((item) => {
         const level = Number(item.level) || 3;
         if (level <= 1) data.urgent += 1;
         else if (level === 2) data.serious += 1;
         else data.normal += 1;
       });
       return data;
+    },
+    displayAlerts() {
+      return this.alarms
+        .filter((item) => {
+          const level = Number(item.level) || 3;
+          if (this.activeLevel === 'urgent') return level <= 1;
+          if (this.activeLevel === 'serious') return level === 2;
+          return level >= 3;
+        })
+        .slice(0, 10);
     },
   },
   onLoad() {
@@ -130,7 +223,7 @@ export default {
       const range = this.buildTodayRange();
       const query = {
         pageNum: 1,
-        pageSize: 10,
+        pageSize: 50,
         status: 0,
         startTime: range.startTime,
         endTime: range.endTime,
@@ -153,14 +246,10 @@ export default {
     },
     goDetail(id) {
       if (!id) return;
-      uni.navigateTo({
-        url: `/pages/manage/realtime/detail?id=${id}`,
-      });
+      uni.navigateTo({ url: `/pages/manage/realtime/detail?id=${id}` });
     },
     jumpSetting() {
-      uni.navigateTo({
-        url: "/pages/manage/personal/setting/setting",
-      });
+      uni.navigateTo({ url: "/pages/manage/personal/setting/setting" });
     },
     goPage(url) {
       if (url === "/pages/manage/monitor/index") {
@@ -174,91 +263,156 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+// ─── 全局背景 ───
 .home-page {
   min-height: 100vh;
   box-sizing: border-box;
   padding: 0 24rpx 140rpx;
-  background: linear-gradient(180deg, #eaf5ff 0%, #f7fbff 100%);
+  background: linear-gradient(170deg, #e8f4ff 0%, #f0f8ff 50%, #f7fbff 100%);
 }
 
+// ─── Hero Card ───
 .hero-card {
   margin-top: 10rpx;
   border-radius: 28rpx;
-  background: linear-gradient(120deg, #f9fcff 0%, #ddeeff 100%);
-  padding: 26rpx;
+  background: linear-gradient(130deg, #ffffff 0%, #d6ecff 60%, #c2dfff 100%);
+  padding: 28rpx 28rpx 24rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 10rpx 28rpx rgba(64, 124, 192, 0.14);
+  box-shadow: 0 8rpx 32rpx rgba(20, 112, 216, 0.13), 0 2rpx 8rpx rgba(20, 112, 216, 0.06);
+  border: 1rpx solid rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+  position: relative;
+
+  // 顶部装饰光晕
+  &::before {
+    content: '';
+    position: absolute;
+    top: -30rpx;
+    right: 80rpx;
+    width: 200rpx;
+    height: 200rpx;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(20, 112, 216, 0.08) 0%, transparent 70%);
+  }
+}
+
+.hero-left {
+  flex: 1;
+  z-index: 1;
 }
 
 .hero-title {
-  color: #1470d8;
-  font-size: 54rpx;
+  font-size: 56rpx;
   font-weight: 900;
-  line-height: 1.05;
+  line-height: 1.1;
+  // 渐变文字
+  background: linear-gradient(120deg, #0e5fc8 0%, #38a4ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .hero-sub {
-  margin-top: 10rpx;
-  color: #315c86;
-  font-size: 26rpx;
+  margin-top: 6rpx;
+  color: #4a7da8;
+  font-size: 25rpx;
   font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
-.hero-badge {
-  color: #1e81e9;
-  font-size: 26rpx;
-  font-weight: 700;
+.hero-switch {
+  margin-top: 18rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  background: rgba(20, 112, 216, 0.1);
+  border: 1rpx solid rgba(20, 112, 216, 0.2);
+  border-radius: 999rpx;
+  padding: 8rpx 20rpx;
+  color: #1470d8;
+
+  text {
+    font-size: 24rpx;
+    font-weight: 700;
+    color: #1470d8;
+  }
 }
 
+.hero-deco {
+  width: 90rpx;
+  height: 90rpx;
+  flex-shrink: 0;
+  z-index: 1;
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// ─── Quick Grid ───
 .quick-grid {
   margin-top: 20rpx;
-  background: #ecf6ff;
+  background: rgba(236, 246, 255, 0.7);
   border-radius: 24rpx;
-  padding: 18rpx;
+  padding: 16rpx;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14rpx;
+  gap: 12rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4rpx 16rpx rgba(40, 91, 150, 0.07);
 }
 
 .quick-item {
-  background: #f9fcff;
+  background: #ffffff;
   border-radius: 18rpx;
-  height: 142rpx;
+  height: 148rpx;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 8rpx 20rpx rgba(52, 117, 185, 0.1);
+  box-shadow: 0 4rpx 16rpx rgba(52, 117, 185, 0.08);
+  border: 1rpx solid rgba(200, 225, 248, 0.6);
+  transition: all 0.15s;
+
+  &:active {
+    transform: scale(0.96);
+    box-shadow: 0 2rpx 8rpx rgba(52, 117, 185, 0.06);
+  }
 
   text {
-    margin-top: 10rpx;
-    color: #27486a;
-    font-size: 26rpx;
+    margin-top: 12rpx;
+    color: #2c4a68;
+    font-size: 24rpx;
     font-weight: 700;
   }
 }
 
 .quick-icon {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(140deg, #38b6ff 0%, #187cff 100%);
-  color: #fff;
-  font-size: 30rpx;
-  font-weight: 800;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 18rpx;
   display: flex;
   justify-content: center;
   align-items: center;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.12);
+
+  &--red    { background: linear-gradient(140deg, #ff6b6b 0%, #ef4444 100%); }
+  &--purple { background: linear-gradient(140deg, #a78bfa 0%, #7c3aed 100%); }
+  &--blue   { background: linear-gradient(140deg, #38b6ff 0%, #0e6ecf 100%); }
+  &--green  { background: linear-gradient(140deg, #34d399 0%, #059669 100%); }
 }
 
+// ─── Section Card ───
 .section-card {
   margin-top: 18rpx;
   border-radius: 24rpx;
-  background: #f8fbff;
-  box-shadow: 0 10rpx 24rpx rgba(40, 91, 150, 0.1);
-  padding: 20rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 24rpx rgba(40, 91, 150, 0.08);
+  padding: 22rpx;
+  border: 1rpx solid rgba(210, 230, 248, 0.5);
 }
 
 .section-head {
@@ -268,91 +422,184 @@ export default {
 }
 
 .section-title {
-  color: #1e2d3d;
-  font-size: 36rpx;
+  color: #1a2d42;
+  font-size: 34rpx;
   font-weight: 800;
 }
 
+// ─── Map Card ───
 .map-wrap {
-  margin-top: 12rpx;
+  margin-top: 14rpx;
   height: 330rpx;
-  border-radius: 18rpx;
+  border-radius: 16rpx;
   overflow: hidden;
 }
 
+.map-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.live-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%   { box-shadow: 0 0 0 0    rgba(34, 197, 94, 0.45); }
+  70%  { box-shadow: 0 0 0 8rpx rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0    rgba(34, 197, 94, 0); }
+}
+
 .map-link {
-  color: #7f8da3;
+  color: #22c55e;
   font-size: 24rpx;
   font-weight: 700;
 }
 
 .all-link {
-  color: #7f8da3;
-  font-size: 28rpx;
-  font-weight: 700;
-}
-
-.level-overview {
-  margin-top: 14rpx;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12rpx;
-}
-
-.level-box {
-  border-radius: 16rpx;
-  background: #f3f7fd;
-  padding: 14rpx 10rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.level-name {
+  color: #1470d8;
   font-size: 26rpx;
-  color: #34485f;
   font-weight: 700;
 }
 
-.level-count {
-  font-size: 30rpx;
-  font-weight: 900;
+// ─── Level Tabs ───
+.level-tabs {
+  margin-top: 18rpx;
+  display: flex;
+  gap: 14rpx;
 }
 
-.level-box.urgent .level-count { color: #ef4444; }
-.level-box.serious .level-count { color: #f59e0b; }
-.level-box.normal .level-count { color: #22c55e; }
+.level-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14rpx 8rpx 10rpx;
+  border-radius: 16rpx;
+  border: 1.5rpx solid transparent;
+  background: #f4f8fd;
+  transition: all 0.2s;
+  gap: 8rpx;
 
-.level-tag.urgent,
-.dot.urgent { background-color: #ef4444; }
+  &:active { transform: scale(0.97); }
+}
 
-.level-tag.serious,
-.dot.serious { background-color: #f59e0b; }
+.level-tab__inner {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
 
-.level-tag.normal,
-.dot.normal { background-color: #22c55e; }
+.level-tab__label {
+  font-size: 27rpx;
+  font-weight: 700;
+  color: #7a8da3;
+}
 
+.level-tab__badge {
+  min-width: 36rpx;
+  height: 36rpx;
+  border-radius: 999rpx;
+  padding: 0 10rpx;
+  font-size: 22rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+
+  &--urgent  { background: #ef4444; }
+  &--serious { background: #f59e0b; }
+  &--normal  { background: #22c55e; }
+
+  // 有警情时的脉冲
+  &.is-pulse {
+    animation: badge-pulse 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.15); }
+}
+
+.level-tab__bar {
+  width: 56rpx;
+  height: 5rpx;
+  border-radius: 999rpx;
+  opacity: 0.3;
+  transition: opacity 0.2s;
+  &--urgent  { background: #ef4444; }
+  &--serious { background: #f59e0b; }
+  &--normal  { background: #22c55e; }
+}
+
+// Active state
+.level-tab--urgent.is-active {
+  border-color: rgba(239, 68, 68, 0.25);
+  background: #fff5f5;
+  .level-tab__label { color: #ef4444; }
+  .level-tab__bar--urgent { opacity: 1; }
+}
+.level-tab--serious.is-active {
+  border-color: rgba(245, 158, 11, 0.25);
+  background: #fffbf0;
+  .level-tab__label { color: #d97706; }
+  .level-tab__bar--serious { opacity: 1; }
+}
+.level-tab--normal.is-active {
+  border-color: rgba(34, 197, 94, 0.25);
+  background: #f0fff4;
+  .level-tab__label { color: #16a34a; }
+  .level-tab__bar--normal { opacity: 1; }
+}
+
+// ─── Alert List ───
 .alert-list {
-  margin-top: 12rpx;
+  margin-top: 14rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
 }
 
 .alert-item {
-  border-top: 1px solid #e8edf5;
-  padding: 14rpx 4rpx;
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
+  border-radius: 14rpx;
+  overflow: hidden;
+  background: #f8fbff;
+  border: 1rpx solid #e8edf8;
+  box-shadow: 0 2rpx 8rpx rgba(40, 91, 150, 0.05);
+  transition: all 0.15s;
+
+  &:active {
+    transform: scale(0.985);
+    box-shadow: 0 1rpx 4rpx rgba(40, 91, 150, 0.04);
+  }
+
+  &--urgent  { background: #fff8f8; border-color: rgba(239, 68, 68, 0.12); }
+  &--serious { background: #fffcf5; border-color: rgba(245, 158, 11, 0.12); }
+  &--normal  { background: #f8fff9; border-color: rgba(34, 197, 94, 0.12); }
 }
 
-.dot {
-  margin-top: 14rpx;
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 7rpx;
-  margin-right: 12rpx;
+.alert-stripe {
+  width: 6rpx;
+  flex-shrink: 0;
+  border-radius: 0;
+  &--urgent  { background: #ef4444; }
+  &--serious { background: #f59e0b; }
+  &--normal  { background: #22c55e; }
 }
 
 .alert-main {
   flex: 1;
+  padding: 16rpx 14rpx;
 }
 
 .alert-title-row {
@@ -362,30 +609,57 @@ export default {
 }
 
 .alert-title {
-  color: #1f2d3c;
-  font-size: 29rpx;
+  color: #1a2d42;
+  font-size: 28rpx;
   font-weight: 700;
+  flex: 1;
   padding-right: 10rpx;
 }
 
 .level-tag {
-  font-size: 22rpx;
-  font-weight: 700;
+  font-size: 20rpx;
+  font-weight: 800;
   border-radius: 999rpx;
-  padding: 4rpx 12rpx;
-  color: #fff;
+  padding: 4rpx 14rpx;
+  flex-shrink: 0;
+
+  &--urgent  { background: rgba(239, 68, 68,  0.1); color: #ef4444; }
+  &--serious { background: rgba(245, 158, 11, 0.1); color: #d97706; }
+  &--normal  { background: rgba(34, 197, 94,  0.1); color: #16a34a; }
 }
 
 .alert-meta {
   margin-top: 6rpx;
-  color: #7f8da3;
-  font-size: 23rpx;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  color: #8a9db8;
+  font-size: 22rpx;
 }
 
+.meta-dot {
+  color: #b8c8d8;
+}
+
+.alert-arrow {
+  display: flex;
+  align-items: center;
+  padding: 0 16rpx 0 4rpx;
+  color: #b8c8d8;
+  font-size: 32rpx;
+}
+
+// ─── Empty ───
 .empty {
-  text-align: center;
-  color: #96a5b8;
-  font-size: 24rpx;
-  padding: 20rpx 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+  padding: 40rpx 0;
+
+  text {
+    color: #a0b0c4;
+    font-size: 26rpx;
+  }
 }
 </style>

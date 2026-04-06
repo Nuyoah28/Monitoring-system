@@ -2,6 +2,9 @@
 	<view class="main" :class="{ 'drawer-open': showSessionList, 'owner-app': isOwnerApp }" :style="{ minHeight: safeHeight + 'px', paddingTop: statusBarHeight + 'px', '--status-bar-height': statusBarHeight + 'px' }">
 		<view class="header">
 			<view class="topNav">
+				<view class="back-btn" @tap="goBack">
+					<u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
+				</view>
 				<view class="choosen" @tap="toggleSessionList">
 					<image class="session-tag" src="/static/messagelist.png"></image>
 				</view>
@@ -161,6 +164,14 @@ import Vue from 'vue';
 			},
 		},
 		methods:{
+			goBack() {
+				if (getCurrentPages().length > 1) {
+					uni.navigateBack();
+				} else {
+					// Fallback to home if directly opened
+					uni.switchTab({ url: '/pages/manage/controls/controls' });
+				}
+			},
 			loadSessionCache() {
 				try {
 					const cache = uni.getStorageSync('aiSessionCache');
@@ -649,6 +660,20 @@ import Vue from 'vue';
 				margin-bottom: 8rpx;
 
 				.topNav {
+					display: flex;
+					align-items: center;
+					gap: 16rpx;
+					.back-btn {
+						background: rgba(255, 255, 255, 0.7);
+						border: 1px solid rgba(0, 122, 255, 0.15);
+						width: 66rpx;
+						height: 66rpx;
+						border-radius: 18rpx;
+						box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.08);
+						display: flex;
+						align-items: center;
+						justify-content: center;
+					}
 					.choosen {
 						position: relative;
 						z-index: 1200;
