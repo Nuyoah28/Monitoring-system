@@ -133,9 +133,9 @@ custom_val_dataset = dict(
     dataset=dict(
         type='YOLOv5CocoDataset',
         metainfo=metainfo,
-        data_root='data/custom_finetune/',
+        # data_root='data/custom_finetune/',
         test_mode=True,
-        ann_file='annotations/instances_val.json',
+        # ann_file='annotations/instances_val.json',
         data_prefix=dict(img='images/val/'),
         batch_shapes_cfg=None,
         return_classes=True,
@@ -152,10 +152,10 @@ val_dataloader = dict(dataset=custom_val_dataset,
 test_dataloader = val_dataloader
 
 # 评估器
-val_evaluator = dict(type='mmdet.CocoMetric',
-                     ann_file='data/custom_finetune/annotations/instances_val.json',
-                     metric='bbox',
-                     classwise=True)         # 开启详细分类评估，显示Recall/Precision明细
+# val_evaluator = dict(type='mmdet.CocoMetric',
+#                      ann_file='data/custom_finetune/annotations/instances_val.json',
+#                      metric='bbox',
+#                      classwise=True)         # 开启详细分类评估，显示Recall/Precision明细
 test_evaluator = val_evaluator
 
 # ======================================================================
