@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from agent_core.context import RequestContext
 from agent_core.react_agent import ReactIntelligentAgent
 from agent_core.utils import is_non_retryable_spark_error
 
@@ -9,7 +8,6 @@ IntelligentAgent = ReactIntelligentAgent
 __all__ = [
     "IntelligentAgent",
     "ReactIntelligentAgent",
-    "RequestContext",
     "is_non_retryable_spark_error",
 ]
 

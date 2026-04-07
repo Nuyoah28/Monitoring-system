@@ -29,6 +29,14 @@
                   <option value="pending">未处理</option>
                   <option value="done">已处理</option>
                 </select>
+                <button class="mini-action chart-mini-action" type="button" @click="activeTab = 'video'">
+                  <span class="mini-icon video-icon" aria-hidden="true"></span>
+                  <span>联动视频</span>
+                </button>
+                <button class="mini-action chart-mini-action" type="button" @click="activeTab = 'agent'">
+                  <span class="mini-icon agent-icon" aria-hidden="true"></span>
+                  <span>交给 Agent</span>
+                </button>
               </div>
             </div>
             <div class="table-wrap detail-table-wrap">
@@ -56,7 +64,7 @@
           </div>
 
           <div class="alarm-right">
-            <article class="card">
+            <article class="card chart-card">
               <div class="panel-headline small">
                 <h3>告警统计</h3>
                 <span>处理率 {{ alarmCompletionRate }}%</span>
@@ -79,13 +87,24 @@
             <article class="card">
               <div class="panel-headline small">
                 <h3>类别图表</h3>
-                <div class="quick-actions">
-                  <button class="mini-action" type="button" @click="activeTab = 'video'">联动视频</button>
-                  <button class="mini-action" type="button" @click="activeTab = 'agent'">交给 Agent</button>
+                <div class="chart-filter">
+                  <span>时间段</span>
+                  <select v-model="chartTimeRange">
+                    <option value="day">今日</option>
+                    <option value="week">近7天</option>
+                    <option value="month">近30天</option>
+                  </select>
                 </div>
               </div>
               <div class="chart-panel">
-                <PieChart1 />
+                <div class="chart-item">
+                  <h4>报警类别分布</h4>
+                  <PieChart1 />
+                </div>
+                <div class="chart-item">
+                  <h4>报警趋势</h4>
+                  <LineChart />
+                </div>
               </div>
             </article>
 
@@ -132,7 +151,7 @@
           <article class="card video-side">
             <h3>点位地图联动</h3>
             <div class="map-square">
-              <MapPanZoom :points="mapPoints" @point-click="onMapPointClick" />
+              <AMapLinkage3D :points="mapPoints" @point-click="onMapPointClick" />
             </div>
             <div class="video-stats-grid">
               <div class="mini-kpi"><span>在线</span><strong>{{ onlineCount }}</strong></div>
@@ -144,56 +163,91 @@
         </section>
 
         <section v-show="activeTab === 'env'" class="panel env-panel">
-          <article class="card env-chart-card">
-            <h3>环境质量折线图</h3>
-            <div class="chart-wrap tall">
-              <svg width="100%" height="220" viewBox="0 0 300 220" preserveAspectRatio="none" aria-label="天气质量指标折线图">
-                <polyline points="18,176 55,162 92,145 129,136 166,126 203,110 240,102 278,96" fill="none" stroke="#63b8ff" stroke-width="2.7" />
-                <polyline points="18,168 55,165 92,156 129,145 166,136 203,131 240,122 278,114" fill="none" stroke="#53d5a5" stroke-width="2.7" />
-                <polyline points="18,160 55,150 92,147 129,155 166,148 203,142 240,134 278,126" fill="none" stroke="#f8cb71" stroke-width="2.7" />
-                <line x1="18" y1="186" x2="282" y2="186" stroke="rgba(168,198,232,0.6)" stroke-width="1" />
-                <line x1="18" y1="52" x2="18" y2="186" stroke="rgba(168,198,232,0.6)" stroke-width="1" />
-              </svg>
-              <div class="legend">
-                <span><i class="dot" style="background:#63b8ff;"></i>AQI</span>
-                <span><i class="dot" style="background:#53d5a5;"></i>湿度</span>
-                <span><i class="dot" style="background:#f8cb71;"></i>PM2.5</span>
+          <article v-for="metric in envTrendMetrics" :key="metric.key" class="card env-metric-card">
+            <div class="panel-headline small env-metric-head">
+              <h3>{{ metric.label }}趋势</h3>
+              <div v-if="metric.key === 'aqi'" class="chart-filter">
+                <span>时间段</span>
+                <select v-model="envTrendRange">
+                  <option value="day">今日</option>
+                  <option value="week">近7天</option>
+                  <option value="month">近30天</option>
+                </select>
               </div>
+              <span v-else>{{ metric.unit }}</span>
+            </div>
+            <div class="env-trend-item single">
+              <svg
+                class="env-trend-svg"
+                viewBox="0 0 360 156"
+                preserveAspectRatio="none"
+                :aria-label="`${metric.label} 折线图`"
+              >
+                <line x1="40" y1="128" x2="344" y2="128" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
+                <line x1="40" y1="16" x2="40" y2="128" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
+                <line
+                  v-for="tick in envTrendCharts[metric.key].yTicks"
+                  :key="`${metric.key}-y-${tick.value}`"
+                  x1="40"
+                  :y1="tick.y"
+                  x2="344"
+                  :y2="tick.y"
+                  stroke="rgba(168,198,232,0.16)"
+                  stroke-width="1"
+                />
+                <text
+                  v-for="tick in envTrendCharts[metric.key].yTicks"
+                  :key="`${metric.key}-yl-${tick.value}`"
+                  x="34"
+                  :y="tick.y + 4"
+                  text-anchor="end"
+                  fill="rgba(214, 230, 255, 0.86)"
+                  font-size="10"
+                >
+                  {{ tick.value }}
+                </text>
+                <text
+                  v-for="tick in envTrendCharts[metric.key].xTicks"
+                  :key="`${metric.key}-x-${tick.label}`"
+                  :x="tick.x"
+                  y="144"
+                  text-anchor="middle"
+                  fill="rgba(214, 230, 255, 0.78)"
+                  font-size="10"
+                >
+                  {{ tick.label }}
+                </text>
+                <path :d="envTrendCharts[metric.key].areaPath" :fill="metric.areaColor" />
+                <polyline
+                  :points="envTrendCharts[metric.key].points"
+                  fill="none"
+                  :stroke="metric.color"
+                  stroke-width="2.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle
+                  v-for="(dot, idx) in envTrendCharts[metric.key].dots"
+                  :key="`${metric.key}-dot-${idx}`"
+                  :cx="dot.x"
+                  :cy="dot.y"
+                  r="2.6"
+                  :fill="metric.color"
+                  stroke="rgba(255,255,255,0.82)"
+                  stroke-width="0.8"
+                />
+              </svg>
             </div>
           </article>
 
           <article class="card env-slot-card">
-            <h3>车位占用环比</h3>
+            <h3>车位占用数据</h3>
             <div class="bar-grid">
               <div class="bar-row" v-for="item in parkingBars" :key="item.name">
                 <span>{{ item.name }}</span>
                 <div class="bar"><i :style="{ width: `${item.percent}%` }"></i></div>
                 <strong>{{ item.value }}</strong>
               </div>
-            </div>
-          </article>
-
-          <article class="card env-table-card">
-            <h3>环境与车位数据表</h3>
-            <div class="table-wrap">
-              <table class="info-table">
-                <thead>
-                  <tr>
-                    <th>监测项</th>
-                    <th>当前值</th>
-                    <th>阈值</th>
-                    <th>状态</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="item in envRows" :key="item.name">
-                    <td>{{ item.name }}</td>
-                    <td>{{ item.value }}</td>
-                    <td>{{ item.limit }}</td>
-                    <td><span class="state-chip" :class="item.state === '正常' ? 'done' : 'pending'">{{ item.state }}</span></td>
-                  </tr>
-                </tbody>
-              </table>
             </div>
           </article>
         </section>
@@ -393,7 +447,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch
 import { useRouter } from 'vue-router'
 import DashboardLayout from '@/components/DashboardLayout.vue'
 import PieChart1 from '@/components/piechart1.vue'
-import MapPanZoom from '@/components/MapPanZoom.vue'
+import LineChart from '@/components/LineChart.vue'
+import AMapLinkage3D from '@/components/AMapLinkage3D.vue'
 import VirtualAgentStage from '@/components/VirtualAgentStage.vue'
 import ChatPanel from '@/components/chat_panel.vue'
 import axios from 'axios'
@@ -418,6 +473,8 @@ interface MapPointItem {
   camera: string
   className: string
   streamUrl?: string
+  longitude?: number
+  latitude?: number
   style?: {
     left?: string
     top?: string
@@ -563,6 +620,7 @@ const alarmTableRows = computed(() => {
 
 const alarmKeyword = ref('')
 const alarmDealFilter = ref<'all' | 'pending' | 'done'>('all')
+const chartTimeRange = ref<'day' | 'week' | 'month'>('week')
 
 const filteredAlarmRows = computed(() => {
   const keyword = alarmKeyword.value.toLowerCase()
@@ -629,20 +687,121 @@ const severityText = (level: number) => {
   return '低'
 }
 
-const envRows = ref([
-  { name: 'AQI', value: '72', limit: '<100', state: '正常' },
-  { name: 'PM2.5', value: '48', limit: '<75', state: '正常' },
-  { name: '湿度', value: '58%', limit: '40%-70%', state: '正常' },
-  { name: '噪声', value: '62dB', limit: '<70dB', state: '正常' },
-  { name: '地面西侧余位', value: '9', limit: '>15', state: '偏低' },
-])
-
 const parkingBars = ref([
   { name: '地库A区', value: 38, percent: 78 },
   { name: '地库B区', value: 21, percent: 52 },
   { name: '地面东侧', value: 15, percent: 46 },
   { name: '地面西侧', value: 9, percent: 28 },
 ])
+
+const envTrendRange = ref<'day' | 'week' | 'month'>('week')
+
+const envTrendMetrics = [
+  { key: 'aqi', label: 'AQI', unit: '指数', color: '#63b8ff', areaColor: 'rgba(99,184,255,0.22)' },
+  { key: 'humidity', label: '湿度', unit: '%', color: '#53d5a5', areaColor: 'rgba(83,213,165,0.20)' },
+  { key: 'pm25', label: 'PM2.5', unit: 'ug/m3', color: '#f8cb71', areaColor: 'rgba(248,203,113,0.18)' },
+] as const
+
+type EnvMetricKey = typeof envTrendMetrics[number]['key']
+
+interface EnvPoint {
+  label: string
+  aqi: number
+  humidity: number
+  pm25: number
+}
+
+const envTrendData: Record<'day' | 'week' | 'month', EnvPoint[]> = {
+  day: [
+    { label: '00:00', aqi: 74, humidity: 61, pm25: 46 },
+    { label: '04:00', aqi: 78, humidity: 64, pm25: 49 },
+    { label: '08:00', aqi: 71, humidity: 59, pm25: 44 },
+    { label: '12:00', aqi: 83, humidity: 55, pm25: 53 },
+    { label: '16:00', aqi: 88, humidity: 52, pm25: 58 },
+    { label: '20:00', aqi: 79, humidity: 57, pm25: 50 },
+    { label: '24:00', aqi: 73, humidity: 60, pm25: 45 },
+  ],
+  week: [
+    { label: '周一', aqi: 76, humidity: 62, pm25: 47 },
+    { label: '周二', aqi: 82, humidity: 59, pm25: 52 },
+    { label: '周三', aqi: 78, humidity: 57, pm25: 49 },
+    { label: '周四', aqi: 86, humidity: 55, pm25: 56 },
+    { label: '周五', aqi: 81, humidity: 58, pm25: 51 },
+    { label: '周六', aqi: 74, humidity: 63, pm25: 45 },
+    { label: '周日', aqi: 72, humidity: 64, pm25: 43 },
+  ],
+  month: [
+    { label: '4/01', aqi: 79, humidity: 60, pm25: 51 },
+    { label: '4/05', aqi: 75, humidity: 62, pm25: 47 },
+    { label: '4/10', aqi: 83, humidity: 58, pm25: 55 },
+    { label: '4/15', aqi: 88, humidity: 54, pm25: 60 },
+    { label: '4/20', aqi: 80, humidity: 57, pm25: 52 },
+    { label: '4/25', aqi: 73, humidity: 63, pm25: 44 },
+    { label: '4/30', aqi: 77, humidity: 61, pm25: 48 },
+  ],
+}
+
+const envTrendSeries = computed(() => envTrendData[envTrendRange.value])
+
+interface TrendTick {
+  value: number
+  y: number
+}
+
+interface TrendXTick {
+  label: string
+  x: number
+}
+
+interface TrendRenderData {
+  points: string
+  areaPath: string
+  dots: Array<{ x: number; y: number }>
+  yTicks: TrendTick[]
+  xTicks: TrendXTick[]
+}
+
+const buildTrendRender = (metric: EnvMetricKey): TrendRenderData => {
+  const series = envTrendSeries.value
+  const left = 40
+  const right = 344
+  const top = 16
+  const bottom = 128
+  const width = right - left
+  const height = bottom - top
+  const values = series.map(item => item[metric])
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const diff = Math.max(max - min, 1)
+  const pad = Math.max(Math.round(diff * 0.2), 2)
+  const yMin = Math.max(min - pad, 0)
+  const yMax = max + pad
+  const yDiff = Math.max(yMax - yMin, 1)
+  const stepX = series.length > 1 ? width / (series.length - 1) : 0
+
+  const dots = series.map((item, idx) => {
+    const x = left + idx * stepX
+    const y = bottom - ((item[metric] - yMin) / yDiff) * height
+    return { x, y }
+  })
+
+  const points = dots.map(dot => `${dot.x},${dot.y}`).join(' ')
+  const areaPath = `${points} ${right},${bottom} ${left},${bottom}`
+  const yTicks = Array.from({ length: 5 }, (_, idx) => {
+    const ratio = idx / 4
+    const value = Math.round(yMax - ratio * yDiff)
+    return { value, y: top + ratio * height }
+  })
+  const xTicks = series.map((item, idx) => ({ label: item.label, x: left + idx * stepX }))
+
+  return { points, areaPath: `M ${areaPath} Z`, dots, yTicks, xTicks }
+}
+
+const envTrendCharts = computed<Record<EnvMetricKey, TrendRenderData>>(() => ({
+  aqi: buildTrendRender('aqi'),
+  humidity: buildTrendRender('humidity'),
+  pm25: buildTrendRender('pm25'),
+}))
 
 const onlineCount = computed(() => monitors.value.filter(item => item.status === 1 || item.status === 'online').length)
 const offlineCount = computed(() => Math.max(monitors.value.length - onlineCount.value, 0))
@@ -912,6 +1071,8 @@ const fetchMonitors = async () => {
         })(),
         title: item.location || item.name,
         className: `p${(idx % 3) + 1}`,
+        longitude: item.longitude,
+        latitude: item.latitude,
         style: item.longitude !== undefined && item.latitude !== undefined
           ? { left: `${item.longitude}%`, top: `${item.latitude}%` }
           : undefined,
@@ -1092,6 +1253,12 @@ watch(
 )
 
 watch(activeTab, (tab) => {
+  if (tab === 'alarm') {
+    nextTick(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+  }
+
   if (tab === 'agent') {
     agentStageKey.value += 1
     nextTick(() => {
@@ -1226,6 +1393,76 @@ watch(activeTab, (tab) => {
   gap: 6px;
 }
 
+.chart-actions {
+  gap: 10px;
+}
+
+.chart-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sub);
+  font-size: 12px;
+}
+
+.chart-filter select {
+  border: 1px solid rgba(126, 197, 255, 0.32);
+  border-radius: 6px;
+  background: rgba(17, 47, 75, 0.66);
+  color: #eaf6ff;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.chart-mini-action {
+  min-width: 108px;
+  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  border-radius: 999px;
+}
+
+.mini-icon {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1px solid rgba(126, 197, 255, 0.55);
+  background: radial-gradient(circle at 35% 30%, rgba(126, 197, 255, 0.55), rgba(35, 85, 126, 0.78));
+  position: relative;
+  flex: 0 0 17px;
+}
+
+.video-icon::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid rgba(233, 246, 255, 0.95);
+}
+
+.agent-icon::before,
+.agent-icon::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(233, 246, 255, 0.95);
+}
+
+.agent-icon::before {
+  left: 4px;
+  box-shadow: 5px 0 0 rgba(233, 246, 255, 0.95), 10px 0 0 rgba(233, 246, 255, 0.95);
+}
+
 .mini-action {
   border: 1px solid rgba(126, 197, 255, 0.32);
   border-radius: 999px;
@@ -1238,7 +1475,9 @@ watch(activeTab, (tab) => {
 
 .table-filters {
   display: flex;
-  gap: 6px;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .table-filters input {
@@ -1297,7 +1536,46 @@ watch(activeTab, (tab) => {
 }
 
 .chart-panel {
-  min-height: 210px;
+  min-height: 230px;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 12px;
+}
+
+.chart-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chart-card .chart-panel {
+  flex: 1;
+}
+
+.chart-item {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+}
+
+.chart-item h4 {
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.chart-item :deep(.pie-panel),
+.chart-item :deep(.line-panel) {
+  height: 100%;
+  min-height: 0;
+}
+
+.chart-item :deep(.chart) {
+  height: 100% !important;
+  width: 100%;
 }
 
 .panel-headline {
@@ -1379,9 +1657,10 @@ watch(activeTab, (tab) => {
 .map-square {
   border: 1px dashed rgba(107, 176, 255, 0.55);
   border-radius: 8px;
-  padding: 8px;
+  padding: 0;
   background: linear-gradient(145deg, rgba(30, 67, 105, 0.86), rgba(22, 51, 83, 0.92));
   min-height: 280px;
+  overflow: hidden;
 }
 
 .video-stats-grid {
@@ -1412,24 +1691,23 @@ watch(activeTab, (tab) => {
 
 .env-panel {
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  grid-template-rows: auto 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.env-chart-card {
-  grid-column: 1 / 2;
-  grid-row: 1 / 3;
-}
-
 .env-slot-card {
-  grid-column: 2 / 3;
-  grid-row: 1 / 2;
+  min-height: 0;
 }
 
-.env-table-card {
-  grid-column: 2 / 3;
-  grid-row: 2 / 3;
+.env-metric-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+}
+
+.env-metric-head {
+  margin-bottom: 4px;
 }
 
 .chart-wrap {
@@ -1439,8 +1717,43 @@ watch(activeTab, (tab) => {
   padding: 8px;
 }
 
-.chart-wrap.tall {
-  min-height: 320px;
+.env-trend-item {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(12, 40, 68, 0.48);
+  padding: 6px 8px 4px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+}
+
+.env-trend-item.single {
+  height: 100%;
+}
+
+.env-trend-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.env-trend-title span {
+  font-size: 12px;
+  color: #d6ecff;
+  font-weight: 600;
+}
+
+.env-trend-title em {
+  font-style: normal;
+  font-size: 11px;
+  color: rgba(214, 230, 255, 0.72);
+}
+
+.env-trend-svg {
+  width: 100%;
+  height: 100%;
+  min-height: 72px;
 }
 
 .legend {

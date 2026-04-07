@@ -41,11 +41,11 @@ const initChart = (): void => {
                 show: true,
                 top: 6,
                 left: 6,
-                itemWidth: 8,
-                itemHeight: 8,
+                itemWidth: 12,
+                itemHeight: 12,
                 textStyle: {
                     color: '#d6e6ff',
-                    fontSize: 10,
+                    fontSize: 12,
                 },
                 formatter: (name: string) => name,
             },
@@ -53,12 +53,12 @@ const initChart = (): void => {
                 {
                     name: '危险警报',
                     type: 'pie',
-                    radius: ['45%', '70%'],
-                     center: ['42%', '55%'],
+                    radius: ['50%', '65%'],
+                    center: ['32%', '50%'],
                     avoidLabelOverlap: false,
-                    padAngle: 6,
+                    padAngle: 7,
                     itemStyle: {
-                        borderRadius: 10,
+                        borderRadius: 14,
                     },
                     label: {
                         show: false,
@@ -164,10 +164,11 @@ onUnmounted(() => {
 <style scoped>
 .pie-panel {
   width: 100%;
+  height: 100%;
 }
 
 .chart {
   width: 100%;
-  height: 220px;
+  height: 100%;
 }
 </style>

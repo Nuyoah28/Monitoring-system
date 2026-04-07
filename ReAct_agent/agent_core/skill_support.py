@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any, Optional, Sequence
 
 from agent_core import formatters
-from agent_core.config import AgentSettings
-from agent_core.context import RequestContext
+from agent_core.config.settings import AgentSettings
+from agent_core.core.context import RequestContext
 from agent_core.intent_utils import extract_alarm_id
-from agent_core.memory import ConversationMemoryStore
+from agent_core.memory.store import ConversationMemoryStore
 from agent_core.utils import extract_time_range, in_time_range, normalize_text, safe_int
 
 

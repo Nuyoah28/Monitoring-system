@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from flask_sock import Sock
 
-from agent_core.config import SETTINGS
+from agent_core.config.settings import SETTINGS
 from intelligent_agent import IntelligentAgent
 import json
 import hashlib

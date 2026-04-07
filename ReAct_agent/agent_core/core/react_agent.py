@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable, Optional
 
 from agent_core.backend_client import BackendClient
-from agent_core.config import SETTINGS, AgentSettings
-from agent_core.context import RequestContext
+from agent_core.config.settings import SETTINGS, AgentSettings
+from agent_core.core.catalog import ToolCatalog
+from agent_core.core.context import RequestContext
+from agent_core.core.planner import ToolPlanner
 from agent_core.llm_client import create_llm_client
-from agent_core.memory import ConversationMemoryStore
-from agent_core.planner import SkillPlanner
+from agent_core.memory.store import ConversationMemoryStore
 from agent_core.prompts import (
     build_data_fallback_answer,
     build_final_answer_prompt,
@@ -16,8 +18,8 @@ from agent_core.prompts import (
     is_local_capability_question,
 )
 from agent_core.skill_support import SkillSupport
+from agent_core.tools.gateway import ToolGateway
 from agent_core.utils import build_conversation_key
-from skills import SkillRegistry, SkillRuntime
 
 
 class ReactIntelligentAgent:
@@ -28,45 +30,46 @@ class ReactIntelligentAgent:
             username=settings.backend_username,
             password=settings.backend_password,
         )
+        self.tools = ToolGateway(self.backend)
         self.ai_client = create_llm_client(settings)
         self.memory_store = ConversationMemoryStore(
             history_limit=settings.max_history_messages,
             ttl_seconds=settings.memory_ttl_seconds,
         )
-        self.support = SkillSupport(self.backend, self.memory_store, settings)
-        self.skill_registry = SkillRegistry.discover()
-        self.planner = SkillPlanner(self.ai_client, self.skill_registry, self.support)
+        self.support = SkillSupport(self.tools, self.memory_store, settings)
+
+        skills_dir = Path(__file__).resolve().parent.parent.parent / "skills"
+        self.tool_catalog = ToolCatalog.discover(skills_dir)
+        self.planner = ToolPlanner(self.ai_client, self.tool_catalog, self.support)
 
     def _default_conversation_key(self, user_token: Optional[str]) -> str:
         return build_conversation_key(user_token)
 
     def _get_history(self, conversation_key: str) -> list[dict[str, str]]:
-        return self.memory_store.get_history(conversation_key)
+        return self.memory_store.get_history(
+            conversation_key,
+            top_k=self.settings.memory_vector_top_k,
+        )
 
     def _append_history(self, conversation_key: str, question: str, answer: str) -> None:
         self.memory_store.append_turn(conversation_key, question, answer)
 
-    def _execute_skill_calls(
+    def _execute_tool_calls(
         self,
-        skill_calls: list[tuple[str, dict]],
+        tool_calls: list[tuple[str, dict]],
         request_context: RequestContext,
     ) -> list[str]:
-        runtime = SkillRuntime(
-            request_context=request_context,
-            backend=self.backend,
-            support=self.support,
-        )
         observations: list[str] = []
-        for skill_name, params in skill_calls:
-            skill = self.skill_registry.get(skill_name)
-            if skill is None:
+        for tool_name, params in tool_calls:
+            tool_spec = self.tool_catalog.get(tool_name)
+            if tool_spec is None:
                 continue
             try:
-                result = skill.run(params or {}, runtime)
+                result = self.tools.execute(tool_name, params or {}, self.support, request_context)
                 if result:
                     observations.append(result)
             except Exception as exc:
-                print(f"Skill execution failed: {skill_name}: {exc}")
+                print(f"Tool execution failed: {tool_name}: {exc}")
                 observations.append("相关系统查询失败，请稍后重试。")
         return observations
 
@@ -111,7 +114,7 @@ class ReactIntelligentAgent:
             return fallback
 
         try:
-            cbs_answer = self.backend.chat_cbs(
+            cbs_answer = self.tools.chat_cbs(
                 question,
                 user_token=user_token,
                 conversation_key=conversation_key,
@@ -157,11 +160,15 @@ class ReactIntelligentAgent:
             self._append_history(conversation_key, question, answer)
             return answer
 
-        skill_calls, skip_primary_ai = self.planner.plan(question, request_context)
-        observations = self._execute_skill_calls(skill_calls, request_context)
+        tool_calls, skip_primary_ai = self.planner.plan(question, request_context)
+        observations = self._execute_tool_calls(tool_calls, request_context)
         data_summary = "\n\n".join(observations)
         final_prompt = build_final_answer_prompt(question, data_summary)
-        history = self._get_history(conversation_key)
+        history = self.memory_store.get_history(
+            conversation_key,
+            query=question,
+            top_k=self.settings.memory_vector_top_k,
+        )
 
         answer = self._generate_answer_with_fallback(
             question=question,

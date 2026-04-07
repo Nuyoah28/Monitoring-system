@@ -13,7 +13,7 @@ from urllib.parse import quote, urlparse
 
 import requests
 
-from agent_core.config import AgentSettings
+from agent_core.config.settings import AgentSettings
 from agent_core.utils import is_non_retryable_spark_error
 
 try:
