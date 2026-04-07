@@ -67,6 +67,23 @@ def _resolve_int(
         return default
 
 
+def _resolve_bool(
+    dotenv_values: dict[str, str],
+    env_name: str,
+    file_value: Any,
+    default: bool,
+) -> bool:
+    value = _resolve_value(dotenv_values, env_name, file_value, default)
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
 @dataclass(frozen=True)
 class AgentSettings:
     config_path: str
@@ -87,9 +104,16 @@ class AgentSettings:
     max_alarm_fetch_pages: int
     alarm_page_size: int
     memory_db_path: str
+    log_dir: str
     memory_ttl_seconds: int
     memory_vector_top_k: int
     max_agent_workers: int
+    qq_gateway_enabled: bool
+    qq_gateway_verify_token: str
+    qq_api_base_url: str
+    qq_api_access_token: str
+    qq_group_require_at: bool
+    qq_request_timeout_seconds: int
 
 
 def load_settings() -> AgentSettings:
@@ -97,6 +121,7 @@ def load_settings() -> AgentSettings:
     default_config_path = str(base_dir / "agent_config.json")
     default_dotenv_path = str(base_dir / ".env")
     default_memory_db_path = str(base_dir / "db" / "memory_vectors.db")
+    default_log_dir = str(base_dir / "log")
 
     config_path = os.getenv("AGENT_CONFIG_PATH") or os.getenv("AGENT_AI_CONFIG_PATH") or default_config_path
     dotenv_path = os.getenv("AGENT_DOTENV_PATH") or default_dotenv_path
@@ -107,6 +132,8 @@ def load_settings() -> AgentSettings:
     backend_config = _dict_value(file_config.get("backend"))
     runtime_config = _dict_value(file_config.get("runtime"))
     ai_config = _dict_value(file_config.get("ai"))
+    gateway_config = _dict_value(file_config.get("gateway"))
+    qq_config = _dict_value(gateway_config.get("qq"))
 
     if not ai_config and {"active_provider", "providers"} <= set(file_config.keys()):
         ai_config = {
@@ -155,9 +182,16 @@ def load_settings() -> AgentSettings:
         max_alarm_fetch_pages=_resolve_int(dotenv_values, "AGENT_MAX_ALARM_FETCH_PAGES", runtime_config.get("max_alarm_fetch_pages"), 30),
         alarm_page_size=_resolve_int(dotenv_values, "AGENT_ALARM_PAGE_SIZE", runtime_config.get("alarm_page_size"), 100),
         memory_db_path=str(_resolve_value(dotenv_values, "AGENT_MEMORY_DB_PATH", runtime_config.get("memory_db_path"), default_memory_db_path)),
+        log_dir=str(_resolve_value(dotenv_values, "AGENT_LOG_DIR", runtime_config.get("log_dir"), default_log_dir)),
         memory_ttl_seconds=_resolve_int(dotenv_values, "AGENT_MEMORY_TTL_SECONDS", runtime_config.get("memory_ttl_seconds"), 7200),
         memory_vector_top_k=max(1, _resolve_int(dotenv_values, "AGENT_MEMORY_VECTOR_TOP_K", runtime_config.get("memory_vector_top_k"), 4)),
         max_agent_workers=max(4, _resolve_int(dotenv_values, "AGENT_MAX_WORKERS", runtime_config.get("max_agent_workers"), 16)),
+        qq_gateway_enabled=_resolve_bool(dotenv_values, "AGENT_QQ_GATEWAY_ENABLED", qq_config.get("enabled"), False),
+        qq_gateway_verify_token=str(_resolve_value(dotenv_values, "AGENT_QQ_GATEWAY_VERIFY_TOKEN", qq_config.get("verify_token"), "")),
+        qq_api_base_url=str(_resolve_value(dotenv_values, "AGENT_QQ_API_BASE_URL", qq_config.get("api_base_url"), "http://127.0.0.1:5700")).rstrip("/"),
+        qq_api_access_token=str(_resolve_value(dotenv_values, "AGENT_QQ_API_ACCESS_TOKEN", qq_config.get("access_token"), "")),
+        qq_group_require_at=_resolve_bool(dotenv_values, "AGENT_QQ_GROUP_REQUIRE_AT", qq_config.get("group_require_at"), True),
+        qq_request_timeout_seconds=max(3, _resolve_int(dotenv_values, "AGENT_QQ_REQUEST_TIMEOUT_SECONDS", qq_config.get("request_timeout_seconds"), 8)),
     )
 
 

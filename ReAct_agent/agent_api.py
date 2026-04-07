@@ -10,6 +10,7 @@ from flask_cors import CORS
 from flask_sock import Sock
 
 from agent_core.config.settings import SETTINGS
+from gateway import create_qq_gateway_blueprint
 from intelligent_agent import IntelligentAgent
 import json
 import hashlib
@@ -34,6 +35,7 @@ agent_executor = ThreadPoolExecutor(
     max_workers=SETTINGS.max_agent_workers,
     thread_name_prefix="agent-worker",
 )
+app.register_blueprint(create_qq_gateway_blueprint(lambda: agent, agent_executor, SETTINGS))
 
 PUBLIC_AGENT_ERROR_MESSAGE = "抱歉，智能助手暂时不可用，请稍后重试。"
 PUBLIC_VOICE_ERROR_MESSAGE = "抱歉，语音服务暂时不可用，请稍后重试。"

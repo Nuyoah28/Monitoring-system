@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Callable, Optional, cast
+from urllib.parse import quote
+
+import requests
 
 from agent_core.backend_client import BackendClient
 from agent_core.tools.alarm_tool import AlarmTool
@@ -85,7 +88,78 @@ class ToolGateway:
         )
 
     def execute(self, tool_name: str, params: dict[str, Any], support: Any, request_context: Any) -> str:
+        if tool_name == "web_access":
+            return self.web_access(params)
         handler = getattr(support, f"handle_{tool_name}", None)
         if not callable(handler):
             return ""
-        return handler(request_context, params)
+        handler_fn = cast(Callable[[Any, dict[str, Any]], Any], handler)
+        result = handler_fn(request_context, params)
+        return result if isinstance(result, str) else str(result or "")
+
+    def web_access(self, params: dict[str, Any]) -> str:
+        action = str(params.get("action") or "search").strip().lower()
+        query = str(params.get("query") or "").strip()
+        url = str(params.get("url") or "").strip()
+
+        if action == "fetch":
+            if not url:
+                return "web_access 需要 url 参数用于 fetch。"
+            if not url.startswith(("http://", "https://")):
+                url = f"https://{url}"
+            try:
+                response = requests.get(
+                    url,
+                    timeout=15,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/124.0.0.0 Safari/537.36"
+                        )
+                    },
+                )
+                response.raise_for_status()
+                text = response.text.strip().replace("\r\n", "\n")
+                if len(text) > 12000:
+                    text = text[:12000] + "\n...(内容已截断)"
+                return f"网页抓取结果（{url}）：\n{text}"
+            except requests.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status == 403:
+                    return self._fetch_via_jina_or_hint(url)
+                raise
+            except Exception:
+                return self._fetch_via_jina_or_hint(url)
+
+        if not query:
+            return "web_access 需要 query 参数用于 search。"
+        search_url = f"https://duckduckgo.com/?q={quote(query)}"
+        return (
+            "web_access 已构建联网检索入口。\n"
+            f"建议访问：{search_url}\n"
+            "如需直接抓取，请改用 action=fetch 并提供 url。"
+        )
+
+    def _fetch_via_jina_or_hint(self, url: str) -> str:
+        try:
+            jina_url = "https://r.jina.ai/http://" + url.replace("https://", "").replace("http://", "")
+            response = requests.get(jina_url, timeout=20)
+            response.raise_for_status()
+            text = response.text.strip().replace("\r\n", "\n")
+            if len(text) > 12000:
+                text = text[:12000] + "\n...(内容已截断)"
+            return (
+                f"网页直连被拦截（403），已使用 Jina 代理获取内容。\n"
+                f"原始URL：{url}\n"
+                f"代理URL：{jina_url}\n\n"
+                f"{text}"
+            )
+        except Exception:
+            return (
+                "联网访问失败：目标网站可能开启了反爬策略（如 403）。\n"
+                f"目标URL：{url}\n"
+                "建议：\n"
+                "1) 使用浏览器/CDP 模式访问后再提取内容。\n"
+                "2) 或让我先尝试搜索该网页标题再汇总公开摘要。"
+            )

@@ -1,3 +1,3 @@
-from agent_core.memory.store import ConversationMemory, ConversationMemoryStore
+from agent_core.memory.store import ConversationMemoryStore
 
-__all__ = ["ConversationMemory", "ConversationMemoryStore"]
+__all__ = ["ConversationMemoryStore"]

@@ -8,6 +8,7 @@ from agent_core.config.settings import SETTINGS, AgentSettings
 from agent_core.core.catalog import ToolCatalog
 from agent_core.core.context import RequestContext
 from agent_core.core.planner import ToolPlanner
+from agent_core.core.session_logger import SessionLogger
 from agent_core.llm_client import create_llm_client
 from agent_core.memory.store import ConversationMemoryStore
 from agent_core.prompts import (
@@ -38,6 +39,7 @@ class ReactIntelligentAgent:
             db_path=settings.memory_db_path,
         )
         self.support = SkillSupport(self.tools, self.memory_store, settings)
+        self.session_logger = SessionLogger(settings.log_dir)
 
         skills_dir = Path(__file__).resolve().parent.parent.parent / "skills"
         self.tool_catalog = ToolCatalog.discover(skills_dir)
@@ -69,12 +71,37 @@ class ReactIntelligentAgent:
             try:
                 if on_event:
                     on_event("using_tools", f"using tool `{tool_name}` from {tool_spec.source_file}")
+                self.session_logger.log(
+                    request_context.conversation_key,
+                    "tool_call",
+                    {
+                        "tool": tool_name,
+                        "params": params or {},
+                        "source": tool_spec.source_file,
+                    },
+                )
                 result = self.tools.execute(tool_name, params or {}, self.support, request_context)
                 if result:
                     observations.append(result)
+                self.session_logger.log(
+                    request_context.conversation_key,
+                    "tool_result",
+                    {
+                        "tool": tool_name,
+                        "result": result,
+                    },
+                )
             except Exception as exc:
                 print(f"Tool execution failed: {tool_name}: {exc}")
                 observations.append("相关系统查询失败，请稍后重试。")
+                self.session_logger.log(
+                    request_context.conversation_key,
+                    "tool_error",
+                    {
+                        "tool": tool_name,
+                        "error": str(exc),
+                    },
+                )
         return observations
 
     def _generate_answer_with_fallback(
@@ -155,6 +182,15 @@ class ReactIntelligentAgent:
         if on_event:
             on_event("reading", "reading question and loading context")
 
+        self.session_logger.log(
+            conversation_key,
+            "question",
+            {
+                "question": question,
+                "user_token_present": bool(user_token),
+            },
+        )
+
         print(f"\n用户问题: {question}")
         if on_chunk and stream_mode == "ws":
             on_chunk("正在分析您的问题...\n\n")
@@ -166,7 +202,12 @@ class ReactIntelligentAgent:
                     on_chunk("[REPLACE]")
                 on_chunk(answer)
             self._append_history(conversation_key, question, answer)
+            if on_event:
+                on_event("done", "done")
             return answer
+
+        if on_event:
+            on_event("searching_skills", "searching skill catalog")
 
         tool_calls, skip_primary_ai = self.planner.plan(question, request_context)
         if on_event:
@@ -198,6 +239,15 @@ class ReactIntelligentAgent:
             stream_mode=stream_mode,
         )
         self._append_history(conversation_key, question, answer)
+        self.session_logger.log(
+            conversation_key,
+            "answer",
+            {
+                "answer": answer,
+                "tool_calls": [name for name, _ in tool_calls],
+                "observation_count": len(observations),
+            },
+        )
         if on_event:
             on_event("done", "done")
         return answer

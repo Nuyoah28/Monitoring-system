@@ -66,7 +66,7 @@ def format_alarm_items(
 
     total = total_count if total_count is not None else len(alarms)
     lines = [f"{title}：共 {total} 条。", ""]
-    for index, alarm in enumerate(alarms[:10], start=1):
+    for index, alarm in enumerate(alarms, start=1):
         lines.append(
             f"{index}. ID {alarm.get('id', '-')}"
             f" | 事件 {alarm.get('eventName', '未知')}"
@@ -78,8 +78,6 @@ def format_alarm_items(
         )
         if alarm.get("content"):
             lines.append(f"   处置说明：{alarm.get('content')}")
-    if total > 10:
-        lines.append(f"... 其余 {total - 10} 条未展开。")
     return "\n".join(lines)
 
 
@@ -113,7 +111,7 @@ def format_alarm_history(history_data: Optional[dict], defer: int) -> str:
         if not graph:
             continue
         lines.append(f"{title}：")
-        for item in graph[:12]:
+        for item in graph:
             lines.append(f"- {item.get('period', '未知')}: {item.get('cnt', 0)}")
         lines.append("")
     return "\n".join(lines).strip()
@@ -157,15 +155,13 @@ def format_weather_data(monitor: Optional[dict], data, *, single: bool) -> str:
         )
 
     lines = [f"{monitor_label}历史天气记录：共 {len(data)} 条。", ""]
-    for index, item in enumerate(data[:10], start=1):
+    for index, item in enumerate(data, start=1):
         lines.append(
             f"{index}. 温度 {item.get('temperature', '未知')}℃"
             f" | 湿度 {item.get('humidity', '未知')}%"
             f" | 天气 {item.get('weather', '未知')}"
             f" | 时间 {item.get('createTime', '未知')}"
         )
-    if len(data) > 10:
-        lines.append(f"... 其余 {len(data) - 10} 条未展开。")
     return "\n".join(lines)
 
 
@@ -174,7 +170,7 @@ def format_monitor_list(monitor_list: Sequence[dict]) -> str:
         return "暂无监控点数据。"
 
     lines = [f"监控点列表：共 {len(monitor_list)} 个。", ""]
-    for index, monitor in enumerate(monitor_list[:10], start=1):
+    for index, monitor in enumerate(monitor_list, start=1):
         lines.append(
             f"{index}. {monitor.get('name', '未知')} (ID {monitor.get('id', '-')})"
             f" | 区域 {monitor.get('department', '未知')}"
@@ -185,8 +181,6 @@ def format_monitor_list(monitor_list: Sequence[dict]) -> str:
         abilities = monitor_abilities(monitor)
         if abilities:
             lines.append(f"   已开能力：{'、'.join(abilities)}")
-    if len(monitor_list) > 10:
-        lines.append(f"... 其余 {len(monitor_list) - 10} 个未展开。")
     return "\n".join(lines)
 
 

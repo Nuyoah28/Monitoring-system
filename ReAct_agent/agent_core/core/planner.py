@@ -160,6 +160,10 @@ class ToolPlanner:
             tool_calls.append(("get_alarm_detail", {"alarm_id": alarm_id}))
 
         weather_requested = contains_any(question, WEATHER_KEYWORDS)
+        web_requested = contains_any(
+            question,
+            ["网页", "网站", "联网", "搜索", "上网", "浏览器", "网址", "http", "https", "web"],
+        )
         alarm_requested = contains_any(question, ALARM_KEYWORDS)
         monitor_requested = contains_any(question, MONITOR_KEYWORDS)
         count_requested = contains_any(question, COUNT_KEYWORDS)
@@ -212,7 +216,7 @@ class ToolPlanner:
                             "case_types": case_types,
                             "status": status,
                             "warning_levels": warning_levels,
-                            "page_size": 10,
+                            "page_size": 200,
                             "time_text": time_text,
                         },
                     )
@@ -232,6 +236,22 @@ class ToolPlanner:
                 )
             elif list_requested or contains_any(question, MONITOR_LIST_KEYWORDS):
                 tool_calls.append(("get_monitor_list", {}))
+
+        if web_requested and self.tool_catalog.get("web_access"):
+            url_match = re.search(r"https?://[^\s]+", question)
+            if url_match:
+                tool_calls.append(
+                    (
+                        "web_access",
+                        {
+                            "action": "fetch",
+                            "url": url_match.group(0),
+                            "query": question,
+                        },
+                    )
+                )
+            else:
+                tool_calls.append(("web_access", {"action": "search", "query": question}))
 
         return tool_calls
 

@@ -13,6 +13,12 @@ ANSWER_SYSTEM_PROMPT = """你是“智行护卫”监控系统里的智能助手
 4. 回答用中文，风格专业、清晰、简洁，尽量先给结论，再给建议。
 5. 如果用户在问系统能力，可以结合监控、告警、天气、检测目标下发等模块来回答。"""
 
+WEB_FAILURE_HINT = """
+如果工具结果中出现“联网访问失败”“403”“反爬”“Jina 代理”等描述，
+不要说“超出系统范围”或“系统不支持网页任务”。
+应明确说明：这是外部站点访问限制导致抓取失败，建议改用浏览器/CDP模式或更换访问方式。
+"""
+
 TOOL_SELECTION_TEMPLATE = """你是监控系统的工具规划助手。请根据用户问题，只输出 JSON，不要输出其他解释。
 
 输出规则：
@@ -27,6 +33,7 @@ TOOL_SELECTION_TEMPLATE = """你是监控系统的工具规划助手。请根据
 - 监控点优先传 monitor_name，只有明确给出数字 ID 时才传 monitor_id。
 - 如果用户明确要求设置检测目标，请调用 update_detection_prompts。
 - 如果用户明确要求修改告警处理状态，请调用 update_alarm_status。
+- 如果用户要求联网搜索、网页访问或URL抓取，优先调用 web_access。
 
 工具列表：
 {skills_desc}
@@ -45,6 +52,7 @@ def build_final_answer_prompt(question: str, data_summary: str) -> str:
     if data_summary:
         return (
             f"{ANSWER_SYSTEM_PROMPT}\n\n"
+            f"{WEB_FAILURE_HINT}\n\n"
             f"用户问题：{question}\n\n"
             f"系统数据：\n{data_summary}\n\n"
             "请基于这些系统数据回答用户，并在必要时给出简短处置建议。"

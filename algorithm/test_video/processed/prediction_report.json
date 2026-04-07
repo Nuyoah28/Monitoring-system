@@ -1,14 +1,14 @@
 {
   "input_dir": "/home/Documents/Monitoring-system/algorithm/test_video/raw",
   "output_dir": "/home/Documents/Monitoring-system/algorithm/test_video/processed",
-  "video_count": 2,
+  "video_count": 3,
   "results": [
     {
       "video": "/home/Documents/Monitoring-system/algorithm/test_video/raw/ebike.mp4",
       "status": "ok",
       "total_frames": 441,
       "processed_frames": 441,
-      "elapsed_sec": 74.55,
+      "elapsed_sec": 47.669,
       "output_video": "/home/Documents/Monitoring-system/algorithm/test_video/processed/ebike_pred.mp4",
       "warning_hits": {
         "danger_zone": 0,
@@ -30,8 +30,30 @@
       "status": "ok",
       "total_frames": 1011,
       "processed_frames": 1011,
-      "elapsed_sec": 84.204,
+      "elapsed_sec": 82.108,
       "output_video": "/home/Documents/Monitoring-system/algorithm/test_video/processed/fire_pred.mp4",
+      "warning_hits": {
+        "danger_zone": 0,
+        "smoke": 0,
+        "area_loitering": 0,
+        "fall": 0,
+        "fire": 0,
+        "smoking": 0,
+        "punch": 0,
+        "garbage": 0,
+        "ice": 0,
+        "ebike": 0,
+        "vehicle": 0,
+        "wave": 0
+      }
+    },
+    {
+      "video": "/home/Documents/Monitoring-system/algorithm/test_video/raw/rubbish.mp4",
+      "status": "ok",
+      "total_frames": 614,
+      "processed_frames": 614,
+      "elapsed_sec": 50.117,
+      "output_video": "/home/Documents/Monitoring-system/algorithm/test_video/processed/rubbish_pred.mp4",
       "warning_hits": {
         "danger_zone": 0,
         "smoke": 0,

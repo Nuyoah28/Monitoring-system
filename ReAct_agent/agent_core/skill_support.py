@@ -225,7 +225,6 @@ class SkillSupport:
         case_types = self._normalize_int_list(params.get("case_types"))
         warning_levels = self._normalize_int_list(params.get("warning_levels"))
         status = safe_int(params.get("status"))
-        page_size = safe_int(params.get("page_size"), 10) or 10
         start_time, end_time = self.extract_time_window(params)
 
         alarms = self.query_alarm_union(
@@ -236,14 +235,19 @@ class SkillSupport:
             start_time=start_time,
             end_time=end_time,
         )
+
+        requested_page_size = safe_int(params.get("page_size"))
+        page_size = requested_page_size if requested_page_size and requested_page_size > 0 else len(alarms)
+        selected_alarms = alarms[:page_size] if page_size else alarms
+
         self.remember_tool_state(
             request_context,
             "get_alarm_list",
             params,
-            alarm_ids=[alarm.get("id") for alarm in alarms[:page_size]],
+            alarm_ids=[alarm.get("id") for alarm in selected_alarms],
         )
         return formatters.format_alarm_items(
-            alarms[:page_size],
+            selected_alarms,
             title="告警列表",
             total_count=len(alarms),
         )

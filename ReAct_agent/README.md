@@ -2,6 +2,44 @@
 
 当前后端已经统一成 `ReAct + Skill Registry` 架构，支持多用户上下文记忆、多线程并发和实时语音链路。
 
+## 网关层（QQ）
+
+新增了可选的网关层，支持仿 OpenClaw 风格将外部 IM 消息转为 Agent 请求。
+
+当前已提供 QQ 网关 webhook：
+
+- `POST /gateway/qq/webhook`
+- `GET /gateway/qq/ping`
+
+当接入 OneBot/CQHTTP 等 QQ 机器人平台时，可将事件回调到该 webhook。
+
+### QQ 网关配置（.env）
+
+```env
+AGENT_QQ_GATEWAY_ENABLED=false
+AGENT_QQ_GATEWAY_VERIFY_TOKEN=
+AGENT_QQ_API_BASE_URL=http://127.0.0.1:5700
+AGENT_QQ_API_ACCESS_TOKEN=
+AGENT_QQ_GROUP_REQUIRE_AT=true
+AGENT_QQ_REQUEST_TIMEOUT_SECONDS=8
+```
+
+说明：
+
+- 开启网关：`AGENT_QQ_GATEWAY_ENABLED=true`
+- 若配置了 `AGENT_QQ_GATEWAY_VERIFY_TOKEN`，请求需带 `X-QQ-Token`。
+- 群聊默认要求 `@机器人` 才处理，避免刷屏。
+
+### 事件处理流程
+
+1. 接收 QQ webhook 事件。
+2. 解析 `message_type`、`raw_message`、`user_id`、`group_id`。
+3. 生成会话 key（群和私聊隔离）。
+4. 调用 Agent 执行。
+5. 回调 QQ API 发送回复：
+   - 群聊 `send_group_msg`
+   - 私聊 `send_private_msg`
+
 ## 快速开始
 
 ```bash
@@ -11,6 +49,11 @@ python agent_api.py
 ```
 
 默认启动在 `5000` 端口。
+
+## cli启动 
+```bash
+python cli.py
+```
 
 ## 目录说明
 

@@ -16,11 +16,22 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _event_logger(verbose: bool):
+    stage_label_map = {
+        "start": "启动",
+        "reading": "读取问题",
+        "searching_skills": "搜索 skills",
+        "planning": "规划调用",
+        "using_tools": "使用工具",
+        "thinking": "模型思考",
+        "done": "完成",
+    }
+
     def _log(stage: str, message: str) -> None:
         if not verbose:
             return
         now = time.strftime("%H:%M:%S")
-        print(f"[{now}] {stage}: {message}")
+        label = stage_label_map.get(stage, stage)
+        print(f"[{now}] {label}: {message}")
 
     return _log
 
@@ -43,6 +54,8 @@ def run_cli() -> None:
 
     print("智能监控系统 AI Agent CLI")
     print("输入 exit 或 quit 退出。")
+    if not args.verbose:
+        print("提示：加 --verbose 可显示运行状态（搜索skills、使用工具、模型思考等）。")
     while True:
         try:
             question = input("\n请输入问题: ").strip()
