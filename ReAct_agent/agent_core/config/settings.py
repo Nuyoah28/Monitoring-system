@@ -86,6 +86,7 @@ class AgentSettings:
     max_history_messages: int
     max_alarm_fetch_pages: int
     alarm_page_size: int
+    memory_db_path: str
     memory_ttl_seconds: int
     memory_vector_top_k: int
     max_agent_workers: int
@@ -95,6 +96,7 @@ def load_settings() -> AgentSettings:
     base_dir = Path(__file__).resolve().parent.parent.parent
     default_config_path = str(base_dir / "agent_config.json")
     default_dotenv_path = str(base_dir / ".env")
+    default_memory_db_path = str(base_dir / "db" / "memory_vectors.db")
 
     config_path = os.getenv("AGENT_CONFIG_PATH") or os.getenv("AGENT_AI_CONFIG_PATH") or default_config_path
     dotenv_path = os.getenv("AGENT_DOTENV_PATH") or default_dotenv_path
@@ -152,6 +154,7 @@ def load_settings() -> AgentSettings:
         max_history_messages=_resolve_int(dotenv_values, "AGENT_MAX_HISTORY_MESSAGES", runtime_config.get("max_history_messages"), 6),
         max_alarm_fetch_pages=_resolve_int(dotenv_values, "AGENT_MAX_ALARM_FETCH_PAGES", runtime_config.get("max_alarm_fetch_pages"), 30),
         alarm_page_size=_resolve_int(dotenv_values, "AGENT_ALARM_PAGE_SIZE", runtime_config.get("alarm_page_size"), 100),
+        memory_db_path=str(_resolve_value(dotenv_values, "AGENT_MEMORY_DB_PATH", runtime_config.get("memory_db_path"), default_memory_db_path)),
         memory_ttl_seconds=_resolve_int(dotenv_values, "AGENT_MEMORY_TTL_SECONDS", runtime_config.get("memory_ttl_seconds"), 7200),
         memory_vector_top_k=max(1, _resolve_int(dotenv_values, "AGENT_MEMORY_VECTOR_TOP_K", runtime_config.get("memory_vector_top_k"), 4)),
         max_agent_workers=max(4, _resolve_int(dotenv_values, "AGENT_MAX_WORKERS", runtime_config.get("max_agent_workers"), 16)),

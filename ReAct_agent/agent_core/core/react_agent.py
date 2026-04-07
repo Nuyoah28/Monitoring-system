@@ -35,6 +35,7 @@ class ReactIntelligentAgent:
         self.memory_store = ConversationMemoryStore(
             history_limit=settings.max_history_messages,
             ttl_seconds=settings.memory_ttl_seconds,
+            db_path=settings.memory_db_path,
         )
         self.support = SkillSupport(self.tools, self.memory_store, settings)
 
@@ -58,6 +59,7 @@ class ReactIntelligentAgent:
         self,
         tool_calls: list[tuple[str, dict]],
         request_context: RequestContext,
+        on_event: Optional[Callable[[str, str], None]] = None,
     ) -> list[str]:
         observations: list[str] = []
         for tool_name, params in tool_calls:
@@ -65,6 +67,8 @@ class ReactIntelligentAgent:
             if tool_spec is None:
                 continue
             try:
+                if on_event:
+                    on_event("using_tools", f"using tool `{tool_name}` from {tool_spec.source_file}")
                 result = self.tools.execute(tool_name, params or {}, self.support, request_context)
                 if result:
                     observations.append(result)
@@ -133,6 +137,7 @@ class ReactIntelligentAgent:
         self,
         question: str,
         on_chunk: Optional[Callable[[str], None]] = None,
+        on_event: Optional[Callable[[str, str], None]] = None,
         user_token: Optional[str] = None,
         conversation_key: Optional[str] = None,
         stream_mode: str = "default",
@@ -146,6 +151,9 @@ class ReactIntelligentAgent:
             user_token=user_token,
             conversation_key=conversation_key,
         )
+
+        if on_event:
+            on_event("reading", "reading question and loading context")
 
         print(f"\n用户问题: {question}")
         if on_chunk and stream_mode == "ws":
@@ -161,7 +169,12 @@ class ReactIntelligentAgent:
             return answer
 
         tool_calls, skip_primary_ai = self.planner.plan(question, request_context)
-        observations = self._execute_tool_calls(tool_calls, request_context)
+        if on_event:
+            if tool_calls:
+                on_event("planning", "planning complete, model selected tools")
+            else:
+                on_event("planning", "no tool selected, answer directly")
+        observations = self._execute_tool_calls(tool_calls, request_context, on_event=on_event)
         data_summary = "\n\n".join(observations)
         final_prompt = build_final_answer_prompt(question, data_summary)
         history = self.memory_store.get_history(
@@ -169,6 +182,9 @@ class ReactIntelligentAgent:
             query=question,
             top_k=self.settings.memory_vector_top_k,
         )
+
+        if on_event:
+            on_event("thinking", "generating final answer")
 
         answer = self._generate_answer_with_fallback(
             question=question,
@@ -182,12 +198,15 @@ class ReactIntelligentAgent:
             stream_mode=stream_mode,
         )
         self._append_history(conversation_key, question, answer)
+        if on_event:
+            on_event("done", "done")
         return answer
 
     def chat(
         self,
         question: str,
         on_chunk: Optional[Callable[[str], None]] = None,
+        on_event: Optional[Callable[[str, str], None]] = None,
         user_token: Optional[str] = None,
         conversation_key: Optional[str] = None,
         stream_mode: str = "default",
@@ -195,6 +214,7 @@ class ReactIntelligentAgent:
         return self.process_question(
             question=question,
             on_chunk=on_chunk,
+            on_event=on_event,
             user_token=user_token,
             conversation_key=conversation_key,
             stream_mode=stream_mode,
