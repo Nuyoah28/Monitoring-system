@@ -43,8 +43,8 @@ export const digitalHumanConfig: DigitalHumanSettings = {
     // Replace these URLs with your licensed local model before final delivery if needed.
     modelUrl:
       process.env.VUE_APP_LIVE2D_MODEL_URL ||
-      // 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display@0.4.0/test/assets/haru/haru_greeter_t03.model3.json',
-      '/live2d/huohuo/huohuo.model3.json',
+      'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display@0.4.0/test/assets/haru/haru_greeter_t03.model3.json',
+      //'/live2d/huohuo/huohuo.model3.json',
     cubismVersion: Number(process.env.VUE_APP_LIVE2D_CUBISM_VERSION || 4) === 2 ? 2 : 4,
     runtimeScriptUrl:
       process.env.VUE_APP_LIVE2D_CUBISM_CORE_URL ||

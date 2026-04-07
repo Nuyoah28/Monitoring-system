@@ -1,0 +1,9 @@
+[
+    ["overflow", "overflowing trash bin", "trash spilling out of bin", "garbage overflow"],
+    ["garbage", "waste", "trash", "litter", "rubbish on ground"],
+    ["garbage bin", "trash can", "dustbin", "waste container", "rubbish bin"],
+    ["bicycle", "electric bicycle", "e-bike", "electric bike in elevator"],
+    ["motorcycle", "electric motorcycle", "electric scooter", "scooter in elevator", "motorbike"],
+    ["fire", "flame", "blaze", "burning fire"],
+    ["smoke", "black smoke", "white smoke", "smoke plume"]
+]

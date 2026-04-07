@@ -93,3 +93,6 @@ backend/src/main/resources/application-dev-my.yml
 *.safetensors
 
 .agent
+
+# Agent memory db
+ReAct_agent/data/db/*.db

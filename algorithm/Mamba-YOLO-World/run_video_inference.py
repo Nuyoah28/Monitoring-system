@@ -7,10 +7,10 @@ from mmengine.utils import track_iter_progress
 
 # --- 关键路径配置 ---
 CONFIG = 'algorithm/Mamba-YOLO-World/configs/mamba2_yolo_world_s_finetune_custom.py'
-CHECKPOINT = 'algorithm/Mamba-YOLO-World/work_dirs/mamba2_yolo_world_s_finetune_custom/20260330_164108/best_coco_bbox_mAP_epoch_100.pth'
+CHECKPOINT = 'algorithm/algo/best_coco_overflow_precision_epoch_90.pth'
 # 你可以把这里的视频路径换成你自己的监控素材！
-INPUT_VIDEO = 'algorithm/Mamba-YOLO-World/data/test_video.mp4' 
-OUTPUT_VIDEO = 'algorithm/Mamba-YOLO-World/inference_results/video_result.mp4'
+INPUT_VIDEO = 'algorithm/test_video/raw/fire.mp4' 
+OUTPUT_VIDEO = 'algorithm/test_video/processed/fire.mp4'
 
 def run_video_test():
     register_all_modules()
