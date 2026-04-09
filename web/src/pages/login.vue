@@ -30,7 +30,7 @@
             </div>
 
             <div class="info-text login">
-                <h2>智慧社区</h2>
+                <h2>社区智眼</h2>
                 <h2>监控预警系统</h2>
             </div>
     </div>

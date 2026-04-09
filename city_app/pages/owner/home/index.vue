@@ -1,7 +1,7 @@
 <template>
   <view class="owner-page">
     <view class="hero">
-      <view class="hero-title">主页功能</view>
+      <view class="hero-title">社区智眼</view>
       <view class="hero-sub">智慧社区业主端 · 便捷服务入口</view>
     </view>
 

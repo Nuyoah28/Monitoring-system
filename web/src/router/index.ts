@@ -3,6 +3,7 @@ import { useUserStore } from '@/stores/user'
 import visual from '@/pages/visual.vue'
 import login from '@/pages/login.vue'
 import home from '@/pages/home.vue'
+import simulate from '@/pages/simulate.vue'
 
 const routes = [
   
@@ -30,6 +31,11 @@ const routes = [
     name:'home',
     component:home,
     meta: { requiresAuth: true }
+  },
+  {
+    path:'/simulate',
+    name:'simulate',
+    component:simulate
   },
 ]
 

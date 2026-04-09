@@ -92,6 +92,18 @@ export default {
       uni.navigateBack()
     },
     async loadDetail() {
+      // --- 模拟数据特殊逻辑 ---
+      if (this.alarmId >= 999001 && this.alarmId <= 999003) {
+        const mockMap = {
+          999001: { id: 999001, name: '北门摄像头(模拟)', eventName: '电动车进楼', department: '北门入口', level: 2, deal: '未处理', video: 'http://localhost:8848/video/电动车进楼.mp4', date: '今日最新', phone: '13800138000', content: '演示模拟推送' },
+          999002: { id: 999002, name: '车库摄像头(模拟)', eventName: '明火', department: '车库入口', level: 3, deal: '未处理', video: 'http://localhost:8848/video/火灾烟雾.mp4', date: '今日最新', phone: '13800138000', content: '演示模拟推送' },
+          999003: { id: 999003, name: '东侧摄像头(模拟)', eventName: '垃圾', department: '东侧步道', level: 1, deal: '未处理', video: 'http://localhost:8848/video/垃圾桶溢出.mp4', date: '今日最新', phone: '13811112222', content: '演示模拟推送' }
+        };
+        this.detail = mockMap[this.alarmId];
+        this.loaded = true;
+        return;
+      }
+
       if (!this.alarmId) {
         uni.$showMsg('报警ID无效')
         return
@@ -105,6 +117,18 @@ export default {
           return
         }
         this.detail = res.data || {}
+        
+        // --- 模拟演示视频重定向逻辑 ---
+        const video = this.detail.video;
+        if (video && typeof video === 'string') {
+          if (video.includes('SIM_BIKE_DEMO')) {
+            this.detail.video = 'http://localhost:8848/video/电动车进楼.mp4';
+          } else if (video.includes('SIM_FIRE_DEMO')) {
+            this.detail.video = 'http://localhost:8848/video/火灾烟雾.mp4';
+          } else if (video.includes('SIM_GARBAGE_DEMO')) {
+            this.detail.video = 'http://localhost:8848/video/垃圾桶溢出.mp4';
+          }
+        }
       } catch (e) {
         uni.$showMsg('网络异常，请稍后重试')
       } finally {

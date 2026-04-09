@@ -2,7 +2,7 @@
   <div class="dash">
     <header class="head">
       <div>
-        <h1>智慧社区安防系统 </h1>
+        <h1>社区智眼</h1>
       </div>
       <div class="pill">当前天气：多云 26C / 湿度58% / AQI 72</div>
       <div class="pill">值班状态：<span style="color:var(--ok);">在线</span></div>

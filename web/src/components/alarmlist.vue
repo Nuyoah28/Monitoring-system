@@ -44,12 +44,46 @@ const userStore = useUserStore();
 const { getAlarmList } = storeToRefs(alarmStore);
 
 const dialogVisible1 = ref<boolean>(false);
-const item = ref<any>('');
+const item = ref<any>(null);
 const alarmlist = computed(() => getAlarmList.value);
+
+// 模拟报警数据（用于演示）
+const mockAlarms = ref([
+  {
+    eventName: '电动车进楼检测',
+    department: '北门入口',
+    date: new Date().toLocaleString(),
+    level: 2,
+    location: '北门',
+    createTime: new Date().toISOString(),
+    video: 'http://localhost:8848/video/电动车进楼.mp4',
+    id: 1, name: '模拟设备', deal: '未处理', content: '检测到电动车进楼', phone: '13800000001'
+  },
+  {
+    eventName: '烟雾火灾告警',
+    department: '车库入口',
+    date: new Date().toLocaleString(),
+    level: 3,
+    location: '车库',
+    createTime: new Date().toISOString(),
+    video: 'http://localhost:8848/video/火灾烟雾.mp4',
+    id: 2, name: '模拟设备', deal: '未处理', content: '检测到大面积烟雾', phone: '13800000002'
+  },
+  {
+    eventName: '垃圾桶溢出告警',
+    department: '东侧步道',
+    date: new Date().toLocaleString(),
+    level: 1,
+    location: '东侧',
+    createTime: new Date().toISOString(),
+    video: 'http://localhost:8848/video/垃圾桶溢出.mp4',
+    id: 3, name: '模拟设备', deal: '未处理', content: '垃圾堆积如山啦', phone: '13800000003'
+  }
+]);
 const scrollList = computed(() => {
-    if (!alarmlist.value || alarmlist.value.length === 0) return [];
-    // 复制数据实现无缝滚动
-    return [...alarmlist.value, ...alarmlist.value];
+    const list = alarmlist.value?.length > 0 ? alarmlist.value : mockAlarms.value;
+    if (!list || list.length === 0) return [];
+    return [...list, ...list];
 });
 const pageNum = ref<number>(1);
 const pageSize = ref<number>(30);
@@ -183,8 +217,10 @@ const getcolor = (type: string): number => {
 const showDetail = (itemData: any): void => {
     dialogVisible1.value = true;
     console.log('item', itemData);
-    console.log("由于物联网端还未接入，为了调试，前端固定设置这个视频链接");
-    itemData.video = baseUrl + '/video/001.flv';//暂定为后端路径
+    // 使用 itemData 中的视频链接，如果没有则使用默认值
+    if (!itemData.video) {
+        itemData.video = baseUrl + '/video/001.flv';
+    }
     item.value = itemData;
 };
 
@@ -223,13 +259,20 @@ const fetchAlarmList = (): void => {
       }
     })
     .catch((error: any) => {
-      if (error.response && (error.response.status === 401 || error.response.data?.code === 'D0400')) {
-        ElMessage({
-          message: 'token过期，请重新登录',
-          type: 'warning',
-        })
-        router.push('/login')
+      console.log('使用模拟报警数据（后端不可用）');
+      // 后端不可用时使用模拟数据
+      alarmStore.setAlarmList(mockAlarms.value);
+      alarmStore.updateStatisticsFromAlarms();
+      
+      const bus = (window as any).$bus
+      if (bus) {
+        bus.$emit('alarm')
       }
+
+      ElMessage({
+        message: '使用模拟报警数据（演示模式）',
+        type: 'info',
+      })
     })
 }
 

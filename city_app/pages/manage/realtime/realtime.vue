@@ -259,7 +259,7 @@ export default {
 	});
   },
   onUnload() {
-  	uni.$off('newAlarm');
+    uni.$off('newAlarm');
   },
   onShow() {
     // console.log("realShow");
@@ -577,7 +577,7 @@ export default {
       this.id = id;
     },
     async sendDeal() {
-      if (this.conten === "") {
+      if (this.content === "") {
         uni.showToast({
           title: "内容不能为空",
           duration: 2000,

@@ -99,8 +99,12 @@ function handleMessage(data) {
                 title: '🎯 [特急] AI 目标抓拍通知',
                 content: `您关注的动态目标监控点【${alarmData.name || '摄像头区域'}】刚刚抓拍到目标，请立即核实处理！`,
                 showCancel: false,
-                confirmText: '收到',
-                success: (res) => console.log('[WebSocket] 动态AI消息已确认', res)
+                confirmText: '去查看',
+                success: (res) => {
+                    if (res.confirm) {
+                        uni.navigateTo({ url: '/pages/manage/realtime/realtime' });
+                    }
+                }
             });
             // 振动提醒更强力（连震两次）
             uni.vibrateLong({ success: () => { setTimeout(() => uni.vibrateLong(), 500); } });
@@ -111,7 +115,11 @@ function handleMessage(data) {
                 content: data.message || '您有新的常规报警信息，请及时处理。',
                 showCancel: false,
                 confirmText: '前往处理',
-                success: (res) => console.log('[WebSocket] 常规报警确认', res)
+                success: (res) => {
+                    if (res.confirm) {
+                        uni.navigateTo({ url: '/pages/manage/realtime/realtime' });
+                    }
+                }
             });
             uni.vibrateLong();
         }

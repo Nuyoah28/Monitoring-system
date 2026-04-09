@@ -4,7 +4,7 @@
     <!-- ───── Hero ───── -->
     <view class="hero-card">
       <view class="hero-left">
-        <view class="hero-title">智慧安防</view>
+        <view class="hero-title">社区智眼</view>
         <view class="hero-sub">管理端控制台</view>
         <view class="hero-switch" @tap="jumpSetting">
           <!-- switch icon -->

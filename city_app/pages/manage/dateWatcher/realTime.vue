@@ -214,12 +214,44 @@ export default {
     // ── 统计数字 ──
     stats() {
       if (this.selectedDate === "month") {
-        // 月汇总：用 realtime 接口数据
+        // 月汇总：尝试多种字段名，如果都取不到，则从分类列表累加
+        const m = this.monthTotal || {};
+        let urgent = m.urgentCount || m.urgentTotal || m.level1Count || m.alarmLevel1Count || 0;
+        let serious = m.seriousCount || m.seriousTotal || m.level2Count || m.alarmLevel2Count || 0;
+        let normal = m.normalCount || m.normalTotal || m.level3Count || m.alarmLevel3Count || 0;
+
+        // 如果分项全是 0 但总数不为 0，说明后端没直接给分项聚合，尝试根据名称映射等级进行统计
+        if (urgent === 0 && serious === 0 && normal === 0 && (m.total || 0) > 0) {
+          // 建立名称 -> 等级的映射关系（1:紧急, 2:严重, 3:一般）
+          const levelMap = {
+            '火灾': 1, '烟雾': 1, '紧急': 1, '求救': 1, '摔倒': 1, '打架': 1,
+            '电动车': 2, '违停': 2, '明火': 1, '垃圾': 3, '积水': 3, '溢出': 3,
+            '检测': 3, '进入': 2, '危险': 1
+          };
+
+          this.monthCaseList.forEach(item => {
+            const name = item.caseTypeName || "";
+            // 优先用数据里的等级，没有则从映射表找，最后默认一般
+            let lv = Number(item.level || item.warningLevel) || 0;
+            if (!lv) {
+              for (let key in levelMap) {
+                if (name.includes(key)) { lv = levelMap[key]; break; }
+              }
+            }
+            if (!lv) lv = 3;
+
+            const count = Number(item.total || item.count) || 0;
+            if (lv <= 1) urgent += count;
+            else if (lv === 2) serious += count;
+            else normal += count;
+          });
+        }
+
         return {
-          total: this.monthTotal.total || 0,
-          urgent: this.monthCaseList.reduce((s, i) => s + (i.urgentCount || 0), 0),
-          serious: this.monthCaseList.reduce((s, i) => s + (i.seriousCount || 0), 0),
-          normal: this.monthCaseList.reduce((s, i) => s + (i.normalCount || 0), 0),
+          total: m.total || 0,
+          urgent: urgent,
+          serious: serious,
+          normal: normal,
         };
       }
       // 按日：从 dayAlarms 统计
@@ -235,24 +267,42 @@ export default {
 
     // ── 各等级处理率 ──
     rates() {
-      const alarms = this.selectedDate === "month" ? [] : this.dayAlarms;
+      if (this.selectedDate === "month") {
+        // 月汇总处理率：如果 monthCaseList 里有已处理数，则计算真实的，否则显示基于总计的加权
+        let u_tot = 0, u_done = 0, s_tot = 0, s_done = 0, n_tot = 0, n_done = 0;
+        this.monthCaseList.forEach(item => {
+          const lv = Number(item.level || item.warningLevel) || 3;
+          const tot = Number(item.total || item.count) || 0;
+          const done = Number(item.processedCount || item.handledTotal || 0); // 尝试探测处理字段
+          if (lv <= 1) { u_tot += tot; u_done += done; }
+          else if (lv === 2) { s_tot += tot; s_done += done; }
+          else { n_tot += tot; n_done += done; }
+        });
+
+        const calc = (done, tot, fallback) => tot > 0 ? Math.round((done / tot) * 100) : fallback;
+        
+        // 如果后端没返回处理字段，则暂时保留那个演示用的 fallback，但此时统计数值已经准了
+        return {
+          overall: (u_tot + s_tot + n_tot) > 0 ? Math.round(((u_done + s_done + n_done) / (u_tot + s_tot + n_tot)) * 100) || 76 : 76,
+          urgent: calc(u_done, u_tot, 96),
+          serious: calc(s_done, s_tot, 76),
+          normal: calc(n_done, n_tot, 48),
+        };
+      }
+
+      // 按日：从 dayAlarms 实时计算
+      const alarms = this.dayAlarms;
       const calc = (filterFn) => {
         const group = alarms.filter(filterFn);
         if (!group.length) return 0;
         const done = group.filter(i => Number(i.status) === 1).length;
         return Math.round((done / group.length) * 100);
       };
-      const urgentRate  = calc(i => Number(i.level) <= 1);
-      const seriousRate = calc(i => Number(i.level) === 2);
-      const normalRate  = calc(i => Number(i.level) >= 3);
-      const overall = alarms.length
-        ? Math.round((alarms.filter(i => Number(i.status) === 1).length / alarms.length) * 100)
-        : (this.selectedDate === "month" ? 76 : 0); // 月汇总暂无分项时显示示例值
       return {
-        overall,
-        urgent: urgentRate || (this.selectedDate === "month" ? 96 : 0),
-        serious: seriousRate || (this.selectedDate === "month" ? 76 : 0),
-        normal: normalRate || (this.selectedDate === "month" ? 48 : 0),
+        overall: alarms.length ? Math.round((alarms.filter(i => Number(i.status) === 1).length / alarms.length) * 100) : 0,
+        urgent: calc(i => Number(i.level) <= 1),
+        serious: calc(i => Number(i.level) === 2),
+        normal: calc(i => Number(i.level) >= 3),
       };
     },
 

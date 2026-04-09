@@ -7,7 +7,7 @@
     :before-close="handleClose">
     <span>
       <div class="video">
-        <video ref="videoElement" muted controls @error="handleVideoError"></video>
+        <video ref="videoElement" autoplay muted controls @error="handleVideoError"></video>
         <div v-if="videoLoadError" class="video-error-message">
           视频加载失败: {{ videoErrorMessage }}
         </div>
@@ -193,9 +193,31 @@ const getVideoData = (): void => {
   }).then((response: any) => {
     console.log('dialog', response?.data?.chartData);
     
-    video = response?.data?.chartData || props.item.video;  // 将响应数据绑定到组件状态中，如果API返回undefined则使用传入的视频URL
-    const playUrl = withNoCache(video || props.item.video || '');
-    if (flvjs.isSupported() && videoElement.value) {
+    // 优先播放传过来的报警录像短片，如果没有再使用后台默认配置的监控通道流
+    video = props.item.video || response?.data?.chartData;
+
+    // --- 模拟演示视频重定向逻辑 ---
+    // 当后端收到 SIM_ 开头的 clipId 时，前端将其重定向到本地 8848 端口的演示视频
+    if (video && typeof video === 'string') {
+      if (video.includes('SIM_BIKE_DEMO')) {
+        video = 'http://localhost:8848/video/电动车进楼.mp4';
+      } else if (video.includes('SIM_FIRE_DEMO')) {
+        video = 'http://localhost:8848/video/火灾烟雾.mp4';
+      } else if (video.includes('SIM_GARBAGE_DEMO')) {
+        video = 'http://localhost:8848/video/垃圾桶溢出.mp4';
+      }
+    }
+
+    const playUrl = withNoCache(video || '');
+    const isMp4 = playUrl.toLowerCase().split('?')[0].endsWith('.mp4');
+    
+    if (isMp4) {
+      // MP4 文件使用原生 video 标签播放
+      if (videoElement.value) {
+        videoElement.value.src = playUrl;
+        videoElement.value.load();
+      }
+    } else if (flvjs.isSupported() && videoElement.value) {
       try {
         flvPlayer = flvjs.createPlayer({
           type: 'flv',

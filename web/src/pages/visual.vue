@@ -51,7 +51,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(row, idx) in filteredAlarmRows" :key="`${row.eventName}-${idx}`" :class="severityClass(row.level)">
+                  <tr v-for="(row, idx) in filteredAlarmRows" :key="`${row.eventName}-${idx}`" :class="severityClass(row.level)" @click="openAlarmDetail(row)">
                     <td>{{ row.eventName }}</td>
                     <td>{{ row.department }}</td>
                     <td>{{ row.date }}</td>
@@ -119,6 +119,8 @@
             </article>
           </div>
         </section>
+
+        <dialog1 v-if="alarmDialogVisible" :item="currentAlarmItem" @updateDialogVisible1="alarmDialogVisible = $event" />
 
         <section v-show="activeTab === 'video'" class="panel video-panel">
           <article class="card video-main">
@@ -451,6 +453,7 @@ import LineChart from '@/components/LineChart.vue'
 import AMapLinkage3D from '@/components/AMapLinkage3D.vue'
 import VirtualAgentStage from '@/components/VirtualAgentStage.vue'
 import ChatPanel from '@/components/chat_panel.vue'
+import dialog1 from '@/components/dialog1.vue'
 import axios from 'axios'
 import flvjs from 'flv.js'
 import { rtmpAddressList } from '@/config/config'
@@ -495,6 +498,14 @@ const agentStageKey = ref(0)
 const currentTabLabel = computed(() => tabs.find(item => item.key === activeTab.value)?.label || '导航')
 
 const focusVisible = ref(false)
+const alarmDialogVisible = ref(false)
+const currentAlarmItem = ref<any>(null)
+
+const openAlarmDetail = (row: any) => {
+  currentAlarmItem.value = row
+  alarmDialogVisible.value = true
+}
+
 const focusText = ref('监控大屏')
 const focusStreamUrl = ref('')
 const focusVideoRef = ref<HTMLVideoElement | null>(null)
@@ -536,15 +547,138 @@ const fetchAlarmList = async () => {
         status: 0,
       },
     })
+    console.log('报警API返回:', data)
     const list = data?.data?.alarmList || data?.data?.list || []
-    if (Array.isArray(list)) {
+    if (Array.isArray(list) && list.length > 0) {
       alarmStore.setAlarmList(list)
       alarmStore.updateStatisticsFromAlarms()
+    } else {
+      console.log('后端返回空数据，使用模拟数据')
+      useMockData()
     }
   } catch (e) {
-    void e
+    console.log('请求失败，使用模拟数据', e)
+    useMockData()
   }
 }
+
+const useMockData = () => {
+  const mockAlarms = [
+    {
+      eventName: '电动车进楼检测',
+      department: '北门入口',
+      date: new Date().toLocaleString(),
+      level: '2',
+      deal: '未处理',
+      location: '北门',
+      createTime: new Date().toISOString(),
+      video: 'http://localhost:8848/video/电动车进楼.mp4'
+    },
+    {
+      eventName: '烟雾火灾告警',
+      department: '车库入口',
+      date: new Date().toLocaleString(),
+      level: '3',
+      deal: '未处理',
+      location: '车库',
+      createTime: new Date().toISOString(),
+      video: 'http://localhost:8848/video/火灾烟雾.mp4'
+    },
+    {
+      eventName: '垃圾桶溢出告警',
+      department: '东侧步道',
+      date: new Date().toLocaleString(),
+      level: '1',
+      deal: '未处理',
+      location: '东侧',
+      createTime: new Date().toISOString(),
+      video: 'http://localhost:8848/video/垃圾桶溢出.mp4'
+    }
+  ]
+  alarmStore.setAlarmList(mockAlarms)
+  alarmStore.updateStatisticsFromAlarms()
+  console.log('使用模拟报警数据（演示模式）')
+}
+
+// 隐藏遥控器通信
+let simChannel: BroadcastChannel | null = null;
+onMounted(() => {
+  if (window.BroadcastChannel) {
+    simChannel = new BroadcastChannel('demonstration_channel');
+    simChannel.onmessage = (event) => {
+      if (event.data && event.data.action === 'trigger_alarm') {
+        _handleSimulate(event.data.type);
+      }
+    };
+  }
+});
+
+onUnmounted(() => {
+  if (simChannel) {
+    simChannel.close();
+  }
+});
+
+const _handleSimulate = (type: string) => {
+  let newAlarm: any = null;
+  const now = new Date();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const h = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const t = `${m}-${d} ${h}:${min}`;
+  const iso = now.toISOString();
+  
+  if (type === 'bike') {
+    newAlarm = {
+      eventName: '电动车进楼',
+      department: '北门入口',
+      date: now.toLocaleString(),
+      level: 2,
+      location: '北门',
+      createTime: iso,
+      video: 'http://localhost:8848/video/电动车进楼.mp4',
+      id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
+    };
+  } else if (type === 'fire') {
+    newAlarm = {
+      eventName: '明火',
+      department: '车库入口',
+      date: now.toLocaleString(),
+      level: 3,
+      location: '车库',
+      createTime: iso,
+      video: 'http://localhost:8848/video/火灾烟雾.mp4',
+      id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
+    };
+  } else if (type === 'garbage') {
+    newAlarm = {
+      eventName: '垃圾',
+      department: '东侧步道',
+      date: now.toLocaleString(),
+      level: 1,
+      location: '东侧',
+      createTime: iso,
+      video: 'http://localhost:8848/video/垃圾桶溢出.mp4',
+      id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
+    };
+  }
+
+  if (newAlarm) {
+    const list = [...(alarmStore.getAlarmList || [])];
+    list.unshift(newAlarm);
+    alarmStore.setAlarmList(list);
+    alarmStore.updateStatisticsFromAlarms();
+    
+    // 触发全局报警事件，例如播放提示音或动画
+    const bus = (window as any).$bus;
+    if (bus) bus.$emit('alarm');
+    
+    import('element-plus').then(({ ElMessage }) => {
+      ElMessage({ message: '收到大屏模拟指挥指令：' + newAlarm.eventName, type: 'warning' });
+    });
+  }
+};
 
 const kpis = computed(() => {
   const list = alarmStore.getAlarmList || []
@@ -610,6 +744,7 @@ const alarmTableRows = computed(() => {
     return [{ eventName: '暂无报警', department: '--', date: '--', level: 1, deal: '已处理' }]
   }
   return rows.map((item: any) => ({
+    ...item,
     eventName: item.eventName || '未知事件',
     department: item.department || item.location || '未标注',
     date: item.date || item.time || item.createTime || '--',
@@ -837,9 +972,17 @@ const buildSummary = (label: string, days: number): AgentSummary => {
   const threshold = now - days * 24 * 60 * 60 * 1000
 
   const parseTime = (item: any) => {
-    const raw = item.date || item.time || item.createTime
+    // 优先使用带有年份的 createTime
+    const raw = item.createTime || item.date || item.time
     if (!raw) return 0
-    const date = new Date(raw).getTime()
+    
+    // 如果日期字符串明显缺少年份（如 04-07 12:00），尝试补全
+    let dateStr = String(raw)
+    if (/^\d{2}-\d{2}/.test(dateStr) && !dateStr.includes(String(new Date().getFullYear()))) {
+       dateStr = `${new Date().getFullYear()}-${dateStr}`
+    }
+
+    const date = new Date(dateStr).getTime()
     return Number.isNaN(date) ? 0 : date
   }
 
@@ -1254,7 +1397,9 @@ watch(
 
 watch(activeTab, (tab) => {
   if (tab === 'alarm') {
+    alarmStore.setAlarmList([])  // 清空旧数据
     nextTick(() => {
+      fetchAlarmList()
       window.dispatchEvent(new Event('resize'))
     })
   }

@@ -274,9 +274,8 @@ export default {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin: auto;
-    animation: fade-up 380ms ease;
-    transform: translateY(25vh);
+    margin: 80rpx auto auto;
+    animation: fade-up 380ms ease forwards;
   }
 
   .header {
