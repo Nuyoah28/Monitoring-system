@@ -7,22 +7,12 @@
         <view class="hero-title">社区智眼</view>
         <view class="hero-sub">管理端控制台</view>
         <view class="hero-switch" @tap="jumpSetting">
-          <!-- switch icon -->
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M7 16V4m0 0L3 8m4-4 4 4"/><path d="M17 8v12m0 0 4-4m-4 4-4-4"/>
-          </svg>
+          <image class="hero-switch-icon" src="/static/settings.png" mode="aspectFit"></image>
           <text>切换身份</text>
         </view>
       </view>
       <view class="hero-deco">
-        <!-- shield icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
-          <circle cx="40" cy="40" r="40" fill="rgba(20,112,216,0.08)"/>
-          <path d="M40 12 L62 22 L62 42 C62 55 52 64 40 68 C28 64 18 55 18 42 L18 22 Z"
-                fill="rgba(20,112,216,0.12)" stroke="#1470d8" stroke-width="1.5" stroke-linejoin="round"/>
-          <path d="M31 40 l6 6 12-12" stroke="#1470d8" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <image class="hero-deco-icon" src="/static/logo.png" mode="aspectFit"></image>
       </view>
     </view>
 
@@ -30,37 +20,25 @@
     <view class="quick-grid">
       <view class="quick-item" @tap="goPage('/pages/manage/statistics/index')">
         <view class="quick-icon quick-icon--red">
-          <!-- bell / alert icon -->
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
+          <image class="quick-icon-image" src="/static/alarm.png" mode="aspectFit"></image>
         </view>
         <text>警情统计</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/ai/index')">
         <view class="quick-icon quick-icon--purple">
-          <!-- sparkles / AI icon -->
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-          </svg>
+          <image class="quick-icon-image" src="/static/ai.png" mode="aspectFit"></image>
         </view>
         <text>AI 助手</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/property/parking/index')">
         <view class="quick-icon quick-icon--blue">
-          <!-- parking / car icon -->
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/>
-          </svg>
+          <image class="quick-icon-image" src="/static/locate.png" mode="aspectFit"></image>
         </view>
         <text>车位引导</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/environment/index')">
         <view class="quick-icon quick-icon--green">
-          <!-- leaf / environment icon -->
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
-          </svg>
+          <image class="quick-icon-image" src="/static/analysis.png" mode="aspectFit"></image>
         </view>
         <text>环境检测</text>
       </view>
@@ -151,9 +129,7 @@
         </view>
 
         <view class="empty" v-if="!displayAlerts.length">
-          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#b0bec5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
+          <image class="empty-icon" src="/static/warn-none.png" mode="aspectFit"></image>
           <text>暂无待处理警情</text>
         </view>
       </view>
@@ -324,9 +300,9 @@ export default {
 
 .hero-switch {
   margin-top: 18rpx;
-  display: inline-flex;
+  display: flex;
+  align-self: flex-start;
   align-items: center;
-  gap: 6rpx;
   background: rgba(20, 112, 216, 0.1);
   border: 1rpx solid rgba(20, 112, 216, 0.2);
   border-radius: 999rpx;
@@ -337,7 +313,13 @@ export default {
     font-size: 24rpx;
     font-weight: 700;
     color: #1470d8;
+    margin-left: 8rpx;
   }
+}
+
+.hero-switch-icon {
+  width: 24rpx;
+  height: 24rpx;
 }
 
 .hero-deco {
@@ -345,11 +327,16 @@ export default {
   height: 90rpx;
   flex-shrink: 0;
   z-index: 1;
+  border-radius: 22rpx;
+  background: rgba(20, 112, 216, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-  svg {
-    width: 100%;
-    height: 100%;
-  }
+.hero-deco-icon {
+  width: 56rpx;
+  height: 56rpx;
 }
 
 // ─── Quick Grid ───
@@ -358,9 +345,9 @@ export default {
   background: rgba(236, 246, 255, 0.7);
   border-radius: 24rpx;
   padding: 16rpx;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12rpx;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
   border: 1rpx solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 4rpx 16rpx rgba(40, 91, 150, 0.07);
 }
@@ -376,6 +363,7 @@ export default {
   box-shadow: 0 4rpx 16rpx rgba(52, 117, 185, 0.08);
   border: 1rpx solid rgba(200, 225, 248, 0.6);
   transition: all 0.15s;
+  width: calc(25% - 9rpx);
 
   &:active {
     transform: scale(0.96);
@@ -387,6 +375,7 @@ export default {
     color: #2c4a68;
     font-size: 24rpx;
     font-weight: 700;
+    line-height: 1.2;
   }
 }
 
@@ -403,6 +392,11 @@ export default {
   &--purple { background: linear-gradient(140deg, #a78bfa 0%, #7c3aed 100%); }
   &--blue   { background: linear-gradient(140deg, #38b6ff 0%, #0e6ecf 100%); }
   &--green  { background: linear-gradient(140deg, #34d399 0%, #059669 100%); }
+}
+
+.quick-icon-image {
+  width: 34rpx;
+  height: 34rpx;
 }
 
 // ─── Section Card ───
@@ -438,7 +432,6 @@ export default {
 .map-link-row {
   display: flex;
   align-items: center;
-  gap: 8rpx;
 }
 
 .live-dot {
@@ -460,6 +453,7 @@ export default {
   color: #22c55e;
   font-size: 24rpx;
   font-weight: 700;
+  margin-left: 8rpx;
 }
 
 .all-link {
@@ -472,7 +466,6 @@ export default {
 .level-tabs {
   margin-top: 18rpx;
   display: flex;
-  gap: 14rpx;
 }
 
 .level-tab {
@@ -485,15 +478,27 @@ export default {
   border: 1.5rpx solid transparent;
   background: #f4f8fd;
   transition: all 0.2s;
-  gap: 8rpx;
+  margin-right: 14rpx;
 
   &:active { transform: scale(0.97); }
+
+  &:last-child {
+    margin-right: 0;
+  }
+}
+
+.level-tab__inner text,
+.level-tab__inner view {
+  flex-shrink: 0;
 }
 
 .level-tab__inner {
   display: flex;
   align-items: center;
-  gap: 8rpx;
+}
+
+.level-tab__badge {
+  margin-left: 8rpx;
 }
 
 .level-tab__label {
@@ -565,7 +570,10 @@ export default {
   margin-top: 14rpx;
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
+}
+
+.alert-item + .alert-item {
+  margin-top: 10rpx;
 }
 
 .alert-item {
@@ -632,13 +640,13 @@ export default {
   margin-top: 6rpx;
   display: flex;
   align-items: center;
-  gap: 6rpx;
   color: #8a9db8;
   font-size: 22rpx;
 }
 
 .meta-dot {
   color: #b8c8d8;
+  margin: 0 6rpx;
 }
 
 .alert-arrow {
@@ -654,12 +662,17 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14rpx;
   padding: 40rpx 0;
 
   text {
     color: #a0b0c4;
     font-size: 26rpx;
+    margin-top: 14rpx;
   }
+}
+
+.empty-icon {
+  width: 56rpx;
+  height: 56rpx;
 }
 </style>

@@ -27,6 +27,12 @@ class websocketUtil {
 				return this.socketTask
 			},
 		});
+		if (!this.socketTask || typeof this.socketTask.onOpen !== 'function') {
+			console.warn('websocket connect failed: invalid socketTask', this.url)
+			this.is_open_socket = false
+			this.reconnect();
+			return
+		}
 		this.socketTask.onOpen((res) => {
 			console.log("WebSocket连接正常！");
 			clearTimeout(this.reconnectTimeOut)
@@ -43,6 +49,13 @@ class websocketUtil {
 			this.is_open_socket = false;
 			this.reconnect();
 		})
+		if (typeof this.socketTask.onError === 'function') {
+			this.socketTask.onError((err) => {
+				console.warn('websocket error', err)
+				this.is_open_socket = false
+				this.reconnect();
+			})
+		}
 	}
 	
 	//发送消息
@@ -76,6 +89,7 @@ class websocketUtil {
 	}
 	//外部获取消息
 	getMessage(callback) {
+		if (!this.socketTask || typeof this.socketTask.onMessage !== 'function') return
 		this.socketTask.onMessage((res) => {
 			return callback(res)
 		})

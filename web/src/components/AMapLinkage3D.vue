@@ -182,7 +182,7 @@ const renderMarkers = () => {
     marker.setLabel({
       direction: 'right',
       offset: new AMap.Pixel(6, 0),
-      content: `<span style="color:#d6ecff;font-size:12px;white-space:nowrap;">${point.title}</span>`,
+      content: `<span style="color:#16a34a;font-size:12px;white-space:nowrap;">${point.camera || point.title}</span>`,
     })
     marker.on('click', () => emit('point-click', point))
     return marker

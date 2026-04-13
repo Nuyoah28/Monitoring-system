@@ -63,9 +63,9 @@
             "sdkConfigs" : {
                 "maps" : {
                     "amap" : {
-                        "name" : "amap1L9WILgy",
-                        "appkey_ios" : "ceaa26ae90baca21f1421572a7ba4fb0",
-                        "appkey_android" : "ceaa26ae90baca21f1421572a7ba4fb0"
+                        "name" : "amappHv1ENQd",
+                        "appkey_ios" : "b793c585623cb4d4901d36623652b730",
+                        "appkey_android" : "b793c585623cb4d4901d36623652b730"
                     }
                 },
                 "geolocation" : {
@@ -73,10 +73,10 @@
                         "__platform__" : [ "android" ]
                     },
                     "amap" : {
-                        "name" : "amap1L9WILgy",
-                        "__platform__" : [ "ios", "android" ],
-                        "appkey_ios" : "ceaa26ae90baca21f1421572a7ba4fb0",
-                        "appkey_android" : "ceaa26ae90baca21f1421572a7ba4fb0"
+                        "name" : "amappHv1ENQd",
+                        "__platform__" : [ "android" ],
+                        "appkey_ios" : "b793c585623cb4d4901d36623652b730",
+                        "appkey_android" : "b793c585623cb4d4901d36623652b730"
                     }
                 },
                 "push" : {
@@ -138,5 +138,6 @@
     "uniStatistics" : {
         "enable" : false
     },
-    "vueVersion" : "2"
+    "vueVersion" : "2",
+    "locale" : "zh-Hans"
 }

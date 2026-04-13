@@ -1,6 +1,6 @@
 <template>
-	<view class="main" :class="{ 'drawer-open': showSessionList, 'owner-app': isOwnerApp }" :style="{ minHeight: safeHeight + 'px', paddingTop: statusBarHeight + 'px', '--status-bar-height': statusBarHeight + 'px' }">
-		<view class="header">
+	<view class="main" :class="{ 'drawer-open': showSessionList, 'owner-app': isOwnerApp }" :style="{ minHeight: safeHeight + 'px', height: safeHeight + 'px', paddingTop: statusBarHeight + 'px', '--status-bar-height': statusBarHeight + 'px' }">
+		<view class="header" id="ai-header">
 			<view class="topNav">
 				<view class="back-btn" @tap="goBack">
 					<u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
@@ -9,8 +9,8 @@
 					<image class="session-tag" src="/static/messagelist.png"></image>
 				</view>
 			</view>
-			<view class="header-title">
-				<span>AI助手</span>
+		<view class="header-title">
+				<text>AI助手</text>
 			</view>
 			<view class="setting-btn" @tap="jump">
 				<image class="setting-tag" src="/static/settings.png"></image>
@@ -39,7 +39,7 @@
 			</view>
 			<view class="session-peek" @tap="showSessionList = false"></view>
 		</view>
-		<view class="body" :style="bodyStyle">
+		<view class="body" id="ai-body" :style="bodyStyle">
 			<scroll-view :scroll-top="scrollTop" class="scroll" scroll-y @scroll="recordHeight" :style="{ height: scrollHeight + 'px' }">
 				<view class="chat">
 					<view id="msgbar" v-for="(item, index) in textList" :key="index" :class="index%2 === 1 ? 'left' : 'right'">
@@ -52,9 +52,9 @@
 						</view>
 					</view>
 					<view class="loading" v-show="isLoading">
-						<view class="loadText">
-							<span>智能生成中...</span>
-						</view>
+					<view class="loadText">
+						<text>智能生成中...</text>
+					</view>
 						<view class="spinner">
 							<view></view>
 							<view></view>
@@ -66,7 +66,7 @@
 					</view>
 				</view>
 			</scroll-view>
-			<view class="down" id="down">
+			<view class="down" id="ai-down">
 				<view class="input-wrap">
 					<input class="input-inner" type="text" v-model="text" placeholder="输入或点击麦克风说话" :disabled="isLoading" />
 					<view class="btn-voice" :class="{ recording: isRecording }" @click="voiceClickHandler" :style="{ opacity: isLoading ? 0.6 : 1 }">
@@ -106,7 +106,7 @@ import Vue from 'vue';
 				textList:[],
 				scrollTop:0,
 				newTop:0,
-				scrollHeight:0,
+				scrollHeight:420,
 				count:0,
 				websocket: null,
 				cnt: 0,
@@ -124,9 +124,23 @@ import Vue from 'vue';
 			}
 		},
 		onShow() {
-			const info = uni.getWindowInfo();
-			this.safeHeight = info.safeArea.height;
-			this.statusBarHeight = info.statusBarHeight || 20;
+			const info = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : uni.getSystemInfoSync();
+			const safeAreaHeight = info && info.safeArea && info.safeArea.height
+				? info.safeArea.height
+				: (info.windowHeight || info.screenHeight || 0);
+			this.safeHeight = safeAreaHeight;
+			this.statusBarHeight = (info && info.statusBarHeight) || 20;
+				this.scrollHeight = Math.max(220, safeAreaHeight - 230);
+				console.log('[AIPage] onShow init', {
+					safeAreaHeight,
+					statusBarHeight: this.statusBarHeight,
+					scrollHeight: this.scrollHeight,
+					windowHeight: info && info.windowHeight,
+				});
+				this.$nextTick(() => {
+					this.setSafeArea();
+					this.toBottom();
+				});
 			this.loadSessionCache();
 			if (!this.sessions.length) {
 				this.startNewSession();
@@ -134,7 +148,21 @@ import Vue from 'vue';
 				const defaultId = this.currentSessionId || this.sessions[0].id;
 				this.switchSession(defaultId, false);
 			}
-			this.createWs();
+			try {
+				this.createWs();
+			} catch (e) {
+				this.isLoading = false;
+			}
+		},
+		onReady() {
+			this.$nextTick(() => {
+				this.setSafeArea();
+				console.log('[AIPage] ready state', {
+					safeHeight: this.safeHeight,
+					scrollHeight: this.scrollHeight,
+					textListLen: this.textList.length,
+				});
+			});
 		},
 		beforeDestroy() {
 
@@ -303,10 +331,22 @@ import Vue from 'vue';
 				return s
 			},
 			createWs() {
+				if (!wsRequest) {
+					console.warn('[AIPage] wsRequest not available');
+					return;
+				}
 				let token = uni.getStorageSync('token')
+				if (!token) {
+					console.warn('[AIPage] token missing, skip websocket');
+					return;
+				}
 				// 关于ai对话部分的，如果没有需求先不用管这一部分
 				// this.websocket = new wsRequest(`ws://8.152.219.117:10215/api/v1/gpt/ws/${token}`,5000) //服务器
 				this.websocket = new wsRequest(`${AI_WS_URL}/api/v1/gpt/ws/${token}`,5000) // Python Agent
+				if (!this.websocket || typeof this.websocket.getMessage !== 'function') {
+					console.warn('[AIPage] websocket instance invalid', this.websocket);
+					return;
+				}
 				// this.websocket = new wsRequest(`ws://localhost:10215/api/v1/gpt/ws/${token}`,5000) //本地
 				// this.websocket = new wsRequest(`ws://192.168.3.135:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接
 				// this.websocket = new wsRequest(`ws://192.168.68.31:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接
@@ -339,20 +379,32 @@ import Vue from 'vue';
 				})
 			},
 			setSafeArea() {
-				this.safeHeight = uni.getWindowInfo().safeArea.height;
+				const info = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : uni.getSystemInfoSync();
+				const safeAreaHeight = info && info.safeArea && info.safeArea.height
+					? info.safeArea.height
+					: (info.windowHeight || info.screenHeight || 0);
+				this.safeHeight = safeAreaHeight;
 				this.$nextTick(() => {
-					const query = uni.createSelectorQuery().in(this);
-					query.select('.body').boundingClientRect();
-					query.select('.title').boundingClientRect();
-					query.select('#down').boundingClientRect();
+					const query = uni.createSelectorQuery();
+					query.select('#ai-body').boundingClientRect();
+					query.select('#ai-header').boundingClientRect();
+					query.select('#ai-down').boundingClientRect();
 					query.exec((res) => {
 						const body = res[0];
 						const title = res[1];
 						const down = res[2];
 						if (body && down) {
-							const titleH = (title && title.height) ? title.height : 50;
-							this.scrollHeight = Math.max(200, (body.height || 0) - titleH - down.height);
+							const titleH = (title && title.height) ? title.height : 100;
+							this.scrollHeight = Math.max(220, (body.height || 0) - titleH - (down.height || 0));
+						} else {
+							this.scrollHeight = Math.max(220, this.safeHeight - 230);
 						}
+						console.log('[AIPage] setSafeArea rect', {
+							body,
+							title,
+							down,
+							scrollHeight: this.scrollHeight,
+						});
 					});
 				});
 			},
@@ -629,13 +681,12 @@ import Vue from 'vue';
 	.main {
 		width: 100%;
 		margin: 0 auto;
-		position: absolute;
-		bottom: 0;
-		left: 0;
+		position: relative;
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		min-height: 100vh;
 		background:
 			radial-gradient(1200rpx 520rpx at 12% -5%, rgba(89, 171, 255, 0.3) 0%, rgba(89, 171, 255, 0) 70%),
 			radial-gradient(1000rpx 460rpx at 92% 8%, rgba(0, 210, 255, 0.2) 0%, rgba(0, 210, 255, 0) 72%),
@@ -697,7 +748,7 @@ import Vue from 'vue';
 					align-items: center;
 					justify-content: center;
 					margin-top: 2rpx;
-					span {
+					text {
 						color: #51678f;
 						font-size: 40rpx;
 						font-weight: 700;
@@ -817,11 +868,11 @@ import Vue from 'vue';
 				color: #7990b3;
 			}
 			.body {
-				position: absolute;
+				position: relative;
 				z-index: 10;
-				bottom: 0;
+				flex: 1;
 				width: 100%;
-				height: 93%;
+				height: auto;
 				background: transparent;
 				border-radius: 0;
 				display: flex;
@@ -957,8 +1008,11 @@ import Vue from 'vue';
 					display: flex;
 					flex-direction: column;
 					align-items: center;
-					gap: 10rpx;
 					box-sizing: border-box;
+				}
+				.voice-tip,
+				.tts-bar {
+					margin-top: 10rpx;
 				}
 				.input-wrap {
 					width: 93%;
@@ -1048,13 +1102,15 @@ import Vue from 'vue';
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					gap: 20rpx;
 					padding: 12rpx 24rpx;
 					background: rgba(255, 152, 0, 0.12);
 					border-radius: 24rpx;
 					width: 100%;
 					max-width: 400rpx;
 					box-sizing: border-box;
+				}
+				.tts-bar-text {
+					margin-right: 20rpx;
 				}
 				.tts-bar-text {
 					font-size: 24rpx;
