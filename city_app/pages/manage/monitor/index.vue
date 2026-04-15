@@ -14,7 +14,7 @@
         <view class="meta">负责人：{{ item.leader || '-' }}</view>
         <view class="actions">
           <view class="btn" @tap="openEdit(index)">画范围/编辑</view>
-          <view class="btn danger" @tap="editWorking(index)">{{ item.running ? '停用' : '启用' }}</view>
+          <view class="btn danger" :class="!item.running ? 'enable' : ''" @tap="editWorking(index)">{{ item.running ? '停用' : '启用' }}</view>
         </view>
       </view>
       <view class="empty" v-if="!monitorList.length">暂无监控设备</view>
@@ -106,6 +106,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
+/* 统一物业管理页面 —— 蓝色渐变背景 */
 .monitor-page {
   min-height: 100vh;
   background: linear-gradient(180deg, #eaf5ff 0%, #f7fbff 100%);
@@ -115,25 +116,27 @@ export default {
 
 .header-row {
   margin-top: 8rpx;
-  margin-bottom: 14rpx;
+  margin-bottom: 22rpx;
 }
 
 .title {
-  font-size: 42rpx;
-  color: #1f2d3c;
+  font-size: 40rpx;
   font-weight: 800;
+  color: #1a2a3a;
 }
 
 .list {
   height: calc(100vh - 220rpx);
 }
 
+/* 统一卡片样式 */
 .item {
-  background: #f9fcff;
-  border-radius: 20rpx;
-  padding: 22rpx;
-  margin-bottom: 14rpx;
-  box-shadow: 0 8rpx 20rpx rgba(45, 98, 160, 0.1);
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8rpx 20rpx rgba(62, 95, 150, 0.08);
+  padding: 24rpx;
+  margin-bottom: 16rpx;
 }
 
 .item-head {
@@ -143,9 +146,9 @@ export default {
 }
 
 .name {
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: 700;
-  color: #223446;
+  color: #1a2a3a;
 }
 
 .status {
@@ -154,14 +157,17 @@ export default {
   padding: 4rpx 12rpx;
   color: #fff;
 }
-
-.status.on { background: #22c55e; }
-.status.off { background: #f97316; }
+.status.on {
+  background: #22c55e;
+}
+.status.off {
+  background: #94a3b8;
+}
 
 .meta {
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #6f8093;
+  color: rgba(26, 42, 58, 0.62);
 }
 
 .actions {
@@ -175,16 +181,21 @@ export default {
   border-radius: 12rpx;
   font-size: 24rpx;
   color: #fff;
-  background: #2b8cff;
+  background: #3b82f6;
 }
 
+/* 启用 = 绿色 */
 .btn.danger {
-  background: #f97316;
+  background: #f43f5e;
+}
+/* 停用 = 红色 */
+.btn.danger.enable {
+  background: #22c55e;
 }
 
 .empty {
   text-align: center;
-  color: #8da0b5;
+  color: rgba(26, 42, 58, 0.62);
   font-size: 24rpx;
   padding-top: 60rpx;
 }
