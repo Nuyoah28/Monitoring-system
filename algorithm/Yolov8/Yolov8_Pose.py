@@ -197,15 +197,32 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
                 if TYPE_LIST[11]:
                     list11 = action_result.get('wave', False)
 
-                # Draw action labels on image
-                if bboxes is not None and len(bboxes) > 0:
+                # Draw action labels on image (multi-person overlays when available)
+                overlays = []
+                if hasattr(action_recognizer, "get_last_overlays"):
+                    overlays = action_recognizer.get_last_overlays() or []
+
+                if overlays:
+                    for box, one_action in overlays:
+                        x, y = int(box[0]), int(box[1])
+                        line = 0
+                        if one_action.get("fall", False):
+                            cv2.putText(np_img, "fall", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+                            line += 1
+                        if one_action.get("punch", False):
+                            cv2.putText(np_img, "punch", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+                            line += 1
+                        if one_action.get("wave", False):
+                            cv2.putText(np_img, "wave", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+                elif bboxes is not None and len(bboxes) > 0:
+                    # fallback for legacy recognizer behavior
                     x, y = int(bboxes[0, 0]), int(bboxes[0, 1])
                     if list3:
-                        cv2.putText(np_img, "fall", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
+                        cv2.putText(np_img, "fall", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
                     if list6:
-                        cv2.putText(np_img, "punch", (x, y - 40), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
+                        cv2.putText(np_img, "punch", (x, y - 32), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
                     if list11:
-                        cv2.putText(np_img, "wave", (x, y - 80), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
+                        cv2.putText(np_img, "wave", (x, y - 64), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
 
         # ---------------------------------------------------------#
         #   Danger zone detection (keep hand-written, position-based)

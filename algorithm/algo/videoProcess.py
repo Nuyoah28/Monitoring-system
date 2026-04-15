@@ -132,6 +132,10 @@ def stream_video():
         checkpoint_path='algo/stgcnpp_ntu60.pth',
         buffer_size=30,
         confidence_threshold=0.5,
+        max_tracks=8,
+        top_k_tracks=4,
+        infer_interval=2,
+        max_missing=10,
     )
     print('模型加载成功！')
     

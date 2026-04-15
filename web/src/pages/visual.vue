@@ -133,6 +133,7 @@
                 v-for="tile in cameraTiles"
                 :key="tile.name"
                 class="video-tile"
+                :class="{ 'tile-breathing': true, 'tile-alert': tileHasAlert(tile.name) }"
                 @click="openFocus(tile)"
               >
                 <video
@@ -142,6 +143,10 @@
                   autoplay
                   playsinline
                 ></video>
+                <div v-if="!tile.streamUrl" class="tile-empty-state">
+                  <svg class="tile-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9A2.25 2.25 0 0013.5 5.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
+                  <span>等待接入</span>
+                </div>
                 <div class="tile-overlay">
                   <div class="tile-title">{{ tile.name }}</div>
                   <div class="tile-sub">{{ tile.streamUrl ? '实时画面' : '未配置流地址' }}</div>
@@ -151,15 +156,31 @@
           </article>
 
           <article class="card video-side">
-            <h3>点位地图联动</h3>
+            <h3 class="map-title">点位地图联动 <span class="live-dot"></span></h3>
             <div class="map-square">
               <AMapLinkage3D :points="mapPoints" @point-click="onMapPointClick" />
             </div>
             <div class="video-stats-grid">
-              <div class="mini-kpi"><span>在线</span><strong>{{ onlineCount }}</strong></div>
-              <div class="mini-kpi"><span>离线</span><strong>{{ offlineCount }}</strong></div>
-              <div class="mini-kpi"><span>总监控点</span><strong>{{ monitors.length }}</strong></div>
-              <div class="mini-kpi"><span>当前预览</span><strong>{{ cameraTiles.length }}</strong></div>
+              <div class="mini-kpi kpi-online"><span>在线</span><strong>{{ onlineCount }}</strong></div>
+              <div class="mini-kpi kpi-offline"><span>离线</span><strong>{{ offlineCount }}</strong></div>
+              <div class="mini-kpi kpi-total"><span>总监控点</span><strong>{{ monitors.length }}</strong></div>
+              <div class="mini-kpi kpi-preview"><span>当前预览</span><strong>{{ cameraTiles.length }}</strong></div>
+            </div>
+            <div class="event-stream">
+              <div class="event-stream-head">
+                <span class="event-stream-title">AI 实时事件</span>
+                <span class="event-stream-count">{{ recentEvents.length }} 条</span>
+              </div>
+              <div class="event-stream-list">
+                <div v-for="(ev, idx) in recentEvents" :key="idx" class="event-item" :class="'event-' + ev.severity">
+                  <span class="event-time">{{ ev.time }}</span>
+                  <span class="event-dot" :class="'dot-' + ev.severity"></span>
+                  <span class="event-text">{{ ev.text }}</span>
+                </div>
+                <div v-if="!recentEvents.length" class="event-item event-empty">
+                  <span class="event-text">暂无事件，系统运行正常</span>
+                </div>
+              </div>
             </div>
           </article>
         </section>
@@ -168,6 +189,10 @@
           <article v-for="metric in envTrendMetrics" :key="metric.key" class="card env-metric-card">
             <div class="panel-headline small env-metric-head">
               <h3>{{ metric.label }}趋势</h3>
+              <div class="env-live-badge" :style="{ color: metric.color }">
+                <strong>{{ envCurrentValues[metric.key] }}</strong>
+                <span>{{ metric.unit }}</span>
+              </div>
               <div v-if="metric.key === 'aqi'" class="chart-filter">
                 <span>时间段</span>
                 <select v-model="envTrendRange">
@@ -244,11 +269,59 @@
 
           <article class="card env-slot-card">
             <h3>车位占用数据</h3>
-            <div class="bar-grid">
-              <div class="bar-row" v-for="item in parkingBars" :key="item.name">
-                <span>{{ item.name }}</span>
-                <div class="bar"><i :style="{ width: `${item.percent}%` }"></i></div>
-                <strong>{{ item.value }}</strong>
+            <div class="parking-dashboard">
+              <div class="parking-ring-wrap">
+                <svg class="parking-ring" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(126,197,255,0.12)" stroke-width="10" />
+                  <circle cx="60" cy="60" r="50" fill="none"
+                    :stroke="parkingOccupancyColor"
+                    stroke-width="10"
+                    stroke-linecap="round"
+                    :stroke-dasharray="`${parkingOccupancy * 3.14} 314`"
+                    transform="rotate(-90 60 60)"
+                    style="transition: stroke-dasharray 0.6s ease"
+                  />
+                  <text x="60" y="54" text-anchor="middle" fill="#eaf6ff" font-size="22" font-weight="700">{{ parkingOccupancy }}%</text>
+                  <text x="60" y="72" text-anchor="middle" fill="rgba(214,230,255,0.6)" font-size="10">占用率</text>
+                </svg>
+                <div class="parking-summary">
+                  <span>已用 <strong>{{ parkingUsed }}</strong></span>
+                  <span>空闲 <strong>{{ parkingFree }}</strong></span>
+                </div>
+              </div>
+              <div class="bar-grid">
+                <div class="bar-row" v-for="item in parkingBars" :key="item.name">
+                  <span>{{ item.name }}</span>
+                  <div class="bar"><i :style="{ width: `${item.percent}%` }"></i></div>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card env-comfort-card">
+            <div class="comfort-head">
+              <h3>环境舒适度</h3>
+              <span class="comfort-label" :style="{ color: comfortColor }">{{ comfortLabel }}</span>
+            </div>
+            <div class="comfort-score-wrap">
+              <div class="comfort-score" :style="{ '--score-color': comfortColor }">
+                <strong>{{ comfortScore }}</strong>
+                <span>/ 100</span>
+              </div>
+              <div class="comfort-factors">
+                <div class="comfort-factor">
+                  <span>AQI</span>
+                  <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.aqi)}%`, background: '#63b8ff' }"></i></div>
+                </div>
+                <div class="comfort-factor">
+                  <span>湿度</span>
+                  <div class="comfort-bar"><i :style="{ width: `${envCurrentValues.humidity}%`, background: '#53d5a5' }"></i></div>
+                </div>
+                <div class="comfort-factor">
+                  <span>PM2.5</span>
+                  <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.pm25 * 1.2)}%`, background: '#f8cb71' }"></i></div>
+                </div>
               </div>
             </div>
           </article>
@@ -940,6 +1013,81 @@ const envTrendCharts = computed<Record<EnvMetricKey, TrendRenderData>>(() => ({
 
 const onlineCount = computed(() => monitors.value.filter(item => item.status === 1 || item.status === 'online').length)
 const offlineCount = computed(() => Math.max(monitors.value.length - onlineCount.value, 0))
+
+// ====== 新增：视频页 AI 事件流 ======
+const recentEvents = computed(() => {
+  const list = alarmStore.getAlarmList || []
+  return list.slice(0, 5).map((item: any) => {
+    const raw = item.date || item.createTime || ''
+    let time = '--:--'
+    if (raw) {
+      const d = new Date(raw)
+      if (!isNaN(d.getTime())) {
+        time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      }
+    }
+    const level = Number(item.level || 1)
+    const severity = level >= 3 ? 'high' : level === 2 ? 'mid' : 'low'
+    return {
+      time,
+      text: `${item.department || '未标注'} ${item.eventName || '事件'}`,
+      severity,
+    }
+  })
+})
+
+const tileHasAlert = (tileName: string) => {
+  const list = alarmStore.getAlarmList || []
+  return list.some((item: any) => {
+    const dept = String(item.department || '').toLowerCase()
+    const name = tileName.toLowerCase()
+    return dept && name.includes(dept.slice(0, 2))
+  })
+}
+
+// ====== 新增：环境实时数值 ======
+const envCurrentValues = computed(() => {
+  const series = envTrendSeries.value
+  const last = series[series.length - 1]
+  return {
+    aqi: last?.aqi ?? 0,
+    humidity: last?.humidity ?? 0,
+    pm25: last?.pm25 ?? 0,
+  }
+})
+
+// ====== 新增：车位仪表盘 ======
+const parkingTotal = 160
+const parkingUsed = computed(() => parkingBars.value.reduce((sum, item) => sum + item.value, 0))
+const parkingFree = computed(() => Math.max(parkingTotal - parkingUsed.value, 0))
+const parkingOccupancy = computed(() => Math.round((parkingUsed.value / parkingTotal) * 100))
+const parkingOccupancyColor = computed(() => {
+  const pct = parkingOccupancy.value
+  if (pct > 80) return '#ff8d8d'
+  if (pct > 50) return '#f8cb71'
+  return '#53d5a5'
+})
+
+// ====== 新增：环境舒适度评分 ======
+const comfortScore = computed(() => {
+  const { aqi, humidity, pm25 } = envCurrentValues.value
+  const aqiScore = Math.max(0, 100 - aqi)
+  const humScore = humidity >= 40 && humidity <= 70 ? 100 : Math.max(0, 100 - Math.abs(humidity - 55) * 2)
+  const pmScore = Math.max(0, 100 - pm25)
+  return Math.round(aqiScore * 0.4 + humScore * 0.3 + pmScore * 0.3)
+})
+const comfortColor = computed(() => {
+  const s = comfortScore.value
+  if (s >= 80) return '#53d5a5'
+  if (s >= 60) return '#f8cb71'
+  return '#ff8d8d'
+})
+const comfortLabel = computed(() => {
+  const s = comfortScore.value
+  if (s >= 80) return '优良'
+  if (s >= 60) return '一般'
+  return '较差'
+})
 
 type SummaryRange = 'week' | 'month'
 interface SummaryRow {
@@ -1819,7 +1967,7 @@ watch(activeTab, (tab) => {
   border: 1px solid rgba(126, 197, 255, 0.24);
   border-radius: 8px;
   background: rgba(17, 47, 75, 0.56);
-  padding: 8px;
+  padding: 8px 8px 8px 14px;
 }
 
 .mini-kpi span {
@@ -1837,8 +1985,12 @@ watch(activeTab, (tab) => {
 .env-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(180px, auto);
   gap: 8px;
+}
+
+.env-panel > .env-metric-card:first-child {
+  grid-column: 1 / -1;
 }
 
 .env-slot-card {
@@ -1941,6 +2093,299 @@ watch(activeTab, (tab) => {
   display: block;
   height: 100%;
   background: linear-gradient(90deg, rgba(126, 197, 255, 0.88), rgba(83, 213, 165, 0.86));
+}
+
+/* ====== 1. 视频卡片呼吸灯 ====== */
+@keyframes tile-breathe {
+  0%, 100% { border-color: rgba(107, 176, 255, 0.35); box-shadow: 0 0 0 0 rgba(99, 184, 255, 0); }
+  50% { border-color: rgba(107, 176, 255, 0.65); box-shadow: 0 0 12px 0 rgba(99, 184, 255, 0.15); }
+}
+
+@keyframes tile-alert-pulse {
+  0%, 100% { border-color: rgba(255, 120, 120, 0.5); box-shadow: 0 0 0 0 rgba(255, 100, 100, 0); }
+  50% { border-color: rgba(255, 100, 100, 0.85); box-shadow: 0 0 18px 0 rgba(255, 80, 80, 0.25); }
+}
+
+.tile-breathing {
+  animation: tile-breathe 3.5s ease-in-out infinite;
+  border-style: solid;
+}
+
+.tile-alert {
+  animation: tile-alert-pulse 1.8s ease-in-out infinite;
+}
+
+.tile-empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(168, 198, 232, 0.4);
+  pointer-events: none;
+}
+
+.tile-cam-icon {
+  width: 42px;
+  height: 42px;
+  opacity: 0.5;
+}
+
+.tile-empty-state span {
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+/* ====== 2. 地图标题脉冲点 ====== */
+@keyframes live-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.8); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.map-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #53d5a5;
+  border-radius: 50%;
+  animation: live-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(83, 213, 165, 0.6);
+}
+
+/* ====== 3. KPI 彩色竖线 ====== */
+.mini-kpi {
+  position: relative;
+  padding-left: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-kpi::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+}
+
+.kpi-online::before { background: #53d5a5; }
+.kpi-offline::before { background: #ff8d8d; }
+.kpi-total::before { background: #63b8ff; }
+.kpi-preview::before { background: #a78bfa; }
+
+/* ====== 4. AI 事件流 ====== */
+.event-stream {
+  margin-top: 10px;
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(10, 30, 52, 0.6);
+  padding: 8px 10px;
+  max-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.event-stream-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.event-stream-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cde8ff;
+}
+
+.event-stream-count {
+  font-size: 11px;
+  color: var(--sub);
+}
+
+.event-stream-list {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(17, 47, 75, 0.5);
+  font-size: 11px;
+  transition: background 0.2s;
+}
+
+.event-item:hover {
+  background: rgba(34, 79, 118, 0.7);
+}
+
+.event-time {
+  color: rgba(214, 230, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+}
+
+.event-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-low { background: #53d5a5; }
+.dot-mid { background: #f8cb71; }
+.dot-high { background: #ff8d8d; }
+
+.event-text {
+  color: #d6ecff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-empty {
+  justify-content: center;
+  color: rgba(214, 230, 255, 0.4);
+}
+
+/* ====== 5. 环境实时数值徽章 ====== */
+.env-live-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.env-live-badge strong {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.env-live-badge span {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* ====== 6. 车位圆环仪表盘 ====== */
+.parking-dashboard {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.parking-ring-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.parking-ring {
+  width: 110px;
+  height: 110px;
+}
+
+.parking-summary {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--sub);
+}
+
+.parking-summary strong {
+  color: #eaf6ff;
+  margin-left: 2px;
+}
+
+/* ====== 7. 环境舒适度评分卡 ====== */
+.env-comfort-card {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(83, 213, 165, 0.08), transparent 40%),
+    linear-gradient(180deg, rgba(17, 46, 75, 0.82), rgba(13, 33, 56, 0.8));
+  border: 1px solid rgba(83, 213, 165, 0.18);
+}
+
+.comfort-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.comfort-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.comfort-score-wrap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.comfort-score {
+  text-align: center;
+}
+
+.comfort-score strong {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--score-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.comfort-score span {
+  font-size: 14px;
+  color: rgba(214, 230, 255, 0.45);
+  margin-left: 2px;
+}
+
+.comfort-factors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comfort-factor {
+  display: grid;
+  grid-template-columns: 3.4rem 1fr;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--sub);
+}
+
+.comfort-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.comfort-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.4s ease;
 }
 
 
