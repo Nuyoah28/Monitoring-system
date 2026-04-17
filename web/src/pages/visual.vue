@@ -186,8 +186,50 @@
         </section>
 
         <section v-show="activeTab === 'env'" class="panel env-panel">
-          <article v-for="metric in envTrendMetrics" :key="metric.key" class="card env-metric-card">
+          <article class="card env-overview-card">
+            <div class="env-overview-head">
+              <div>
+                <p class="panel-overline">ENVIRONMENT COMMAND</p>
+                <h3>环境态势总览</h3>
+                <p class="env-overview-copy">{{ envSituationSummary }}</p>
+              </div>
+              <div class="env-overview-status">
+                <span class="overview-pill" :class="envSituationTone">{{ envSituationLabel }}</span>
+                <span class="env-overview-updated">最新样本 {{ latestEnvSampleLabel }}</span>
+              </div>
+            </div>
+
+            <div class="env-overview-grid">
+              <article
+                v-for="item in envOverviewCards"
+                :key="item.label"
+                class="env-overview-stat"
+                :class="item.tone"
+              >
+                <div class="env-overview-top">
+                  <span>{{ item.label }}</span>
+                  <em>{{ item.badge }}</em>
+                </div>
+                <div class="env-overview-value">
+                  <strong>{{ item.value }}</strong>
+                  <span>{{ item.unit }}</span>
+                </div>
+                <div class="env-overview-meter">
+                  <i :style="{ width: `${item.progress}%`, background: item.color }"></i>
+                </div>
+                <p>{{ item.detail }}</p>
+              </article>
+            </div>
+          </article>
+
+          <article
+            v-for="metric in envTrendMetrics"
+            :key="metric.key"
+            class="card env-metric-card"
+            :class="`env-metric-${metric.key}`"
+          >
             <div class="panel-headline small env-metric-head">
+              <p class="panel-overline env-metric-kicker">TREND WATCH</p>
               <h3>{{ metric.label }}趋势</h3>
               <div class="env-live-badge" :style="{ color: metric.color }">
                 <strong>{{ envCurrentValues[metric.key] }}</strong>
@@ -202,6 +244,8 @@
                 </select>
               </div>
               <span v-else>{{ metric.unit }}</span>
+              <span class="overview-pill metric-pill" :class="envMetricSignals[metric.key].tone">{{ envMetricSignals[metric.key].label }}</span>
+              <span class="env-metric-note">{{ envMetricSignals[metric.key].note }}</span>
             </div>
             <div class="env-trend-item single">
               <svg
@@ -268,7 +312,12 @@
           </article>
 
           <article class="card env-slot-card">
+            <p class="panel-overline">PARKING ANALYTICS</p>
             <h3>车位占用数据</h3>
+            <div class="env-slot-meta">
+              <span class="overview-pill" :class="parkingOccupancyTone">{{ parkingOccupancyLabel }}</span>
+              <span class="parking-head-text">峰值区域 {{ busiestParkingZone.name }}</span>
+            </div>
             <div class="parking-dashboard">
               <div class="parking-ring-wrap">
                 <svg class="parking-ring" viewBox="0 0 120 120">
@@ -285,15 +334,37 @@
                   <text x="60" y="72" text-anchor="middle" fill="rgba(214,230,255,0.6)" font-size="10">占用率</text>
                 </svg>
                 <div class="parking-summary">
+                  <span>总量 <strong>{{ parkingTotal }}</strong></span>
                   <span>已用 <strong>{{ parkingUsed }}</strong></span>
                   <span>空闲 <strong>{{ parkingFree }}</strong></span>
                 </div>
               </div>
-              <div class="bar-grid">
-                <div class="bar-row" v-for="item in parkingBars" :key="item.name">
-                  <span>{{ item.name }}</span>
-                  <div class="bar"><i :style="{ width: `${item.percent}%` }"></i></div>
-                  <strong>{{ item.value }}</strong>
+              <div class="parking-detail-stack">
+                <div class="parking-stat-grid">
+                  <article class="parking-stat-card">
+                    <span>当前占用率</span>
+                    <strong>{{ parkingOccupancy }}%</strong>
+                    <p>整体车位压力 {{ parkingOccupancyLabel }}</p>
+                  </article>
+                  <article class="parking-stat-card">
+                    <span>空闲引导</span>
+                    <strong>{{ parkingFree }}</strong>
+                    <p>优先分流至 {{ busiestParkingZone.name }}</p>
+                  </article>
+                </div>
+
+                <div class="bar-grid parking-zone-grid">
+                  <div class="bar-row parking-bar-row" v-for="item in parkingZoneCards" :key="item.name">
+                    <div class="bar-copy">
+                      <span>{{ item.name }}</span>
+                      <em>{{ item.statusText }}</em>
+                    </div>
+                    <div class="bar"><i :style="{ width: `${item.percent}%`, background: item.color }"></i></div>
+                    <div class="bar-value">
+                      <strong>{{ item.value }}</strong>
+                      <small>{{ item.free }} 空闲</small>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -304,23 +375,31 @@
               <h3>环境舒适度</h3>
               <span class="comfort-label" :style="{ color: comfortColor }">{{ comfortLabel }}</span>
             </div>
-            <div class="comfort-score-wrap">
-              <div class="comfort-score" :style="{ '--score-color': comfortColor }">
-                <strong>{{ comfortScore }}</strong>
-                <span>/ 100</span>
+            <div class="comfort-layout">
+              <div class="comfort-score-panel">
+                <div class="comfort-score" :style="{ '--score-color': comfortColor }">
+                  <strong>{{ comfortScore }}</strong>
+                  <span>/ 100</span>
+                </div>
+                <p class="comfort-score-note">当前舒适度{{ comfortLabel }}，建议结合空气质量与湿度变化持续联动巡检。</p>
               </div>
-              <div class="comfort-factors">
-                <div class="comfort-factor">
-                  <span>AQI</span>
-                  <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.aqi)}%`, background: '#63b8ff' }"></i></div>
+              <div class="comfort-factor-panel">
+                <div class="comfort-factors">
+                  <div class="comfort-factor">
+                    <span>AQI</span>
+                    <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.aqi)}%`, background: '#63b8ff' }"></i></div>
+                  </div>
+                  <div class="comfort-factor">
+                    <span>湿度</span>
+                    <div class="comfort-bar"><i :style="{ width: `${envCurrentValues.humidity}%`, background: '#53d5a5' }"></i></div>
+                  </div>
+                  <div class="comfort-factor">
+                    <span>PM2.5</span>
+                    <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.pm25 * 1.2)}%`, background: '#f8cb71' }"></i></div>
+                  </div>
                 </div>
-                <div class="comfort-factor">
-                  <span>湿度</span>
-                  <div class="comfort-bar"><i :style="{ width: `${envCurrentValues.humidity}%`, background: '#53d5a5' }"></i></div>
-                </div>
-                <div class="comfort-factor">
-                  <span>PM2.5</span>
-                  <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.pm25 * 1.2)}%`, background: '#f8cb71' }"></i></div>
+                <div class="comfort-tips">
+                  <span v-for="tip in comfortTips" :key="tip" class="comfort-tip">{{ tip }}</span>
                 </div>
               </div>
             </div>
@@ -328,22 +407,28 @@
         </section>
 
         <section v-show="activeTab === 'agent'" class="panel agent-panel">
-          <div class="main-col">
-            <article class="card hero-card">
-              <div class="section-head hero-head">
-                <div>
+            <article class="card hero-card hero-card-clean">
+              <div class="section-head hero-head hero-head-clean">
+                <div class="hero-head-primary">
+                  <p class="panel-overline">AI AGENT</p>
                   <h3>数字助手</h3>
                   <p>数字助手常驻在线，支持语音或文字发起交互，可联动平台能力完成告警查询、监控查看与智能问答。</p>
-                </div>
-                <div class="hero-head-side">
-                  <div class="service-strip">
+                  <div class="service-strip service-strip-compact">
                     <span v-for="item in serviceHighlights" :key="item" class="service-chip">{{ item }}</span>
                   </div>
+                </div>
+                <div class="hero-head-side">
                   <span class="status-pill" :class="currentStageStatus">{{ agentStatusLabel }}</span>
+                  <span class="status-pill subtle">{{ agentConversationLabel }}</span>
                 </div>
               </div>
 
-              <div class="hero-shell">
+              <div class="agent-brief-bar">
+                <span class="agent-brief-label">当前提示</span>
+                <p>{{ agentPreview }}</p>
+              </div>
+
+              <div class="hero-shell hero-shell-clean">
                 <div class="hero-stage">
                   <VirtualAgentStage
                     :key="agentStageKey"
@@ -363,9 +448,8 @@
                 />
               </div>
             </article>
-          </div>
 
-          <aside class="side-col">
+          <aside v-if="false" class="side-col">
             <article class="card side-card task-card">
               <div class="card-title-row">
                 <h3>待办事项</h3>
@@ -1089,6 +1173,169 @@ const comfortLabel = computed(() => {
   return '较差'
 })
 
+type StatusTone = 'good' | 'warn' | 'alert' | 'info'
+
+interface MetricSignal {
+  label: string
+  note: string
+  tone: StatusTone
+}
+
+const latestEnvSampleLabel = computed(() => {
+  const series = envTrendSeries.value
+  return series[series.length - 1]?.label || '--'
+})
+
+const buildMetricSignal = (key: EnvMetricKey, value: number): MetricSignal => {
+  if (key === 'aqi') {
+    if (value <= 75) return { label: '稳定', note: '空气质量保持在安全区间', tone: 'good' }
+    if (value <= 90) return { label: '关注', note: '建议加强新风与巡检频率', tone: 'warn' }
+    return { label: '预警', note: '建议检查通风与污染源状态', tone: 'alert' }
+  }
+
+  if (key === 'humidity') {
+    if (value >= 45 && value <= 65) return { label: '舒适', note: '湿度处于舒适区间', tone: 'good' }
+    if (value >= 35 && value <= 75) return { label: '波动', note: '可视情况联动除湿或加湿', tone: 'warn' }
+    return { label: '异常', note: '建议联动空调与新风设备', tone: 'alert' }
+  }
+
+  if (value <= 45) return { label: '良好', note: '颗粒物控制平稳', tone: 'good' }
+  if (value <= 60) return { label: '关注', note: '建议增加局部清洁频率', tone: 'warn' }
+  return { label: '偏高', note: '建议加强净化和地库通风', tone: 'alert' }
+}
+
+const envMetricSignals = computed<Record<EnvMetricKey, MetricSignal>>(() => ({
+  aqi: buildMetricSignal('aqi', envCurrentValues.value.aqi),
+  humidity: buildMetricSignal('humidity', envCurrentValues.value.humidity),
+  pm25: buildMetricSignal('pm25', envCurrentValues.value.pm25),
+}))
+
+const parkingZoneCards = computed(() => parkingBars.value.map((item) => {
+  const estimatedTotal = item.percent > 0 ? Math.max(item.value, Math.round(item.value / (item.percent / 100))) : item.value
+  const free = Math.max(estimatedTotal - item.value, 0)
+  let tone: StatusTone = 'good'
+  let statusText = '余量充足'
+  let color = 'linear-gradient(90deg, rgba(126, 197, 255, 0.9), rgba(83, 213, 165, 0.85))'
+
+  if (item.percent >= 80) {
+    tone = 'alert'
+    statusText = '接近满载'
+    color = 'linear-gradient(90deg, rgba(255, 164, 164, 0.95), rgba(255, 108, 108, 0.88))'
+  } else if (item.percent >= 60) {
+    tone = 'warn'
+    statusText = '建议分流'
+    color = 'linear-gradient(90deg, rgba(248, 216, 132, 0.95), rgba(248, 203, 113, 0.88))'
+  }
+
+  return {
+    ...item,
+    estimatedTotal,
+    free,
+    tone,
+    statusText,
+    color,
+  }
+}))
+
+const busiestParkingZone = computed(() => {
+  const zones = parkingZoneCards.value
+  if (!zones.length) {
+    return {
+      name: '--',
+      percent: 0,
+      estimatedTotal: 0,
+      free: 0,
+      value: 0,
+      tone: 'info' as StatusTone,
+      statusText: '--',
+      color: 'linear-gradient(90deg, rgba(126, 197, 255, 0.9), rgba(83, 213, 165, 0.85))',
+    }
+  }
+  return zones.reduce((max, item) => (item.percent > max.percent ? item : max), zones[0])
+})
+
+const parkingOccupancyTone = computed<StatusTone>(() => {
+  if (parkingOccupancy.value >= 80) return 'alert'
+  if (parkingOccupancy.value >= 60) return 'warn'
+  return 'good'
+})
+
+const parkingOccupancyLabel = computed(() => {
+  if (parkingOccupancy.value >= 80) return '接近满载'
+  if (parkingOccupancy.value >= 60) return '压力偏高'
+  return '余量充足'
+})
+
+const envSituationTone = computed<StatusTone>(() => {
+  if (comfortScore.value < 60 || parkingOccupancy.value >= 85) return 'alert'
+  if (comfortScore.value < 80 || parkingOccupancy.value >= 65) return 'warn'
+  return 'good'
+})
+
+const envSituationLabel = computed(() => {
+  if (envSituationTone.value === 'alert') return '需要干预'
+  if (envSituationTone.value === 'warn') return '建议关注'
+  return '运行平稳'
+})
+
+const envSituationSummary = computed(() => {
+  const zoneName = busiestParkingZone.value.name
+  return `当前舒适度 ${comfortScore.value} 分，环境指标整体 ${comfortLabel.value}，车位调度建议优先关注 ${zoneName}。`
+})
+
+const envOverviewCards = computed(() => [
+  {
+    label: 'AQI',
+    value: envCurrentValues.value.aqi,
+    unit: '指数',
+    badge: envMetricSignals.value.aqi.label,
+    detail: envMetricSignals.value.aqi.note,
+    tone: envMetricSignals.value.aqi.tone,
+    progress: Math.min(100, Math.round((envCurrentValues.value.aqi / 120) * 100)),
+    color: 'linear-gradient(90deg, rgba(126, 232, 255, 0.95), rgba(99, 184, 255, 0.88))',
+  },
+  {
+    label: '湿度',
+    value: envCurrentValues.value.humidity,
+    unit: '%',
+    badge: envMetricSignals.value.humidity.label,
+    detail: envMetricSignals.value.humidity.note,
+    tone: envMetricSignals.value.humidity.tone,
+    progress: Math.min(100, envCurrentValues.value.humidity),
+    color: 'linear-gradient(90deg, rgba(118, 235, 191, 0.95), rgba(83, 213, 165, 0.88))',
+  },
+  {
+    label: 'PM2.5',
+    value: envCurrentValues.value.pm25,
+    unit: 'ug/m3',
+    badge: envMetricSignals.value.pm25.label,
+    detail: envMetricSignals.value.pm25.note,
+    tone: envMetricSignals.value.pm25.tone,
+    progress: Math.min(100, Math.round(envCurrentValues.value.pm25 * 1.6)),
+    color: 'linear-gradient(90deg, rgba(248, 216, 132, 0.95), rgba(248, 203, 113, 0.88))',
+  },
+  {
+    label: '空闲车位',
+    value: parkingFree.value,
+    unit: '个',
+    badge: parkingOccupancyLabel.value,
+    detail: `峰值区域 ${busiestParkingZone.value.name}，可继续做余量分流`,
+    tone: parkingOccupancyTone.value,
+    progress: Math.min(100, Math.round((parkingFree.value / parkingTotal) * 100)),
+    color: 'linear-gradient(90deg, rgba(149, 223, 255, 0.95), rgba(86, 189, 255, 0.86))',
+  },
+])
+
+const comfortTips = computed(() => {
+  const tips: string[] = []
+  if (envMetricSignals.value.aqi.tone !== 'good') tips.push('建议提高新风与巡检频率')
+  if (envMetricSignals.value.humidity.tone !== 'good') tips.push('湿度波动明显，注意联动空调除湿')
+  if (envMetricSignals.value.pm25.tone !== 'good') tips.push('建议加强地库清洁与空气净化')
+  if (parkingOccupancy.value >= 75) tips.push(`车位压力偏高，优先引导至 ${busiestParkingZone.value.name} 之外区域`)
+  if (!tips.length) tips.push('当前环境指标平稳，可保持现有巡检节奏')
+  return tips.slice(0, 3)
+})
+
 type SummaryRange = 'week' | 'month'
 interface SummaryRow {
   label: string
@@ -1235,8 +1482,8 @@ const voiceInteractionState = ref<VoiceInteractionState>('idle')
 const agentPreview = ref('您好，我是晓卫，可以通过对话帮您查询告警、监控点与环境状态。')
 const isChatStreaming = ref(false)
 const isRealtimeConversationActive = ref(false)
-const chatQuickReplies = ['未处理告警有多少', '查看最近告警', '查询1号监控点天气', '介绍一下你的服务']
-const serviceHighlights = ['实时语音', '连续对话', '监控联动', '周期总结']
+const chatQuickReplies = ['未处理告警有多少', '查看最近告警', '查询车库环境状态']
+const serviceHighlights = ['语音问答', '告警联动', '监控查询']
 let statusTimer: number | null = null
 
 const currentStageStatus = computed<AgentStageStatus>(() => {
@@ -1251,6 +1498,52 @@ const agentStatusLabel = computed(() => {
   if (currentStageStatus.value === 'speaking') return '正在回复'
   return '待命中'
 })
+
+const pendingAlarmCount = computed(() => {
+  const list = alarmStore.getAlarmList || []
+  return list.filter((item: any) => item.deal !== '完成' && item.status !== 1).length
+})
+
+const summaryHandleRate = computed(() => {
+  const total = selectedSummaryView.value.total
+  if (!total) return 0
+  return Math.round((selectedSummaryView.value.handled / total) * 100)
+})
+
+const agentConversationLabel = computed(() => {
+  if (isRealtimeConversationActive.value) return '实时会话已开启'
+  if (currentStageStatus.value === 'listening') return '等待语音输入'
+  if (currentStageStatus.value === 'thinking') return '正在联动平台能力'
+  if (currentStageStatus.value === 'speaking') return '结果正在播报'
+  return '文本 / 单次语音'
+})
+
+const agentInsightCards = computed(() => [
+  {
+    label: '会话模式',
+    value: isRealtimeConversationActive.value ? '实时语音' : '文本协同',
+    detail: '支持连续对话、告警查询与联动问答',
+    tone: isRealtimeConversationActive.value ? 'good' : 'info',
+  },
+  {
+    label: '待处理告警',
+    value: String(pendingAlarmCount.value),
+    detail: pendingAlarmCount.value ? '建议优先闭环高等级事件' : '当前无积压，可继续巡检',
+    tone: pendingAlarmCount.value >= 4 ? 'alert' : pendingAlarmCount.value > 0 ? 'warn' : 'good',
+  },
+  {
+    label: '周期处置率',
+    value: `${summaryHandleRate.value}%`,
+    detail: `${activeSummaryRange.value === 'week' ? '最近一周' : '最近一月'}摘要已同步`,
+    tone: summaryHandleRate.value >= 85 ? 'good' : summaryHandleRate.value >= 60 ? 'warn' : 'info',
+  },
+  {
+    label: '重点区域',
+    value: selectedSummaryView.value.topArea || '--',
+    detail: `高优先事件 ${selectedSummaryView.value.highLevel} 起`,
+    tone: selectedSummaryView.value.highLevel > 0 ? 'warn' : 'info',
+  },
+])
 
 const clearStatusTimer = (): void => {
   if (statusTimer !== null) {
@@ -1568,8 +1861,9 @@ watch(activeTab, (tab) => {
 
 :deep(.grid) {
   grid-template-columns: 1fr;
-  height: 100%;
+  height: auto;
   min-height: 0;
+  align-content: start;
 }
 
 :deep(.grid > *) {
@@ -1578,73 +1872,125 @@ watch(activeTab, (tab) => {
 
 .page-shell {
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 8px;
+  grid-template-rows: auto auto;
+  gap: 14px;
   min-height: 0;
-  height: 100%;
+  min-height: 100%;
+  height: auto;
+  align-content: start;
 }
 
 .nav-bar {
-  border: 1px solid rgba(126, 197, 255, 0.38);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(15, 42, 70, 0.95), rgba(12, 34, 58, 0.92));
-  padding: 8px 10px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(126, 197, 255, 0.24);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(12, 31, 52, 0.96), rgba(8, 20, 35, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 18px 32px rgba(2, 10, 20, 0.22);
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 14px;
+}
+
+.nav-bar::before,
+.nav-bar::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.nav-bar::before {
+  inset: 0 auto auto 0;
+  width: 38%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(126, 232, 255, 0.6), rgba(126, 232, 255, 0));
+}
+
+.nav-bar::after {
+  inset: auto 8% -72px auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(103, 190, 255, 0.16), transparent 70%);
+  filter: blur(10px);
 }
 
 .nav-left {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .nav-btn {
-  border: 1px solid rgba(126, 197, 255, 0.34);
-  background: linear-gradient(180deg, rgba(17, 47, 75, 0.82), rgba(14, 39, 64, 0.8));
+  position: relative;
+  border: 1px solid rgba(126, 197, 255, 0.2);
+  background:
+    linear-gradient(180deg, rgba(15, 39, 64, 0.82), rgba(9, 25, 42, 0.84));
   color: #eaf6ff;
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 12px;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .nav-btn.active,
 .nav-btn:hover {
-  border-color: rgba(126, 197, 255, 0.75);
-  background: linear-gradient(180deg, rgba(31, 77, 116, 0.95), rgba(21, 58, 90, 0.95));
+  border-color: rgba(126, 232, 255, 0.42);
+  background:
+    linear-gradient(180deg, rgba(33, 94, 143, 0.96), rgba(18, 55, 88, 0.92));
+  color: #faffff;
+  transform: translateY(-1px);
+  box-shadow:
+    0 18px 28px rgba(2, 10, 20, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .nav-current {
-  font-size: 18px;
-  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  background: rgba(17, 47, 75, 0.34);
+  font-family: var(--font-data);
+  font-size: 24px;
+  font-weight: 700;
   color: #d9ecff;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 16px rgba(103, 190, 255, 0.22);
 }
 
 .content-shell {
   min-height: 0;
-  height: 100%;
+  height: auto;
 }
 
 .panel {
   min-height: 0;
-  height: 100%;
+  height: auto;
 }
 
 .panel .card {
   background:
-    radial-gradient(circle at 10% -10%, rgba(126, 197, 255, 0.08), transparent 38%),
-    linear-gradient(180deg, rgba(17, 46, 75, 0.82), rgba(13, 33, 56, 0.82));
-  box-shadow: inset 0 0 0 1px rgba(126, 197, 255, 0.08);
+    radial-gradient(circle at 12% -10%, rgba(126, 197, 255, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(14, 33, 56, 0.88), rgba(8, 20, 35, 0.92));
+  border-radius: 24px;
+  border-color: rgba(126, 197, 255, 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 197, 255, 0.05),
+    0 18px 34px rgba(2, 10, 20, 0.2);
+  padding: 18px;
 }
 
 .alarm-panel {
   display: grid;
   grid-template-columns: 0.58fr 1.42fr;
-  gap: 8px;
+  gap: 14px;
 }
 
 .alarm-left,
@@ -1663,7 +2009,7 @@ watch(activeTab, (tab) => {
 .alarm-right {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 8px;
+  gap: 14px;
   min-height: 0;
 }
 
@@ -1699,17 +2045,17 @@ watch(activeTab, (tab) => {
 }
 
 .chart-filter select {
-  border: 1px solid rgba(126, 197, 255, 0.32);
-  border-radius: 6px;
-  background: rgba(17, 47, 75, 0.66);
+  border: 1px solid rgba(126, 197, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(9, 25, 42, 0.76);
   color: #eaf6ff;
-  font-size: 11px;
-  padding: 4px 8px;
+  font-size: 12px;
+  padding: 8px 12px;
 }
 
 .chart-mini-action {
-  min-width: 108px;
-  padding: 5px 12px;
+  min-width: 118px;
+  padding: 8px 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1757,34 +2103,35 @@ watch(activeTab, (tab) => {
 }
 
 .mini-action {
-  border: 1px solid rgba(126, 197, 255, 0.32);
+  border: 1px solid rgba(126, 197, 255, 0.22);
   border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 11px;
+  padding: 7px 12px;
+  font-size: 12px;
   color: #d9edff;
-  background: rgba(17, 47, 75, 0.7);
+  background: rgba(17, 47, 75, 0.58);
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .table-filters {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
 .table-filters input {
-  width: 9.6rem;
+  width: 11rem;
 }
 
 .table-filters input,
 .table-filters select {
-  border: 1px solid rgba(126, 197, 255, 0.32);
-  border-radius: 6px;
-  background: rgba(17, 47, 75, 0.66);
+  border: 1px solid rgba(126, 197, 255, 0.22);
+  border-radius: 16px;
+  background: rgba(9, 25, 42, 0.76);
   color: #eaf6ff;
-  font-size: 11px;
-  padding: 4px 8px;
+  font-size: 12px;
+  padding: 9px 12px;
 }
 
 .info-table tbody tr.high {
@@ -1805,9 +2152,10 @@ watch(activeTab, (tab) => {
   justify-content: center;
   min-width: 1.45rem;
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 4px 10px;
   font-size: 11px;
   border: 1px solid transparent;
+  letter-spacing: 0.06em;
 }
 
 .level-chip.high {
@@ -1829,11 +2177,11 @@ watch(activeTab, (tab) => {
 }
 
 .chart-panel {
-  min-height: 230px;
+  min-height: 260px;
   height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
-  gap: 12px;
+  gap: 14px;
 }
 
 .chart-card {
@@ -1850,13 +2198,17 @@ watch(activeTab, (tab) => {
   min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 6px;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  border-radius: 20px;
+  background: rgba(9, 24, 42, 0.52);
 }
 
 .chart-item h4 {
   font-size: 14px;
   color: var(--text);
-  margin-bottom: 8px;
+  margin: 0;
   font-weight: 500;
 }
 
@@ -1875,8 +2227,10 @@ watch(activeTab, (tab) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(126, 197, 255, 0.12);
 }
 
 .panel-headline span {
@@ -1887,7 +2241,7 @@ watch(activeTab, (tab) => {
 .video-panel {
   display: grid;
   grid-template-columns: 1.65fr 1fr;
-  gap: 8px;
+  gap: 14px;
 }
 
 .video-main {
@@ -1909,10 +2263,15 @@ watch(activeTab, (tab) => {
 .video-tile {
   position: relative;
   overflow: hidden;
-  min-height: 170px;
-  border-radius: 8px;
-  border: 1px dashed rgba(107, 176, 255, 0.55);
-  background: rgba(7, 21, 38, 0.8);
+  min-height: 190px;
+  border-radius: 22px;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  background:
+    radial-gradient(circle at 20% 16%, rgba(126, 197, 255, 0.14), transparent 28%),
+    linear-gradient(145deg, rgba(12, 31, 52, 0.96), rgba(7, 18, 32, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 28px rgba(2, 10, 20, 0.16);
 }
 
 .tile-video {
@@ -1926,17 +2285,21 @@ watch(activeTab, (tab) => {
 .tile-overlay {
   position: absolute;
   inset: auto 0 0;
-  background: linear-gradient(180deg, rgba(3, 10, 18, 0), rgba(3, 10, 18, 0.72));
-  padding: 18px 10px 8px;
+  background:
+    linear-gradient(180deg, rgba(3, 10, 18, 0), rgba(3, 10, 18, 0.84));
+  padding: 28px 16px 14px;
+  backdrop-filter: blur(6px);
 }
 
 .tile-title {
   font-weight: 600;
   text-align: center;
+  font-size: 15px;
+  letter-spacing: 0.06em;
 }
 
 .tile-sub {
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--sub);
   font-size: 12px;
   text-align: center;
@@ -1948,84 +2311,299 @@ watch(activeTab, (tab) => {
 }
 
 .map-square {
-  border: 1px dashed rgba(107, 176, 255, 0.55);
-  border-radius: 8px;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 22px;
   padding: 0;
-  background: linear-gradient(145deg, rgba(30, 67, 105, 0.86), rgba(22, 51, 83, 0.92));
-  min-height: 280px;
+  background:
+    radial-gradient(circle at 20% 12%, rgba(126, 197, 255, 0.1), transparent 28%),
+    linear-gradient(145deg, rgba(12, 31, 52, 0.96), rgba(7, 18, 32, 0.98));
+  min-height: 320px;
   overflow: hidden;
 }
 
 .video-stats-grid {
-  margin-top: 8px;
+  margin-top: 14px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 }
 
 .mini-kpi {
-  border: 1px solid rgba(126, 197, 255, 0.24);
-  border-radius: 8px;
-  background: rgba(17, 47, 75, 0.56);
-  padding: 8px 8px 8px 14px;
+  min-height: 92px;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(16, 40, 66, 0.72), rgba(9, 22, 39, 0.8));
+  padding: 14px 14px 14px 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .mini-kpi span {
   display: block;
   color: var(--sub);
   font-size: 12px;
+  letter-spacing: 0.08em;
 }
 
 .mini-kpi strong {
   display: block;
-  margin-top: 4px;
-  font-size: 20px;
+  margin-top: 8px;
+  font-family: var(--font-data);
+  font-size: 28px;
+  letter-spacing: 0.08em;
+}
+
+.panel-overline {
+  margin: 0 0 0.45rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(183, 219, 247, 0.58);
+}
+
+.overview-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.82rem;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  background: rgba(14, 42, 67, 0.5);
+  color: #eaf6ff;
+  font-size: 0.76rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.overview-pill.good {
+  color: #9ff0c8;
+  border-color: rgba(83, 213, 165, 0.32);
+  background: rgba(36, 84, 67, 0.28);
+}
+
+.overview-pill.warn {
+  color: #ffe4a2;
+  border-color: rgba(248, 203, 113, 0.34);
+  background: rgba(96, 74, 33, 0.28);
+}
+
+.overview-pill.alert {
+  color: #ffc0c0;
+  border-color: rgba(255, 141, 141, 0.36);
+  background: rgba(98, 42, 42, 0.26);
+}
+
+.overview-pill.info {
+  color: #dff1ff;
+}
+
+.env-overview-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 1.2rem;
+  padding: 1.35rem 1.4rem 1.45rem;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(126, 197, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 100% 100%, rgba(83, 213, 165, 0.1), transparent 20%),
+    linear-gradient(135deg, rgba(15, 37, 61, 0.96), rgba(8, 21, 36, 0.92));
+  border-color: rgba(126, 197, 255, 0.22);
+}
+
+.env-overview-head,
+.env-overview-status,
+.env-slot-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.env-overview-status {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.env-overview-copy,
+.env-overview-updated,
+.env-metric-note,
+.parking-head-text {
+  margin: 0;
+  color: rgba(214, 230, 255, 0.72);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.env-overview-updated {
+  font-size: 0.74rem;
+  color: rgba(183, 219, 247, 0.52);
+}
+
+.env-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.env-overview-stat {
+  min-height: 11rem;
+  padding: 1.15rem 1.1rem 1.05rem;
+  border-radius: 20px;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(16, 43, 70, 0.62), rgba(9, 24, 40, 0.7));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 12px 28px rgba(3, 10, 20, 0.16);
+}
+
+.env-overview-stat.good {
+  border-color: rgba(83, 213, 165, 0.22);
+}
+
+.env-overview-stat.warn {
+  border-color: rgba(248, 203, 113, 0.24);
+}
+
+.env-overview-stat.alert {
+  border-color: rgba(255, 141, 141, 0.24);
+}
+
+.env-overview-top,
+.env-overview-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.env-overview-top span {
+  color: rgba(214, 230, 255, 0.76);
+  font-size: 0.8rem;
+}
+
+.env-overview-top em {
+  font-style: normal;
+  color: rgba(214, 230, 255, 0.54);
+  font-size: 0.72rem;
+}
+
+.env-overview-value {
+  margin: 0.68rem 0 0.65rem;
+}
+
+.env-overview-value strong {
+  font-size: 2rem;
+  font-family: var(--font-data);
+  letter-spacing: 0.08em;
+  color: #f3fbff;
+}
+
+.env-overview-value span {
+  color: rgba(183, 219, 247, 0.66);
+  font-size: 0.78rem;
+}
+
+.env-overview-meter {
+  height: 0.42rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.env-overview-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  box-shadow: 0 0 18px rgba(126, 197, 255, 0.24);
+}
+
+.env-overview-stat p {
+  margin: 0.72rem 0 0;
+  color: rgba(214, 230, 255, 0.66);
+  font-size: 0.78rem;
+  line-height: 1.6;
 }
 
 .env-panel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: minmax(180px, auto);
-  gap: 8px;
-}
-
-.env-panel > .env-metric-card:first-child {
-  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
 }
 
 .env-slot-card {
   min-height: 0;
+  grid-column: span 2;
+  padding: 1.3rem 1.35rem 1.35rem;
+}
+
+.env-comfort-card {
+  min-height: 0;
+  padding: 1.25rem 1.35rem 1.3rem;
 }
 
 .env-metric-card {
   display: grid;
   grid-template-rows: auto 1fr;
   min-height: 0;
+  min-height: 17.5rem;
+  overflow: hidden;
+  padding: 1rem 1.05rem 1rem;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(126, 197, 255, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(14, 34, 58, 0.92), rgba(8, 20, 35, 0.96));
 }
 
 .env-metric-head {
-  margin-bottom: 4px;
+  margin-bottom: 0.95rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 0.95rem;
+}
+
+.env-metric-kicker {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.env-metric-head h3 {
+  margin: 0;
+}
+
+.metric-pill {
+  margin-left: auto;
+}
+
+.env-metric-note {
+  width: 100%;
+  font-size: 0.78rem;
 }
 
 .chart-wrap {
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(24, 56, 92, 0.66);
-  padding: 8px;
+  border-radius: 20px;
+  background: rgba(12, 30, 50, 0.68);
+  padding: 12px;
 }
 
 .env-trend-item {
   border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(12, 40, 68, 0.48);
-  padding: 6px 8px 4px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(126, 197, 255, 0.08), transparent 30%),
+    rgba(12, 40, 68, 0.48);
+  padding: 0.95rem 1rem 0.72rem;
   display: grid;
   grid-template-rows: auto 1fr;
   min-height: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .env-trend-item.single {
-  height: 100%;
+  height: auto;
+  min-height: 13.25rem;
 }
 
 .env-trend-title {
@@ -2049,8 +2627,8 @@ watch(activeTab, (tab) => {
 
 .env-trend-svg {
   width: 100%;
-  height: 100%;
-  min-height: 72px;
+  height: auto;
+  min-height: 156px;
 }
 
 .legend {
@@ -2071,19 +2649,35 @@ watch(activeTab, (tab) => {
 
 .bar-grid {
   display: grid;
-  gap: 9px;
+  gap: 0.7rem;
 }
 
 .bar-row {
   display: grid;
-  grid-template-columns: 4.6rem 1fr 2rem;
-  gap: 8px;
+  grid-template-columns: minmax(5.2rem, 6rem) 1fr auto;
+  gap: 0.8rem;
   align-items: center;
   font-size: 12px;
+  padding: 0.78rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  background: rgba(13, 36, 58, 0.48);
+}
+
+.bar-row span {
+  color: #e7f5ff;
+  font-weight: 600;
+}
+
+.bar-row strong {
+  color: #f3fbff;
+  font-family: var(--font-data);
+  letter-spacing: 0.08em;
+  font-size: 1rem;
 }
 
 .bar {
-  height: 8px;
+  height: 0.62rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
@@ -2093,6 +2687,8 @@ watch(activeTab, (tab) => {
   display: block;
   height: 100%;
   background: linear-gradient(90deg, rgba(126, 197, 255, 0.88), rgba(83, 213, 165, 0.86));
+  border-radius: inherit;
+  box-shadow: 0 0 18px rgba(126, 197, 255, 0.2);
 }
 
 /* ====== 1. 视频卡片呼吸灯 ====== */
@@ -2185,12 +2781,13 @@ watch(activeTab, (tab) => {
 
 /* ====== 4. AI 事件流 ====== */
 .event-stream {
-  margin-top: 10px;
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(10, 30, 52, 0.6);
-  padding: 8px 10px;
-  max-height: 200px;
+  margin-top: 14px;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(12, 30, 50, 0.74), rgba(8, 20, 35, 0.82));
+  padding: 12px 14px;
+  max-height: 240px;
   display: flex;
   flex-direction: column;
 }
@@ -2199,7 +2796,7 @@ watch(activeTab, (tab) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
 
 .event-stream-title {
@@ -2218,22 +2815,24 @@ watch(activeTab, (tab) => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .event-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: rgba(17, 47, 75, 0.5);
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(126, 197, 255, 0.08);
+  background: rgba(17, 47, 75, 0.4);
   font-size: 11px;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.2s ease;
 }
 
 .event-item:hover {
-  background: rgba(34, 79, 118, 0.7);
+  background: rgba(34, 79, 118, 0.58);
+  border-color: rgba(126, 197, 255, 0.18);
 }
 
 .event-time {
@@ -2286,28 +2885,48 @@ watch(activeTab, (tab) => {
 /* ====== 6. 车位圆环仪表盘 ====== */
 .parking-dashboard {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 16px;
-  align-items: center;
+  grid-template-columns: minmax(12rem, 13rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: stretch;
 }
 
 .parking-ring-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.35rem 1.1rem;
+  border-radius: 24px;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(126, 197, 255, 0.12), transparent 30%),
+    rgba(12, 35, 58, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 30px rgba(3, 10, 20, 0.14);
 }
 
 .parking-ring {
-  width: 110px;
-  height: 110px;
+  width: 112px;
+  height: 112px;
+  filter: drop-shadow(0 0 18px rgba(126, 197, 255, 0.18));
 }
 
 .parking-summary {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
   font-size: 11px;
   color: var(--sub);
+}
+
+.parking-summary span {
+  padding: 0.4rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  background: rgba(13, 36, 58, 0.42);
 }
 
 .parking-summary strong {
@@ -2315,19 +2934,131 @@ watch(activeTab, (tab) => {
   margin-left: 2px;
 }
 
+.env-slot-meta {
+  margin-bottom: 1rem;
+}
+
+.parking-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.parking-stat-card {
+  min-height: 8.4rem;
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(16, 42, 68, 0.62), rgba(10, 27, 45, 0.72));
+}
+
+.parking-stat-card span,
+.parking-stat-card p {
+  color: rgba(214, 230, 255, 0.68);
+  font-size: 0.76rem;
+}
+
+.parking-stat-card strong {
+  display: block;
+  margin: 0.45rem 0 0.32rem;
+  font-size: 1.55rem;
+  font-family: var(--font-data);
+  letter-spacing: 0.08em;
+  color: #f4fbff;
+}
+
+.parking-stat-card p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.parking-detail-stack {
+  display: grid;
+  gap: 1rem;
+  min-height: 0;
+  align-content: start;
+}
+
+.parking-zone-grid {
+  gap: 0.85rem;
+}
+
+.parking-bar-row {
+  grid-template-columns: minmax(7rem, 8.5rem) 1fr auto;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+}
+
+.bar-copy {
+  display: grid;
+  gap: 0.26rem;
+  min-width: 0;
+}
+
+.bar-copy span {
+  font-size: 0.82rem;
+}
+
+.bar-copy em {
+  font-style: normal;
+  color: rgba(214, 230, 255, 0.56);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.bar-value {
+  display: grid;
+  justify-items: end;
+  gap: 0.22rem;
+}
+
+.bar-value small {
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
 /* ====== 7. 环境舒适度评分卡 ====== */
 .env-comfort-card {
   background:
-    radial-gradient(circle at 20% 10%, rgba(83, 213, 165, 0.08), transparent 40%),
-    linear-gradient(180deg, rgba(17, 46, 75, 0.82), rgba(13, 33, 56, 0.8));
-  border: 1px solid rgba(83, 213, 165, 0.18);
+    radial-gradient(circle at 20% 10%, rgba(83, 213, 165, 0.12), transparent 40%),
+    linear-gradient(180deg, rgba(14, 33, 56, 0.9), rgba(8, 20, 35, 0.94));
+  border: 1px solid rgba(83, 213, 165, 0.16);
 }
 
 .comfort-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.comfort-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+  align-items: stretch;
+}
+
+.comfort-score-panel,
+.comfort-factor-panel {
+  border-radius: 24px;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(14, 39, 64, 0.56), rgba(9, 24, 40, 0.62));
+}
+
+.comfort-score-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1rem 1.05rem;
+}
+
+.comfort-factor-panel {
+  padding: 0.95rem 1rem 0.95rem;
 }
 
 .comfort-label {
@@ -2335,15 +3066,9 @@ watch(activeTab, (tab) => {
   font-weight: 600;
 }
 
-.comfort-score-wrap {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 16px;
-  align-items: center;
-}
-
 .comfort-score {
-  text-align: center;
+  text-align: left;
+  min-width: 7rem;
 }
 
 .comfort-score strong {
@@ -2359,23 +3084,30 @@ watch(activeTab, (tab) => {
   margin-left: 2px;
 }
 
+.comfort-score-note {
+  margin: 0.95rem 0 0;
+  color: rgba(214, 230, 255, 0.68);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
 .comfort-factors {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.9rem;
 }
 
 .comfort-factor {
   display: grid;
-  grid-template-columns: 3.4rem 1fr;
-  gap: 8px;
+  grid-template-columns: 4rem 1fr;
+  gap: 0.85rem;
   align-items: center;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--sub);
 }
 
 .comfort-bar {
-  height: 6px;
+  height: 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
@@ -2388,11 +3120,29 @@ watch(activeTab, (tab) => {
   transition: width 0.4s ease;
 }
 
+.comfort-tips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.comfort-tip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.46rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(83, 213, 165, 0.18);
+  background: rgba(27, 73, 56, 0.22);
+  color: rgba(224, 244, 236, 0.86);
+  font-size: 0.76rem;
+}
+
 
 .agent-panel {
   display: grid;
-  grid-template-columns: minmax(0, 2.1fr) minmax(20rem, 0.78fr);
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
   align-items: stretch;
 }
 
@@ -2407,7 +3157,7 @@ watch(activeTab, (tab) => {
 .main-col,
 .side-col {
   display: grid;
-  gap: 0.85rem;
+  gap: 1rem;
   min-height: 0;
   height: 100%;
   overflow: hidden;
@@ -2421,7 +3171,7 @@ watch(activeTab, (tab) => {
 .side-col {
   display: grid;
   grid-template-rows: minmax(8rem, 0.34fr) minmax(18rem, 1fr);
-  gap: 0.85rem;
+  gap: 1rem;
 }
 
 .agent-main-card {
@@ -2430,14 +3180,17 @@ watch(activeTab, (tab) => {
 }
 
 .hero-card {
-  gap: 0.95rem;
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.2rem;
   background:
-    radial-gradient(circle at 12% 0%, rgba(126, 197, 255, 0.12), transparent 26%),
-    linear-gradient(180deg, rgba(18, 48, 79, 0.86), rgba(11, 28, 48, 0.8));
+    radial-gradient(circle at 12% 0%, rgba(126, 197, 255, 0.18), transparent 26%),
+    radial-gradient(circle at 90% 18%, rgba(75, 230, 168, 0.08), transparent 22%),
+    linear-gradient(180deg, rgba(18, 48, 79, 0.92), rgba(11, 28, 48, 0.88));
   box-shadow:
     inset 0 0 0 1px rgba(126, 197, 255, 0.08),
-    0 20px 44px rgba(4, 12, 24, 0.16);
+    0 24px 44px rgba(4, 12, 24, 0.2);
 }
 
 .summary-card,
@@ -2447,8 +3200,10 @@ watch(activeTab, (tab) => {
   min-height: 0;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(17, 46, 75, 0.82), rgba(13, 33, 56, 0.8));
-  box-shadow: inset 0 0 0 1px rgba(126, 197, 255, 0.07);
+    linear-gradient(180deg, rgba(14, 33, 56, 0.88), rgba(8, 20, 35, 0.92));
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 197, 255, 0.05),
+    0 18px 32px rgba(2, 10, 20, 0.16);
 }
 
 .card-title-row,
@@ -2477,15 +3232,16 @@ watch(activeTab, (tab) => {
 .mini-action,
 .summary-head,
 .focus-tag {
-  border: 1px solid rgba(126, 197, 255, 0.22);
-  background: rgba(17, 47, 75, 0.78);
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  background: rgba(17, 47, 75, 0.58);
   color: #eaf6ff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.42rem 0.8rem;
+  padding: 0.5rem 0.88rem;
   border-radius: 999px;
   font-size: 0.78rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .summary-toolbar {
@@ -2504,8 +3260,8 @@ watch(activeTab, (tab) => {
 .summary-tab:hover,
 .mini-action:hover,
 .summary-head:hover {
-  border-color: rgba(126, 197, 255, 0.42);
-  background: rgba(34, 79, 118, 0.92);
+  border-color: rgba(126, 232, 255, 0.34);
+  background: rgba(34, 79, 118, 0.72);
 }
 
 .summary-head {
@@ -2514,8 +3270,8 @@ watch(activeTab, (tab) => {
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
-  padding: 0.66rem 0.8rem;
-  border-radius: 12px;
+  padding: 0.82rem 0.95rem;
+  border-radius: 18px;
   font-size: 0.82rem;
 }
 
@@ -2536,10 +3292,10 @@ watch(activeTab, (tab) => {
 
 .summary-kpi,
 .focus-card {
-  padding: 0.78rem 0.84rem;
-  border-radius: 14px;
-  border: 1px solid rgba(126, 197, 255, 0.12);
-  background: rgba(14, 42, 67, 0.56);
+  padding: 0.9rem 0.95rem;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 197, 255, 0.1);
+  background: rgba(14, 42, 67, 0.44);
 }
 
 .focus-card span {
@@ -2549,11 +3305,6 @@ watch(activeTab, (tab) => {
   font-size: 0.75rem;
 }
 
-
-.hero-card {
-  padding: 1.2rem;
-  gap: 1.1rem;
-}
 
 .section-head,
 .hero-head {
@@ -2573,10 +3324,118 @@ watch(activeTab, (tab) => {
 
 .hero-head p {
   margin: 0;
-  color: var(--sub);
+  color: rgba(214, 230, 255, 0.74);
   line-height: 1.58;
   font-size: 0.88rem;
-  max-width: 42rem;
+  max-width: 34rem;
+}
+
+.hero-head-primary {
+  min-width: 0;
+}
+
+.hero-card-clean {
+  gap: 0.9rem;
+  padding: 1rem;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(126, 197, 255, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(16, 41, 67, 0.92), rgba(8, 22, 39, 0.94));
+}
+
+.hero-head-clean {
+  align-items: flex-end;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid rgba(126, 197, 255, 0.12);
+}
+
+.hero-head-clean .hero-head-side {
+  flex-direction: row;
+  align-items: center;
+}
+
+.service-strip-compact {
+  margin-top: 0.82rem;
+}
+
+.agent-brief-bar {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8rem;
+  align-items: start;
+  padding: 0.88rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  background: linear-gradient(180deg, rgba(11, 31, 52, 0.72), rgba(8, 22, 39, 0.58));
+}
+
+.agent-brief-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  background: rgba(15, 42, 67, 0.52);
+  color: rgba(214, 230, 255, 0.84);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.agent-brief-bar p {
+  margin: 0;
+  padding-top: 0.08rem;
+  color: rgba(221, 239, 252, 0.86);
+  font-size: 0.82rem;
+  line-height: 1.62;
+}
+
+.agent-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.agent-insight-card {
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(14, 42, 67, 0.58), rgba(8, 23, 38, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 16px 28px rgba(3, 10, 20, 0.14);
+}
+
+.agent-insight-card span,
+.agent-insight-card p {
+  color: rgba(214, 230, 255, 0.66);
+  font-size: 0.76rem;
+}
+
+.agent-insight-card strong {
+  display: block;
+  margin: 0.45rem 0 0.3rem;
+  font-size: 1.42rem;
+  color: #f4fbff;
+  letter-spacing: 0.04em;
+}
+
+.agent-insight-card p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.agent-insight-card.good {
+  border-color: rgba(83, 213, 165, 0.22);
+}
+
+.agent-insight-card.warn {
+  border-color: rgba(248, 203, 113, 0.24);
+}
+
+.agent-insight-card.alert {
+  border-color: rgba(255, 141, 141, 0.28);
 }
 
 .hero-head-side,
@@ -2587,22 +3446,39 @@ watch(activeTab, (tab) => {
   gap: 0.45rem;
 }
 
+.hero-head-side {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.hero-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
 .service-chip,
 .status-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(126, 197, 255, 0.22);
-  background: rgba(17, 47, 75, 0.78);
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  background: rgba(17, 47, 75, 0.54);
   color: #eaf6ff;
   border-radius: 999px;
-  padding: 0.42rem 0.8rem;
+  padding: 0.48rem 0.82rem;
   font-size: 0.78rem;
 }
 
 .status-pill.listening {
   border-color: rgba(248, 203, 113, 0.42);
   color: #f8cb71;
+}
+
+.status-pill.subtle {
+  background: rgba(13, 35, 58, 0.62);
+  color: rgba(214, 230, 255, 0.78);
 }
 
 .status-pill.thinking,
@@ -2614,16 +3490,30 @@ watch(activeTab, (tab) => {
 .hero-shell {
   position: relative;
   flex: 1;
-  min-height: 32rem;
+  min-height: 34rem;
   height: 100%;
   overflow: hidden;
-  border-radius: 30px;
+  border-radius: 32px;
   border: 1px solid rgba(126, 197, 255, 0.18);
   background:
-    radial-gradient(circle at 80% 14%, rgba(126, 197, 255, 0.08), transparent 24%),
-    radial-gradient(circle at 0% 100%, rgba(83, 213, 165, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(8, 25, 43, 0.96), rgba(7, 18, 32, 0.98));
-  box-shadow: 0 22px 48px rgba(3, 10, 20, 0.28);
+    radial-gradient(circle at 80% 14%, rgba(126, 197, 255, 0.16), transparent 24%),
+    radial-gradient(circle at 0% 100%, rgba(83, 213, 165, 0.1), transparent 28%),
+    radial-gradient(circle at 50% 100%, rgba(126, 197, 255, 0.1), transparent 35%),
+    linear-gradient(180deg, rgba(8, 25, 43, 0.98), rgba(7, 18, 32, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 22px 48px rgba(3, 10, 20, 0.28);
+}
+
+.hero-shell-clean {
+  min-height: 33rem;
+  border-radius: 28px;
+}
+
+.hero-card-clean .service-chip,
+.hero-card-clean .status-pill {
+  padding: 0.42rem 0.74rem;
+  font-size: 0.74rem;
 }
 
 .hero-shell::before,
@@ -2636,8 +3526,11 @@ watch(activeTab, (tab) => {
 
 .hero-shell::before {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%),
-    radial-gradient(circle at 20% 18%, rgba(126, 197, 255, 0.12), transparent 22%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 24%),
+    radial-gradient(circle at 20% 18%, rgba(126, 197, 255, 0.16), transparent 22%),
+    linear-gradient(rgba(126, 197, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(126, 197, 255, 0.04) 1px, transparent 1px);
+  background-size: auto, auto, 2.6rem 2.6rem, 2.6rem 2.6rem;
 }
 
 .hero-shell::after {
@@ -2675,7 +3568,9 @@ watch(activeTab, (tab) => {
   bottom: 1.7rem;
   width: min(19.5rem, calc(100% - 25rem));
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(9, 28, 47, 0.56), rgba(6, 18, 33, 0.42));
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  background: linear-gradient(180deg, rgba(9, 28, 47, 0.64), rgba(6, 18, 33, 0.48));
+  backdrop-filter: blur(8px);
 }
 
 .hero-shell :deep(.chat-input) {
@@ -2683,6 +3578,8 @@ watch(activeTab, (tab) => {
   bottom: 1.7rem;
   width: min(19rem, 33vw);
   border-radius: 24px;
+  background: linear-gradient(180deg, rgba(9, 28, 47, 0.82), rgba(6, 18, 33, 0.74));
+  backdrop-filter: blur(8px);
 }
 
 .hero-shell :deep(.realtime-banner) {
@@ -2728,11 +3625,15 @@ watch(activeTab, (tab) => {
 
 .task-item {
   border-left: 3px solid var(--warn);
-  border-radius: 8px;
-  background: rgba(248, 203, 113, 0.12);
-  padding: 8px 9px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(92, 71, 26, 0.3), rgba(46, 34, 11, 0.18)),
+    rgba(248, 203, 113, 0.08);
+  padding: 0.85rem 0.9rem 0.85rem 1rem;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
+  color: #f4ebcb;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .summary-card {
@@ -2746,11 +3647,11 @@ watch(activeTab, (tab) => {
 }
 
 .summary-tab {
-  border: 1px solid rgba(126, 197, 255, 0.3);
-  background: rgba(17, 47, 75, 0.62);
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  background: rgba(17, 47, 75, 0.48);
   color: #eaf6ff;
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
 }
@@ -2767,10 +3668,10 @@ watch(activeTab, (tab) => {
 }
 
 .summary-kpi {
-  border: 1px solid rgba(126, 197, 255, 0.2);
-  border-radius: 8px;
-  background: rgba(17, 47, 75, 0.48);
-  padding: 7px;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(17, 47, 75, 0.36);
+  padding: 12px;
 }
 
 .summary-kpi span {
@@ -2781,16 +3682,18 @@ watch(activeTab, (tab) => {
 
 .summary-kpi strong {
   display: block;
-  margin-top: 3px;
-  font-size: 18px;
+  margin-top: 6px;
+  font-family: var(--font-data);
+  font-size: 22px;
+  letter-spacing: 0.08em;
 }
 
 .summary-overview {
-  margin: 8px 0;
-  border: 1px solid rgba(126, 197, 255, 0.2);
-  border-radius: 8px;
-  background: rgba(17, 47, 75, 0.42);
-  padding: 8px;
+  margin: 10px 0;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(17, 47, 75, 0.32);
+  padding: 12px 14px;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -2809,7 +3712,7 @@ watch(activeTab, (tab) => {
 }
 
 .trend-bar {
-  height: 7px;
+  height: 8px;
   border-radius: 999px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
@@ -2830,12 +3733,12 @@ watch(activeTab, (tab) => {
 }
 
 .focus-tag {
-  border: 1px solid rgba(126, 197, 255, 0.24);
+  border: 1px solid rgba(126, 197, 255, 0.16);
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-size: 11px;
   color: #d6ecff;
-  background: rgba(17, 47, 75, 0.5);
+  background: rgba(17, 47, 75, 0.36);
 }
 
 .advice-list {
@@ -2860,19 +3763,33 @@ watch(activeTab, (tab) => {
 .info-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .info-table th,
 .info-table td {
   border-bottom: 1px solid rgba(126, 197, 255, 0.16);
-  padding: 8px 6px;
+  padding: 12px 10px;
   text-align: left;
 }
 
 .info-table th {
   color: #cde8ff;
   font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(9, 25, 42, 0.92);
+  backdrop-filter: blur(8px);
+}
+
+.info-table tbody tr {
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.info-table tbody tr:hover {
+  background: rgba(34, 79, 118, 0.22);
 }
 
 .state-chip {
@@ -2880,8 +3797,9 @@ watch(activeTab, (tab) => {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 4px 10px;
   font-size: 11px;
+  letter-spacing: 0.06em;
 }
 
 .state-chip.done {
@@ -2897,12 +3815,12 @@ watch(activeTab, (tab) => {
 }
 
 .btn {
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: 5px 9px;
+  border: 1px solid rgba(126, 197, 255, 0.22);
+  border-radius: 999px;
+  padding: 8px 14px;
   font-size: 12px;
   color: var(--text);
-  background: rgba(26, 60, 97, 0.82);
+  background: linear-gradient(180deg, rgba(16, 44, 70, 0.92), rgba(10, 26, 43, 0.88));
   cursor: pointer;
 }
 
@@ -2924,13 +3842,14 @@ watch(activeTab, (tab) => {
 
 .focus-shell {
   width: min(1100px, 96vw);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(8, 30, 58, 0.95);
-  padding: 10px;
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(9, 25, 43, 0.97), rgba(7, 18, 32, 0.98));
+  padding: 14px;
   display: grid;
   grid-template-columns: 1fr 280px;
-  gap: 10px;
+  gap: 14px;
 }
 
 .focus-screen {
@@ -2956,10 +3875,10 @@ watch(activeTab, (tab) => {
 }
 
 .focus-panel {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(9, 34, 63, 0.82);
-  padding: 9px;
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 20px;
+  background: rgba(10, 24, 42, 0.84);
+  padding: 12px;
 }
 
 .focus-title {
@@ -2979,16 +3898,16 @@ watch(activeTab, (tab) => {
 }
 
 .monitor-shell {
-  background: #0a1b2f;
-  border: 1px solid rgba(99, 184, 255, 0.3);
-  border-radius: 10px;
-  padding: 18px;
+  background: linear-gradient(180deg, rgba(9, 25, 43, 0.97), rgba(7, 18, 32, 0.98));
+  border: 1px solid rgba(99, 184, 255, 0.18);
+  border-radius: 28px;
+  padding: 20px;
   min-width: 360px;
-  max-width: 640px;
+  max-width: 720px;
   max-height: 70vh;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   color: var(--text);
 }
 
@@ -3022,15 +3941,16 @@ watch(activeTab, (tab) => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid rgba(99, 184, 255, 0.2);
-  border-radius: 8px;
-  background: rgba(13, 30, 52, 0.8);
+  padding: 12px 14px;
+  border: 1px solid rgba(99, 184, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(13, 30, 52, 0.72);
   cursor: pointer;
 }
 
 .monitor-row:hover {
-  border-color: var(--accent);
+  border-color: rgba(126, 232, 255, 0.34);
+  background: rgba(17, 47, 75, 0.56);
 }
 
 .row-title {
@@ -3061,9 +3981,12 @@ watch(activeTab, (tab) => {
 @media (max-width: 1400px) {
   .alarm-panel,
   .video-panel,
-  .env-panel,
   .agent-panel {
     grid-template-columns: 1fr;
+  }
+
+  .env-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .env-chart-card,
@@ -3088,10 +4011,30 @@ watch(activeTab, (tab) => {
     min-height: 34rem;
   }
 
+  .env-overview-grid,
+  .agent-insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .section-head,
   .hero-head,
   .card-title-row,
   .summary-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hero-head-side,
+  .hero-status-row,
+  .env-overview-status {
+    align-items: flex-start;
+  }
+
+  .hero-head-clean .hero-head-side {
+    flex-direction: row;
+  }
+
+  .nav-bar {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -3103,11 +4046,31 @@ watch(activeTab, (tab) => {
   }
 
   .nav-current {
-    font-size: 15px;
+    font-size: 18px;
   }
 
   .video-stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .env-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .env-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .parking-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .parking-ring-wrap {
+    align-items: flex-start;
+  }
+
+  .parking-summary {
+    justify-content: flex-start;
   }
 
   .summary-kpis,
@@ -3122,6 +4085,62 @@ watch(activeTab, (tab) => {
   }
 
   .focus-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .page-shell {
+    gap: 12px;
+  }
+
+  .env-overview-grid,
+  .parking-stat-grid,
+  .agent-insight-grid,
+  .comfort-layout,
+  .agent-brief-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-bar,
+  .panel .card {
+    padding: 14px;
+  }
+
+  .table-filters,
+  .panel-headline,
+  .chart-filter,
+  .hero-head-side {
+    width: 100%;
+  }
+
+  .hero-head-clean .hero-head-side {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .agent-brief-label {
+    width: fit-content;
+  }
+
+  .table-filters > * {
+    width: 100%;
+  }
+
+  .chart-panel,
+  .hero-shell :deep(.chat-messages),
+  .hero-shell :deep(.chat-input),
+  .hero-shell :deep(.realtime-banner) {
+    width: 100%;
+  }
+
+  .bar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bar-value {
+    justify-items: start;
+  }
+
+  .chart-panel {
     grid-template-columns: 1fr;
   }
 }
