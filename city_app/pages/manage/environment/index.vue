@@ -18,6 +18,17 @@
       <view class="status-pill" :class="comfortLevel.type">{{ comfortLevel.text }}</view>
     </view>
 
+    <view class="quality-card" v-if="weather">
+      <view class="quality-left">
+        <text class="quality-tag" :class="aqiLevel.class">{{ aqiLevel.text }}</text>
+        <text class="quality-desc">{{ aqiLevel.desc }}</text>
+      </view>
+      <view class="quality-right">
+        <text class="aqi-value">{{ realtime.aqi || '-' }}</text>
+        <text class="aqi-label">AQI指数</text>
+      </view>
+    </view>
+
     <view class="score-panel">
       <view>
         <view class="score-label">综合舒适度</view>
@@ -41,24 +52,39 @@
 
     <view class="grid">
       <view class="metric-card">
+        <view class="metric-icon">
+          <u-icon name="sun" color="#ff9c28" size="36rpx"></u-icon>
+        </view>
         <text class="metric-name">温度</text>
         <text class="metric-value">{{ realtime.temperature }}°C</text>
         <text class="metric-desc">较昨日 {{ realtime.temperatureDelta >= 0 ? '+' : '' }}{{ realtime.temperatureDelta }}°C</text>
       </view>
+
       <view class="metric-card">
+        <view class="metric-icon">
+          <u-icon name="water" color="#409df8" size="36rpx"></u-icon>
+        </view>
         <text class="metric-name">湿度</text>
         <text class="metric-value">{{ realtime.humidity }}%</text>
         <text class="metric-desc">动态区间 {{ humidityRange }}</text>
       </view>
+
       <view class="metric-card">
+        <view class="metric-icon">
+          <u-icon name="dashboard" color="#5f8df7" size="36rpx"></u-icon>
+        </view>
         <text class="metric-name">AQI</text>
         <text class="metric-value">{{ realtime.aqi }}</text>
         <text class="metric-desc">{{ aqiText }}</text>
       </view>
+
       <view class="metric-card">
+        <view class="metric-icon">
+          <u-icon name="wind" color="#56c999" size="36rpx"></u-icon>
+        </view>
         <text class="metric-name">PM2.5</text>
         <text class="metric-value">{{ realtime.pm25 }}</text>
-        <text class="metric-desc">ug/m3</text>
+        <text class="metric-desc">μg/m³</text>
       </view>
     </view>
 
@@ -105,6 +131,20 @@
         <view class="event-text">{{ item.text }}</view>
       </view>
     </view>
+
+    <view class="tip-card" v-if="weather">
+      <view class="tip-header">
+        <u-icon name="info-circle" color="#409df8" size="28rpx"></u-icon>
+        <text class="tip-title">健康出行提示</text>
+      </view>
+      <text class="tip-content">{{ healthTip }}</text>
+    </view>
+
+    <view class="empty-box" v-else>
+      <u-icon name="inbox" color="#c0c6d1" size="80rpx"></u-icon>
+      <text class="empty-text">暂无环境监测数据</text>
+      <text class="empty-desc">请选择其他监测点或稍后重试</text>
+    </view>
   </scroll-view>
 </template>
 
@@ -140,8 +180,8 @@ export default {
       const nowMinute = new Date().getMinutes();
       const temperature = Number(base.temperature || (22 + seed + (nowMinute % 5) * 0.4)).toFixed(1);
       const humidity = Math.round(Number(base.humidity || (48 + seed * 3 + (nowMinute % 6))));
-      const pm25 = Math.max(18, Math.round(42 + seed * 4 + (nowMinute % 7) * 2));
-      const aqi = Math.max(45, Math.round(pm25 * 1.55));
+      const pm25 = Math.max(18, Math.round(Number(base.pm25 || (42 + seed * 4 + (nowMinute % 7) * 2))));
+      const aqi = Math.max(45, Math.round(Number(base.aqi || pm25 * 1.55)));
       return {
         temperature,
         humidity,
@@ -207,6 +247,33 @@ export default {
       if (!events.length) events.push({ time: '今日', text: '暂无明显环境异常' });
       return events;
     },
+    aqiLevel() {
+      const aqi = Number(this.realtime.aqi) || 0;
+      if (aqi <= 50) {
+        return { class: 'level-excellent', text: '优', desc: '空气质量令人满意' };
+      } else if (aqi <= 100) {
+        return { class: 'level-good', text: '良', desc: '空气质量可接受' };
+      } else if (aqi <= 150) {
+        return { class: 'level-light', text: '轻度污染', desc: '敏感人群减少外出' };
+      } else if (aqi <= 200) {
+        return { class: 'level-moderate', text: '中度污染', desc: '一般人群减少外出' };
+      } else {
+        return { class: 'level-heavy', text: '重度污染', desc: '避免外出活动' };
+      }
+    },
+    healthTip() {
+      const aqi = Number(this.realtime.aqi) || 0;
+      const temp = Number(this.realtime.temperature) || 25;
+      if (aqi <= 100) {
+        return `当前空气质量良好，气温${temp}℃，适宜户外活动与开窗通风。`;
+      } else if (aqi <= 150) {
+        return '空气质量轻度污染，老人、儿童及敏感人群建议减少长时间户外逗留。';
+      } else if (aqi <= 200) {
+        return '空气质量中度污染，建议关闭门窗，外出请佩戴口罩，减少户外活动。';
+      } else {
+        return '空气质量重度污染，强烈建议避免外出，关闭门窗并开启空气净化设备。';
+      }
+    },
   },
   onLoad() {
     const info = uni.getWindowInfo();
@@ -256,6 +323,7 @@ export default {
         this.weather = (data && data.data) || null;
       } catch (e) {
         this.weather = null;
+        uni.showToast({ title: '环境数据获取失败', icon: 'none' });
       }
     },
     onMonitorChange(e) {
@@ -307,7 +375,7 @@ export default {
 }
 
 .title-row {
-  margin: 10rpx 0 18rpx;
+  margin: 10rpx 0 24rpx;
   display: flex;
   align-items: center;
   gap: 16rpx;
@@ -405,6 +473,77 @@ export default {
   color: #e04d60;
 }
 
+.quality-card {
+  margin-top: 18rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(45, 98, 160, 0.12);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quality-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.quality-tag {
+  font-size: 32rpx;
+  font-weight: 700;
+  padding: 6rpx 16rpx;
+  border-radius: 30rpx;
+  display: inline-block;
+}
+
+.level-excellent {
+  background: #e6f7ef;
+  color: #00b47d;
+}
+
+.level-good {
+  background: #fff7e6;
+  color: #ff8f23;
+}
+
+.level-light {
+  background: #fff1f0;
+  color: #ff6666;
+}
+
+.level-moderate {
+  background: #fce6ef;
+  color: #e63975;
+}
+
+.level-heavy {
+  background: #f5e6f7;
+  color: #b139c7;
+}
+
+.quality-desc {
+  font-size: 24rpx;
+  color: #6f8093;
+}
+
+.quality-right {
+  text-align: right;
+}
+
+.aqi-value {
+  font-size: 48rpx;
+  font-weight: 800;
+  color: #1f2d3c;
+  line-height: 1;
+}
+
+.aqi-label {
+  font-size: 22rpx;
+  color: #8da0b5;
+}
+
 .score-panel {
   margin-top: 18rpx;
   padding: 24rpx;
@@ -471,11 +610,15 @@ export default {
   margin-top: 18rpx;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12rpx;
+  gap: 16rpx;
 }
 
 .metric-card {
   padding: 20rpx;
+}
+
+.metric-icon {
+  margin-bottom: 6rpx;
 }
 
 .metric-value {
@@ -605,5 +748,51 @@ export default {
   flex: 1;
   text-align: right;
   color: #38506a;
+}
+
+.tip-card {
+  margin-top: 18rpx;
+  background: linear-gradient(90deg, #edf6ff 0%, #f5f9ff 100%);
+  border-radius: 20rpx;
+  padding: 24rpx;
+  border: 1rpx solid #d6e9ff;
+}
+
+.tip-header {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-bottom: 12rpx;
+}
+
+.tip-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #3a4a5e;
+}
+
+.tip-content {
+  font-size: 25rpx;
+  color: #5a6b80;
+  line-height: 1.5;
+}
+
+.empty-box {
+  margin-top: 80rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #8da0b5;
+  font-weight: 500;
+}
+
+.empty-desc {
+  font-size: 24rpx;
+  color: #b0bfd1;
 }
 </style>

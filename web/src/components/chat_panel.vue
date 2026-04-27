@@ -153,14 +153,7 @@ const question = ref('');
 const messages = ref<ChatMessage[]>([
   {
     role: 'assistant',
-    content: `您好，我是智能助手，可以协助您：
-
-- 查告警：统计未处理、查看最近告警、定位重点事件
-- 看监控：联动监控画面，继续追问相关信息
-- 查天气：查询监控点最新天气与历史情况
-- 做总结：查看最近一周或最近一月的报警趋势与建议
-
-您可以直接输入问题，或点击下方快捷提问开始。`,
+    content: '您好，我是智能助手，可帮您查询告警、环境和监控状态，支持文字与语音交互。',
   },
 ]);
 const messageBox = ref<HTMLElement | null>(null);
@@ -1151,10 +1144,13 @@ onBeforeUnmount(() => {
 
 .chat-panel.stage .quick-reply,
 .chat-panel.stage .banner-action {
-  background: linear-gradient(180deg, rgba(16, 47, 78, 0.88), rgba(9, 28, 47, 0.82));
-  border-color: rgba(126, 197, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(18, 53, 86, 0.92), rgba(9, 28, 47, 0.82));
+  border-color: rgba(126, 197, 255, 0.26);
   color: #dff1ff;
-  box-shadow: 0 10px 26px rgba(4, 12, 24, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 10px 26px rgba(4, 12, 24, 0.2);
 }
 
 .chat-panel.stage .quick-reply:hover,
@@ -1168,11 +1164,14 @@ onBeforeUnmount(() => {
   right: 1.35rem;
   bottom: 11.55rem;
   width: min(20.5rem, 34vw);
-  padding: 0.72rem 0.82rem;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(12, 39, 62, 0.94), rgba(10, 30, 49, 0.88));
-  border: 1px solid rgba(126, 197, 255, 0.18);
+  padding: 0.9rem 0.88rem 0.82rem;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(126, 197, 255, 0.14), transparent 32%),
+    linear-gradient(135deg, rgba(12, 39, 62, 0.94), rgba(10, 30, 49, 0.88));
+  border: 1px solid rgba(126, 197, 255, 0.2);
   box-shadow: 0 16px 32px rgba(4, 12, 24, 0.22);
+  overflow: hidden;
 }
 
 .chat-panel.stage .realtime-copy strong {
@@ -1192,10 +1191,11 @@ onBeforeUnmount(() => {
   top: 4.85rem;
   bottom: 1.35rem;
   width: min(21.5rem, calc(100% - 25.5rem));
-  padding: 0.3rem 0.36rem 0.18rem 0.2rem;
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(9, 28, 47, 0.72), rgba(6, 18, 33, 0.54));
-  border: 1px solid rgba(126, 197, 255, 0.16);
+  padding: 0.72rem 0.42rem 0.18rem 0.22rem;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(9, 28, 47, 0.8), rgba(6, 18, 33, 0.58));
+  border: 1px solid rgba(126, 197, 255, 0.18);
   box-shadow:
     0 18px 38px rgba(2, 10, 19, 0.24),
     inset 0 0 0 1px rgba(255, 255, 255, 0.03);
@@ -1210,12 +1210,12 @@ onBeforeUnmount(() => {
 }
 
 .chat-panel.stage .chat-content {
-  padding: 0.46rem 0.6rem;
-  border-radius: 14px;
-  border-color: rgba(126, 197, 255, 0.12);
+  padding: 0.54rem 0.7rem;
+  border-radius: 16px;
+  border-color: rgba(126, 197, 255, 0.14);
   box-shadow: 0 8px 22px rgba(4, 12, 24, 0.18);
   font-size: 0.76rem;
-  line-height: 1.34;
+  line-height: 1.46;
 }
 
 .chat-panel.stage :deep(.chat-content p),
@@ -1249,8 +1249,9 @@ onBeforeUnmount(() => {
 }
 
 .chat-panel.stage .chat-message.user .chat-content {
-  background: linear-gradient(180deg, rgba(213, 235, 255, 0.96), rgba(191, 223, 249, 0.94));
+  background: linear-gradient(180deg, rgba(226, 241, 255, 0.96), rgba(194, 224, 248, 0.94));
   color: #153e61;
+  border-color: rgba(177, 214, 242, 0.48);
 }
 
 .chat-panel.stage .chat-typing {
@@ -1262,17 +1263,20 @@ onBeforeUnmount(() => {
   right: 1.35rem;
   bottom: 1.35rem;
   width: min(20.5rem, 34vw);
-  padding: 0.74rem;
+  padding: 0.92rem 0.82rem 0.78rem;
   flex-wrap: wrap;
   align-items: center;
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(11, 33, 55, 0.9), rgba(8, 22, 39, 0.8));
-  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(126, 197, 255, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(11, 33, 55, 0.92), rgba(8, 22, 39, 0.82));
+  border: 1px solid rgba(126, 197, 255, 0.18);
   box-shadow:
     0 18px 38px rgba(2, 10, 19, 0.24),
     inset 0 0 0 1px rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(18px);
   gap: 0.38rem;
+  overflow: hidden;
 }
 
 .chat-panel.stage .stage-shortcuts {

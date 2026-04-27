@@ -7,13 +7,7 @@
       <div class="light-column"></div>
       <div class="halo halo-outer"></div>
       <div class="halo halo-inner"></div>
-      <div class="spark spark-a"></div>
-      <div class="spark spark-b"></div>
-      <div class="spark spark-c"></div>
-      <div class="spark spark-d"></div>
-      <div class="signal-beam"></div>
-
-      <DigitalHumanViewport :status="status" @avatar-tap="handleAvatarTap">
+      <DigitalHumanViewport :status="status">
         <template #fallback>
           <svg class="avatar-portrait" viewBox="0 0 420 560" aria-hidden="true">
             <defs>
@@ -121,16 +115,6 @@
         </template>
       </DigitalHumanViewport>
 
-      <div class="agent-copy">
-        <p class="eyebrow">智能助手</p>
-        <h4>{{ title }}</h4>
-        <p class="agent-brief">{{ displayText }}</p>
-        <div class="status-row">
-          <span class="status-badge"><span class="dot"></span>{{ statusLabel }}</span>
-          <span class="status-badge subtle">{{ conversationModeLabel }}</span>
-        </div>
-      </div>
-
       <div class="voice-meter" aria-hidden="true">
         <span></span>
         <span></span>
@@ -142,7 +126,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue';
 import DigitalHumanViewport from '@/components/DigitalHumanViewport.vue';
 
 type AgentStageStatus = 'idle' | 'listening' | 'thinking' | 'speaking';
@@ -154,82 +137,21 @@ interface VirtualAgentStageProps {
   previewText?: string;
 }
 
-const props = withDefaults(defineProps<VirtualAgentStageProps>(), {
+withDefaults(defineProps<VirtualAgentStageProps>(), {
   title: '晓卫',
   status: 'idle',
   conversationActive: false,
   previewText: '',
-});
-
-const tapPreview = ref('');
-let tapPreviewTimer: number | null = null;
-
-const clearTapPreviewTimer = (): void => {
-  if (tapPreviewTimer !== null) {
-    window.clearTimeout(tapPreviewTimer);
-    tapPreviewTimer = null;
-  }
-};
-
-const handleAvatarTap = (text: string): void => {
-  tapPreview.value = text;
-  clearTapPreviewTimer();
-  tapPreviewTimer = window.setTimeout(() => {
-    tapPreview.value = '';
-  }, 2600);
-};
-
-const statusLabel = computed(() => {
-  if (props.status === 'listening') return '正在倾听';
-  if (props.status === 'thinking') return '正在处理';
-  if (props.status === 'speaking') return '正在回复';
-  return '待命中';
-});
-
-const conversationModeLabel = computed(() => {
-  if (props.conversationActive) {
-    return '实时语音';
-  }
-  if (props.status === 'listening') {
-    return '语音输入';
-  }
-  return '文字 / 点击';
-});
-
-const displayText = computed(() => {
-  if (tapPreview.value) {
-    return tapPreview.value;
-  }
-  const preview = props.previewText?.trim();
-  if (preview) {
-    return preview;
-  }
-  if (props.conversationActive) {
-    return '实时对话中，回答后会继续倾听。';
-  }
-  if (props.status === 'listening') {
-    return '正在倾听，请直接说话。';
-  }
-  if (props.status === 'thinking') {
-    return '正在联动平台能力并整理结果。';
-  }
-  if (props.status === 'speaking') {
-    return '回复已生成，请查看左下消息区。';
-  }
-  return '常驻在线，支持语音或文字发起联动。';
-});
-
-onBeforeUnmount(() => {
-  clearTapPreviewTimer();
 });
 </script>
 
 <style scoped>
 .virtual-agent {
   --stage-bg:
-    radial-gradient(circle at 18% 16%, rgba(106, 204, 255, 0.18), transparent 24%),
-    radial-gradient(circle at 68% 18%, rgba(126, 197, 255, 0.22), transparent 28%),
-    radial-gradient(circle at 84% 74%, rgba(83, 213, 165, 0.12), transparent 28%),
+    radial-gradient(circle at 18% 16%, rgba(106, 204, 255, 0.22), transparent 24%),
+    radial-gradient(circle at 68% 18%, rgba(126, 197, 255, 0.26), transparent 28%),
+    radial-gradient(circle at 84% 74%, rgba(83, 213, 165, 0.14), transparent 28%),
+    radial-gradient(circle at 50% 100%, rgba(126, 197, 255, 0.14), transparent 34%),
     linear-gradient(180deg, rgba(8, 28, 51, 0.97), rgba(7, 20, 38, 0.92));
   position: relative;
   min-height: 100%;
@@ -284,10 +206,12 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(123, 192, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(123, 192, 255, 0.08) 1px, transparent 1px);
-  background-size: 2rem 2rem;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 92%);
+    linear-gradient(rgba(123, 192, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(123, 192, 255, 0.05) 1px, transparent 1px);
+  background-size: 2.8rem 2.8rem;
+  transform: perspective(900px) rotateX(64deg) translateY(26%);
+  transform-origin: center bottom;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.92), transparent 88%);
 }
 
 .ambient,
@@ -301,32 +225,35 @@ onBeforeUnmount(() => {
 
 .ambient-a {
   inset: 12% auto auto 14%;
-  width: 15rem;
-  height: 15rem;
+  width: 12rem;
+  height: 12rem;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(126, 197, 255, 0.28), transparent 72%);
-  filter: blur(4px);
+  filter: blur(8px);
+  opacity: 0.76;
   animation: drift 8s ease-in-out infinite;
 }
 
 .ambient-b {
   inset: auto 8% 10% auto;
-  width: 13rem;
-  height: 13rem;
+  width: 10.5rem;
+  height: 10.5rem;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(83, 213, 165, 0.18), transparent 74%);
   filter: blur(12px);
+  opacity: 0.52;
   animation: drift 10s ease-in-out infinite reverse;
 }
 
 .light-column {
   left: 50%;
   top: -12%;
-  width: 16rem;
+  width: 13rem;
   height: 30rem;
   transform: translateX(-50%);
   background: linear-gradient(180deg, rgba(151, 223, 255, 0.32), rgba(151, 223, 255, 0));
-  filter: blur(18px);
+  filter: blur(22px);
+  opacity: 0.48;
 }
 
 .halo {
@@ -337,17 +264,19 @@ onBeforeUnmount(() => {
 }
 
 .halo-outer {
-  width: 17rem;
-  height: 17rem;
-  border: 1px solid rgba(126, 197, 255, 0.18);
-  box-shadow: 0 0 32px rgba(126, 197, 255, 0.12);
+  width: 15rem;
+  height: 15rem;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  box-shadow:
+    0 0 28px rgba(126, 197, 255, 0.08),
+    inset 0 0 16px rgba(126, 197, 255, 0.06);
   animation: spin 18s linear infinite;
 }
 
 .halo-inner {
-  width: 12.2rem;
-  height: 12.2rem;
-  border: 1px solid rgba(126, 197, 255, 0.26);
+  width: 10.8rem;
+  height: 10.8rem;
+  border: 1px solid rgba(126, 197, 255, 0.18);
   animation: spinReverse 12s linear infinite;
 }
 
@@ -393,45 +322,31 @@ onBeforeUnmount(() => {
   border-left: none;
   border-bottom: none;
   border-radius: 0 22px 0 0;
-  opacity: 0.7;
+  opacity: 0.8;
+  box-shadow: 0 0 24px rgba(126, 197, 255, 0.08);
   z-index: 2;
 }
 
-.agent-copy,
 .voice-meter {
   position: absolute;
   z-index: 8;
   backdrop-filter: blur(14px);
 }
 
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  background: rgba(8, 26, 45, 0.78);
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  color: #d7eeff;
-}
-
-.dot {
-  width: 0.56rem;
-  height: 0.56rem;
-  border-radius: 50%;
-  background: #7ec5ff;
-  box-shadow: 0 0 12px rgba(126, 197, 255, 0.86);
-  flex: 0 0 auto;
-}
-
 .voice-meter {
   left: 50%;
-  bottom: 1.1rem;
+  bottom: 0.9rem;
   transform: translateX(-50%);
   display: flex;
   align-items: flex-end;
-  gap: 0.28rem;
-  padding: 0.56rem 0.8rem;
+  gap: 0.24rem;
+  padding: 0.52rem 0.78rem;
   border-radius: 999px;
-  background: rgba(8, 26, 45, 0.64);
+  background: rgba(8, 26, 45, 0.56);
   border: 1px solid rgba(126, 197, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 10px 20px rgba(2, 11, 24, 0.18);
 }
 
 .voice-meter span {
@@ -472,79 +387,8 @@ onBeforeUnmount(() => {
   animation: blink 6.4s ease-in-out infinite;
 }
 
-.agent-copy {
-  top: 1.3rem;
-  right: 1.3rem;
-  width: min(15.4rem, calc(100% - 2.6rem));
-  display: flex;
-  flex-direction: column;
-  gap: 0.56rem;
-  padding: 0.96rem 1rem;
-  border-radius: 1.5rem;
-  background: linear-gradient(180deg, rgba(10, 30, 52, 0.9), rgba(7, 22, 39, 0.78));
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  box-shadow:
-    0 20px 38px rgba(2, 11, 24, 0.24),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  color: rgba(196, 228, 255, 0.72);
-  text-transform: uppercase;
-}
-
-.agent-copy h4 {
-  margin: 0;
-  font-size: 1.74rem;
-  line-height: 1;
-  color: #f2f9ff;
-}
-
-.agent-brief {
-  margin: 0;
-  line-height: 1.62;
-  font-size: 0.86rem;
-  color: rgba(220, 239, 252, 0.86);
-  max-height: 7rem;
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(126, 197, 255, 0.44) transparent;
-}
-
-.status-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.42rem;
-}
-
-.status-badge {
-  gap: 0.36rem;
-  padding: 0.36rem 0.64rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-}
-
-.status-badge.subtle {
-  background: rgba(13, 35, 58, 0.72);
-  color: rgba(214, 235, 252, 0.78);
-}
-
-.virtual-agent[data-state='listening'] .dot {
-  background: #f8cb71;
-  box-shadow: 0 0 14px rgba(248, 203, 113, 0.82);
-}
-
 .virtual-agent[data-state='listening'] .voice-meter span {
   background: linear-gradient(180deg, rgba(255, 231, 171, 0.96), rgba(248, 203, 113, 0.72));
-}
-
-.virtual-agent[data-state='thinking'] .dot,
-.virtual-agent[data-state='speaking'] .dot {
-  background: #53d5a5;
-  box-shadow: 0 0 14px rgba(83, 213, 165, 0.82);
 }
 
 .virtual-agent[data-state='speaking'] .body-aura,
@@ -573,26 +417,11 @@ onBeforeUnmount(() => {
   .stage-shell {
     min-height: 24rem;
   }
-
-  .agent-copy {
-    width: min(13.6rem, calc(100% - 2rem));
-  }
 }
 
 @media (max-width: 760px) {
   .stage-shell {
     min-height: 20rem;
-  }
-
-  .agent-copy {
-    top: 3.8rem;
-    left: 1rem;
-    right: 1rem;
-    width: auto;
-  }
-
-  .agent-copy h4 {
-    font-size: 1.48rem;
   }
 
   .voice-meter {

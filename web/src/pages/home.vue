@@ -1,27 +1,48 @@
 <template>
   <div class="dash home">
-    <header class="head">
+    <header class="head profile-head">
       <div>
         <h1>值班员信息</h1>
         <p>快速查看个人资料，返回驾驶舱或进入智能助手</p>
       </div>
-      <div class="pill" @click="goBack" style="cursor:pointer">返回驾驶舱</div>
-      <div class="pill" @click="goAgent" style="cursor:pointer">进入智能助手</div>
+      <div class="head-actions">
+        <button class="pill action-pill" type="button" @click="goBack">返回驾驶舱</button>
+        <button class="pill action-pill action-pill-primary" type="button" @click="goAgent">进入智能助手</button>
+      </div>
     </header>
 
     <section class="grid single">
       <article class="card profile">
         <div class="profile-meta">
-          <div class="avatar big">张三</div>
-          <div>
-            <div class="label">用户名</div>
-            <div class="value">张三</div>
-            <div class="label">手机号</div>
-            <div class="value">18735261687</div>
+          <div class="avatar-shell">
+            <div class="avatar big">张三</div>
+            <span class="role-chip">值班中</span>
+          </div>
+
+          <div class="profile-copy">
+            <div class="profile-label">值班人员档案</div>
+            <div class="profile-name">张三</div>
+            <div class="profile-list">
+              <div class="info-row">
+                <span>用户名</span>
+                <strong>张三</strong>
+              </div>
+              <div class="info-row">
+                <span>手机号</span>
+                <strong>18735261687</strong>
+              </div>
+              <div class="info-row">
+                <span>岗位</span>
+                <strong>社区安防值班员</strong>
+              </div>
+            </div>
           </div>
         </div>
+
         <div class="profile-img">
-          <img src="../../public/assets/t01c209d217482e57de.jpg" alt="avatar" />
+          <div class="portrait-frame">
+            <img src="../../public/assets/t01c209d217482e57de.jpg" alt="值班员头像">
+          </div>
         </div>
       </article>
     </section>
@@ -47,61 +68,193 @@ const goAgent = () => {
   min-height: 100vh;
 }
 
+.profile-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.head-actions {
+  display: inline-flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-pill {
+  cursor: pointer;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.action-pill-primary {
+  border-color: rgba(126, 232, 255, 0.44);
+  background: linear-gradient(180deg, rgba(33, 94, 143, 0.96), rgba(18, 55, 88, 0.92));
+}
+
 .grid.single {
   grid-template-columns: 1fr;
 }
 
 .profile {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1.2fr) 360px;
   align-items: center;
+  gap: 24px;
+  min-height: 0;
 }
 
 .profile-meta {
   display: grid;
-  grid-template-columns: 90px 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.avatar-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(75, 230, 168, 0.28);
+  background: rgba(75, 230, 168, 0.12);
+  color: #9ef4c7;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.profile-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-label {
+  color: var(--sub);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+}
+
+.profile-name {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f7fbff;
+}
+
+.profile-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 18px;
+  background: rgba(12, 30, 50, 0.52);
+}
+
+.info-row span {
+  color: var(--sub);
+  font-size: 12px;
+}
+
+.info-row strong {
+  color: #eff7ff;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .profile-img {
   justify-self: end;
 }
 
+.portrait-frame {
+  position: relative;
+  padding: 12px;
+  border-radius: 28px;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(126, 197, 255, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(13, 33, 56, 0.88), rgba(9, 23, 39, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.portrait-frame::after {
+  content: '';
+  position: absolute;
+  inset: auto 12px 12px auto;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(126, 197, 255, 0.22), transparent 72%);
+  filter: blur(8px);
+}
+
 .profile-img img {
-  width: 180px;
-  height: 180px;
-  border-radius: 12px;
+  display: block;
+  width: 240px;
+  height: 300px;
+  border-radius: 20px;
   object-fit: cover;
-  border: 1px solid var(--line);
-}
-
-.label {
-  color: var(--sub);
-  font-size: 12px;
-  margin-top: 6px;
-}
-
-.value {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 6px;
+  border: 1px solid rgba(126, 197, 255, 0.22);
+  position: relative;
+  z-index: 1;
 }
 
 .avatar.big {
-  width: 72px;
-  height: 72px;
-  font-size: 18px;
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+  font-size: 20px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 960px) {
+  .profile-head {
+    grid-template-columns: 1fr;
+  }
+
   .profile {
     grid-template-columns: 1fr;
-    gap: 16px;
   }
 
   .profile-img {
     justify-self: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .profile-meta {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .head-actions {
+    width: 100%;
+  }
+
+  .action-pill {
+    flex: 1 1 100%;
+  }
+
+  .profile-img img {
+    width: min(100%, 240px);
+    height: auto;
+    aspect-ratio: 4 / 5;
+  }
+
+  .info-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 }
 </style>
