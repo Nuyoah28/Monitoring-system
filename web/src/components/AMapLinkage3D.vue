@@ -9,8 +9,11 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 interface MapPointItem {
+  id?: number | string
+  monitorId?: number | string
   title: string
   camera: string
+  department?: string
   className: string
   streamUrl?: string
   longitude?: number
@@ -19,6 +22,11 @@ interface MapPointItem {
     left?: string
     top?: string
   }
+}
+
+interface AlarmCountItem {
+  camera: string
+  count: number
 }
 
 interface FixedPointItem {
@@ -32,6 +40,7 @@ type AMapLike = any
 
 const props = defineProps<{
   points: MapPointItem[]
+  alarmCounts?: AlarmCountItem[]
 }>()
 
 const emit = defineEmits<{
@@ -76,6 +85,20 @@ const parsePercent = (input?: string) => {
   return Number.isFinite(value) ? value : null
 }
 
+const buildFallbackLngLat = (index: number): [number, number] => {
+  if (index < FIXED_POINTS.length) {
+    const fixed = FIXED_POINTS[index]
+    return [fixed.longitude, fixed.latitude]
+  }
+  const dynamicIndex = index - FIXED_POINTS.length
+  const cols = 4
+  const row = Math.floor(dynamicIndex / cols)
+  const col = dynamicIndex % cols
+  const xOffset = (col - (cols - 1) / 2) * 0.00045
+  const yOffset = (1.5 - row) * 0.00033
+  return [DEFAULT_CENTER[0] + xOffset, DEFAULT_CENTER[1] + yOffset]
+}
+
 const normalizeLngLat = (point: MapPointItem, index: number): [number, number] => {
   if (typeof point.longitude === 'number' && typeof point.latitude === 'number') {
     return [point.longitude, point.latitude]
@@ -89,8 +112,7 @@ const normalizeLngLat = (point: MapPointItem, index: number): [number, number] =
     return [lng, lat]
   }
 
-  const fallback: Array<[number, number]> = FIXED_POINTS.map(item => [item.longitude, item.latitude])
-  return fallback[index % fallback.length]
+  return buildFallbackLngLat(index)
 }
 
 const loadAmapScript = async () => {
@@ -159,36 +181,72 @@ const clearMarkers = () => {
   markers = []
 }
 
+const getAlarmCount = (cameraName: string): number => {
+  if (!props.alarmCounts || !cameraName) return 0
+  const normalize = (value: string) => String(value || '').replace(/\s+/g, '').toLowerCase()
+  const current = normalize(cameraName)
+  const found = props.alarmCounts.find((item) => normalize(item.camera) === current) ||
+    props.alarmCounts.find((item) => {
+      const target = normalize(item.camera)
+      return current.includes(target) || target.includes(current)
+    })
+  return found?.count || 0
+}
+
 const renderMarkers = () => {
   if (!mapInstance || !(window as any).AMap) return
   clearMarkers()
 
   const AMap = (window as any).AMap
-  const pointsToRender: MapPointItem[] = FIXED_POINTS.map(item => ({
-    title: item.title,
-    camera: item.camera,
-    className: 'fixed',
-    longitude: item.longitude,
-    latitude: item.latitude,
-  }))
+  const pointsToRender: MapPointItem[] = (props.points && props.points.length)
+    ? props.points
+    : FIXED_POINTS.map(item => ({
+      title: item.title,
+      camera: item.camera,
+      className: 'fixed',
+      longitude: item.longitude,
+      latitude: item.latitude,
+    }))
 
   markers = pointsToRender.map((point, index) => {
     const position = normalizeLngLat(point, index)
+    const alarmCount = getAlarmCount(point.camera)
+    
+    const markerContent = document.createElement('div')
+    markerContent.className = 'marker-wrapper'
+    
+    if (alarmCount > 0) {
+      markerContent.innerHTML = `
+        <div class="marker-dot breathing">
+          <span class="marker-count">${alarmCount > 99 ? '99+' : alarmCount}</span>
+        </div>
+      `
+    } else {
+      markerContent.innerHTML = `
+        <div class="marker-dot normal"></div>
+      `
+    }
+    
     const marker = new AMap.Marker({
       position,
       title: point.title,
       offset: new AMap.Pixel(-6, -6),
+      content: markerContent,
     })
     marker.setLabel({
       direction: 'right',
-      offset: new AMap.Pixel(6, 0),
-      content: `<span style="color:#16a34a;font-size:12px;white-space:nowrap;">${point.camera || point.title}</span>`,
+      offset: new AMap.Pixel(12, 0),
+      content: `<span style="color:#16a34a;font-size:12px;white-space:nowrap;">${point.camera || point.title || `监测点${index + 1}`}</span>`,
     })
     marker.on('click', () => emit('point-click', point))
     return marker
   })
 
   mapInstance.add(markers)
+  if (markers.length > 1 && typeof mapInstance.setFitView === 'function') {
+    mapInstance.setFitView(markers, false, [36, 36, 36, 36])
+    return
+  }
   mapInstance.setCenter(DEFAULT_CENTER)
   mapInstance.setZoom(19)
 }
@@ -234,6 +292,14 @@ onMounted(() => {
 
 watch(
   () => props.points,
+  () => {
+    renderMarkers()
+  },
+  { deep: true },
+)
+
+watch(
+  () => props.alarmCounts,
   () => {
     renderMarkers()
   },
@@ -288,5 +354,71 @@ onUnmounted(() => {
 .amap-root :deep(.amap-logo),
 .amap-root :deep(.amap-copyright) {
   opacity: 0.8;
+}
+
+.amap-root :deep(.marker-wrapper) {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.amap-root :deep(.marker-dot) {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 10px rgba(99, 184, 255, 0.82);
+}
+
+.amap-root :deep(.marker-dot.normal) {
+  background: radial-gradient(circle at 35% 35%, #7fcbff, #2e86d1);
+}
+
+.amap-root :deep(.marker-dot.breathing) {
+  background: radial-gradient(circle at 35% 35%, #ff6b6b, #c92a2a);
+  animation: breathe 2s ease-in-out infinite;
+}
+
+.amap-root :deep(.marker-dot.breathing::after) {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: rgba(255, 107, 107, 0.4);
+  animation: pulse 2s ease-in-out infinite;
+  z-index: -1;
+}
+
+.amap-root :deep(.marker-count) {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
 }
 </style>

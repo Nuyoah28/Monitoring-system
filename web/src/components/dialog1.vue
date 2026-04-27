@@ -1,37 +1,29 @@
 <template>
-  <el-dialog
-    title="报警信息"
-    class="dialog"
-    v-model="localDialogVisible"
-    width="30%"
-    :before-close="handleClose">
-    <span>
-      <div class="video">
-        <video ref="videoElement" autoplay muted controls @error="handleVideoError"></video>
-        <div v-if="videoLoadError" class="video-error-message">
-          视频加载失败: {{ videoErrorMessage }}
+  <div v-if="localDialogVisible" class="process-modal-mask detail-mask" role="dialog" aria-modal="true" @click.self="handleClose">
+    <div class="process-modal-card detail-card">
+      <div class="detail-head">
+        <h4>报警详情</h4>
+        <button class="detail-close" type="button" @click="handleClose" aria-label="关闭">×</button>
+      </div>
+      <div class="dialog-content">
+        <div class="video">
+          <video ref="videoElement" autoplay muted controls @error="handleVideoError"></video>
+          <div v-if="videoLoadError" class="video-error-message">
+            视频加载失败: {{ videoErrorMessage }}
+          </div>
+        </div>
+        <div class="detail-list">
+          <div class="detail-row" v-for="row in tableData" :key="row.key">
+            <span class="detail-key">{{ row.key }}</span>
+            <span class="detail-val">{{ row.val || '--' }}</span>
+          </div>
         </div>
       </div>
-      <el-table
-      :data="tableData"
-        stripe
-      style="width: 100%">
-      <el-table-column width="30">
-      </el-table-column>
-      <el-table-column
-        prop="key">
-      </el-table-column>
-      <el-table-column
-        prop="val"
-        width="160">
-      </el-table-column>
-    </el-table>
-    </span>
-    <span slot="footer" class="dialog-footer">
-      <el-button @click="closeDialog">取 消</el-button>
-      <el-button type="primary" @click="closeDialog">确 定</el-button>
-    </span>
-  </el-dialog>
+      <div class="process-actions detail-actions">
+        <button class="btn footer-btn primary" type="button" @click="closeDialog">确定</button>
+      </div>
+    </div>
+  </div>
 </template>
   
 <script setup lang="ts">
@@ -375,36 +367,156 @@ watch(
 );
 </script>
   
-  <style lang="less" scoped>
-  .video {
-    height: 20rem;
-    position: relative;
-    
-    video {
-        width: 95%;
-        height: 100%;
-        margin: 0 auto;
-        // margin-top: 0.5rem;
-        object-fit: cover; /* 使视频填充容器并裁剪超出部分 */
-      }
-      
-    .video-error-message {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: rgba(0, 0, 0, 0.7);
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 4px;
-      font-size: 14px;
-      text-align: center;
-      z-index: 10;
-      width: 90%;
-      word-wrap: break-word;
-    }
-  }
-  
+<style lang="less" scoped>
+.process-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 13000;
+  background: rgba(2, 10, 20, 0.62);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
 
-  </style>
+.process-modal-card {
+  width: min(420px, 92vw);
+  border-radius: 14px;
+  border: 1px solid rgba(118, 183, 255, 0.3);
+  background: linear-gradient(180deg, rgba(14, 43, 74, 0.95), rgba(9, 31, 54, 0.95));
+  box-shadow: 0 22px 48px rgba(3, 16, 30, 0.48);
+  padding: 14px;
+}
+
+.dialog-content {
+  display: grid;
+  gap: 12px;
+}
+
+.detail-card {
+  width: min(900px, 90vw);
+  max-height: 88vh;
+  overflow: auto;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.detail-head h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #eaf5ff;
+}
+
+.detail-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(126, 197, 255, 0.28);
+  background: rgba(12, 39, 66, 0.7);
+  color: #cde8ff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.video {
+  height: 18rem;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(126, 197, 255, 0.28);
+  background: rgba(8, 27, 45, 0.72);
+
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .video-error-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(3, 14, 28, 0.82);
+    color: #d6e8ff;
+    border: 1px solid rgba(255, 123, 136, 0.52);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: center;
+    z-index: 10;
+    width: min(90%, 420px);
+    word-wrap: break-word;
+  }
+}
+
+.detail-list {
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(8, 27, 45, 0.36);
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(126, 197, 255, 0.14);
+}
+
+.detail-row:nth-child(odd) {
+  background: rgba(24, 63, 98, 0.22);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-key {
+  color: #b9daf8;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detail-val {
+  color: #e3f2ff;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.detail-actions {
+  margin-top: 10px;
+}
+
+.footer-btn {
+  min-width: 72px;
+}
+
+.footer-btn.secondary {
+  border: 1px solid rgba(126, 197, 255, 0.36);
+  color: #d8ebff;
+  background: rgba(15, 45, 74, 0.72);
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.footer-btn.primary {
+  border-color: rgba(99, 184, 255, 0.85);
+  background: rgba(126, 197, 255, 0.22);
+  color: #eaf6ff;
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+</style>
   

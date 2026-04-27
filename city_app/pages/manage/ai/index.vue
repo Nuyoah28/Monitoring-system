@@ -42,13 +42,13 @@
     <view class="body" :style="bodyStyle">
       <scroll-view :scroll-top="scrollTop" class="scroll" scroll-y @scroll="recordHeight">
         <view class="chat">
-          <view id="msgbar" v-for="(item, index) in textList" :key="index" :class="index % 2 === 1 ? 'left' : 'right'">
+          <view id="msgbar" v-for="(item, index) in textList" :key="index" :class="getMessageRole(item, index) === 'assistant' ? 'left' : 'right'">
             <view class="avatar">
-              <image :src="index % 2 === 0 ? '/static/AIuser.png' : '/static/ai.png'"></image>
+              <image :src="getMessageRole(item, index) === 'assistant' ? '/static/ai.png' : '/static/AIuser.png'"></image>
             </view>
             <view class="msg">
-              <rich-text v-if="index % 2 === 1" class="msg-rich" :nodes="mdToHtml(item)"></rich-text>
-              <view v-else>{{ item }}</view>
+              <rich-text v-if="getMessageRole(item, index) === 'assistant'" class="msg-rich" :nodes="mdToHtml(getMessageText(item))"></rich-text>
+              <view v-else>{{ getMessageText(item) }}</view>
             </view>
           </view>
           <view class="loading" v-show="isLoading">
@@ -84,6 +84,8 @@ import wsRequest from '@/api/websocket.js';
 import { AI_HTTP_URL, AI_WS_URL } from '@/common/config.js';
 import Vue from 'vue';
 import OwnerTabbar from '@/components/navigation/owner-tabbar.vue';
+
+const AI_WELCOME_MESSAGE = '你好，我是社区智眼 AI 助手。你可以问我报警处置、监控巡检、环境数据、车位引导相关的问题，我会尽量用简单清楚的方式帮你分析。';
 
 export default {
   components: { OwnerTabbar },
@@ -144,6 +146,12 @@ export default {
     else this.switchSession(this.currentSessionId || this.sessions[0].id, false);
     this.createWs();
   },
+  onHide() {
+    this.closeWs();
+  },
+  onUnload() {
+    this.closeWs();
+  },
   methods: {
     initLayout() {
       const info = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : uni.getSystemInfoSync();
@@ -155,8 +163,15 @@ export default {
       this.scrollHeight = Math.max(260, safeAreaHeight - this.statusBarHeight - header - input);
     },
     goBack() {
-      if (getCurrentPages().length > 1) uni.navigateBack();
-      else uni.switchTab({ url: '/pages/manage/controls/controls' });
+      if (getCurrentPages().length > 1) {
+        uni.navigateBack();
+        return;
+      }
+      if (this.isOwnerApp) {
+        uni.reLaunch({ url: '/pages/owner/home/index' });
+        return;
+      }
+      uni.switchTab({ url: '/pages/manage/controls/controls' });
     },
     loadSessionCache() {
       try {
@@ -182,18 +197,21 @@ export default {
     },
     startNewSession() {
       const id = String(Date.now());
-      this.sessions.unshift({ id, title: '新会话', updatedAt: Date.now(), messages: [] });
+      this.sessions.unshift({ id, title: '新会话', updatedAt: Date.now(), messages: [this.createWelcomeMessage()] });
       this.currentSessionId = id;
-      this.textList = [];
+      this.textList = [this.createWelcomeMessage()];
       this.showSessionList = false;
       this.saveSessionCache();
+      this.$nextTick(() => this.toBottom());
     },
     switchSession(id, closePanel = true) {
       if (this.sessionLongPressLock) return;
       const target = this.sessions.find((item) => item.id === id);
       if (!target) return;
       this.currentSessionId = id;
-      this.textList = Array.isArray(target.messages) ? [...target.messages] : [];
+      const messages = Array.isArray(target.messages) ? [...target.messages] : [];
+      this.textList = messages.length ? messages : [this.createWelcomeMessage()];
+      if (!messages.length) target.messages = [...this.textList];
       if (closePanel) this.showSessionList = false;
       this.$nextTick(() => this.toBottom());
       this.saveSessionCache();
@@ -229,7 +247,8 @@ export default {
     },
     getSessionTitle(session) {
       if (!session || !Array.isArray(session.messages) || !session.messages.length) return (session && session.title) || '新会话';
-      const first = (session.messages[0] || '').replace(/\s+/g, ' ').trim();
+      const firstUserMessage = session.messages.find((item, index) => this.getMessageRole(item, index) === 'user');
+      const first = this.getMessageText(firstUserMessage).replace(/\s+/g, ' ').trim();
       if (!first) return session.title || '新会话';
       return first.length > 12 ? first.slice(0, 12) + '...' : first;
     },
@@ -246,10 +265,27 @@ export default {
       const index = this.sessions.findIndex((item) => item.id === this.currentSessionId);
       if (index < 0) return;
       const messages = [...this.textList];
-      const first = (messages[0] || '').replace(/\s+/g, ' ').trim();
+      const firstUserMessage = messages.find((item, msgIndex) => this.getMessageRole(item, msgIndex) === 'user');
+      const first = this.getMessageText(firstUserMessage).replace(/\s+/g, ' ').trim();
       const title = first ? (first.length > 12 ? first.slice(0, 12) + '...' : first) : '新会话';
       Vue.set(this.sessions, index, { ...this.sessions[index], title, updatedAt: Date.now(), messages });
       this.saveSessionCache();
+    },
+    createWelcomeMessage() {
+      return {
+        role: 'assistant',
+        type: 'welcome',
+        content: AI_WELCOME_MESSAGE,
+      };
+    },
+    getMessageText(item) {
+      if (item == null) return '';
+      if (typeof item === 'object') return String(item.content || item.text || '');
+      return String(item);
+    },
+    getMessageRole(item, index) {
+      if (item && typeof item === 'object' && item.role) return item.role;
+      return index % 2 === 1 ? 'assistant' : 'user';
     },
     mdToHtml(str) {
       if (str == null || typeof str !== 'string') return '';
@@ -271,6 +307,8 @@ export default {
     createWs() {
       const token = uni.getStorageSync('token');
       if (!token) return;
+      if (this.websocket && (this.websocket.is_open_socket || this.websocket.is_connecting)) return;
+      this.closeWs();
       try {
         this.websocket = new wsRequest(`${AI_WS_URL}/api/v1/gpt/ws/${token}`, 5000);
       } catch (e) {
@@ -278,17 +316,19 @@ export default {
       }
       if (!this.websocket || typeof this.websocket.getMessage !== 'function') return;
       this.websocket.getMessage((res) => {
+        const payload = typeof res.data === 'string' ? res.data.trim() : res.data;
+        if (payload === 'ping' || payload === 'pong' || payload === '') return;
         this.cnt += 1;
-        if (res.data === '[REPLACE]') {
+        if (payload === '[REPLACE]') {
           this.answerText = '';
-          Vue.set(this.textList, this.textList.length - 1, '');
+          Vue.set(this.textList, this.textList.length - 1, { role: 'assistant', content: '' });
           return;
         }
         this.isLoading = false;
-        if (res.data !== '[DONE]') this.answerText += res.data;
-        Vue.set(this.textList, this.textList.length - 1, this.answerText);
+        if (payload !== '[DONE]') this.answerText += payload;
+        Vue.set(this.textList, this.textList.length - 1, { role: 'assistant', content: this.answerText });
         this.refreshCurrentSession();
-        if (res.data === '[DONE]') {
+        if (payload === '[DONE]') {
           this.isDisabled = false;
           if (this.answerText && this.answerText.trim()) this.requestTtsAndPlay(this.answerText.trim());
         }
@@ -298,35 +338,63 @@ export default {
         }
       });
     },
+    closeWs() {
+      if (this.websocket && typeof this.websocket.close === 'function') {
+        this.websocket.close();
+      }
+      this.websocket = null;
+      this.isLoading = false;
+      this.isDisabled = false;
+    },
     jumpSetting() {
+      if (this.isOwnerApp) {
+        uni.reLaunch({ url: '/pages/owner/personal/index' });
+        return;
+      }
       uni.navigateTo({ url: '/pages/manage/personal/setting/setting' });
     },
     send() {
-      if (!this.text) {
+      const ask = (this.text || '').trim();
+      if (!ask) {
         uni.showToast({ title: '请勿发送空消息', icon: 'none', duration: 1500 });
+        return;
+      }
+      if (!this.websocket || !this.websocket.is_open_socket) {
+        uni.showToast({ title: 'AI连接未就绪，请稍后再试', icon: 'none' });
         return;
       }
       this.cnt = 0;
       this.answerText = '';
-      this.textList.push(this.text);
+      this.textList.push({ role: 'user', content: ask });
       this.toBottom();
       this.count += 1;
-      this.getAnswer(this.text);
+      const sent = this.getAnswer(ask);
+      if (!sent) {
+        this.textList.pop();
+        uni.showToast({ title: 'AI连接未就绪，请稍后再试', icon: 'none' });
+        return;
+      }
       this.text = '';
       this.isLoading = true;
+      this.isDisabled = true;
       this.refreshCurrentSession();
     },
     getAnswer(ask) {
+      if (!this.websocket || typeof this.websocket.send !== 'function' || !this.websocket.is_open_socket) {
+        this.isLoading = false;
+        return false;
+      }
       this.answerText = '';
-      this.textList.push(this.answerText);
+      const sent = this.websocket.send(JSON.stringify(ask));
+      if (!sent) {
+        this.isLoading = false;
+        return false;
+      }
+      this.textList.push({ role: 'assistant', content: this.answerText });
       this.toBottom();
       this.count += 1;
       this.refreshCurrentSession();
-      if (this.websocket && typeof this.websocket.send === 'function') this.websocket.send(JSON.stringify(ask));
-      else {
-        this.isLoading = false;
-        uni.showToast({ title: 'AI连接未就绪', icon: 'none' });
-      }
+      return true;
     },
     recordHeight(e) {
       this.newTop = e.detail.scrollTop;
@@ -438,8 +506,8 @@ export default {
               return;
             }
             const { question: recognized, answer } = data.data;
-            this.textList.push(recognized || '(语音)');
-            this.textList.push(answer || '');
+            this.textList.push({ role: 'user', content: recognized || '(语音)' });
+            this.textList.push({ role: 'assistant', content: answer || '' });
             this.refreshCurrentSession();
             this.toBottom();
             if (answer && answer.trim()) this.requestTtsAndPlay(answer.trim());

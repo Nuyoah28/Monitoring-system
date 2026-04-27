@@ -1,5 +1,6 @@
 package com.sipc.monitoringsystem.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sipc.monitoringsystem.dao.SystemMessageDao;
 import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
@@ -25,7 +26,12 @@ public class SystemMessageServiceImpl extends ServiceImpl<SystemMessageDao, Syst
     }
 
     @Override
-    public List<SystemMessage> getMessage(SystemMessage message) {
-        return this.list();
+    public List<SystemMessage> getMessage(Integer receiverUserId) {
+        QueryWrapper<SystemMessage> wrapper = new QueryWrapper<>();
+        if (receiverUserId != null) {
+            wrapper.and(w -> w.isNull("receiver_user_id").or().eq("receiver_user_id", receiverUserId));
+        }
+        wrapper.orderByDesc("timestamp").orderByDesc("id");
+        return this.list(wrapper);
     }
 }

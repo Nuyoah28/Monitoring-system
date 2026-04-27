@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.res.BlankRes;
 import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
+import com.sipc.monitoringsystem.model.po.User.User;
 import com.sipc.monitoringsystem.service.SystemMessageService;
+import com.sipc.monitoringsystem.util.JwtUtils;
+import com.sipc.monitoringsystem.util.TokenThreadLocalUtil;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -38,7 +41,9 @@ public class MessageController {
     }
 
     @RequestMapping("/getMessage")
-    public CommonResult<List<SystemMessage>> getMessage(SystemMessage message){
-        return CommonResult.success(systemMessageService.getMessage(message));
+    public CommonResult<List<SystemMessage>> getMessage(){
+        User user = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
+        Integer receiverUserId = user == null ? null : user.getId();
+        return CommonResult.success(systemMessageService.getMessage(receiverUserId));
     }
 }

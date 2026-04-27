@@ -4,6 +4,13 @@
 	},
 	"pages": [
 		{
+			"path": "pages/shared/launch/index",
+			"style": {
+				"navigationBarTitleText": "",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/shared/select/index",
 			"style": {
 				"navigationBarTitleText": "选择端",

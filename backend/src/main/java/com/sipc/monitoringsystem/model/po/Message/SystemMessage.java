@@ -15,6 +15,10 @@ public class SystemMessage {
     private Integer id;
     
     private String message;
+
+    @TableField("receiver_user_id")
+    private Integer receiverUserId;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(fill = FieldFill.INSERT,jdbcType = TIMESTAMP)
     private Timestamp timestamp;

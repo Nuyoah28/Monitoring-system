@@ -26,4 +26,16 @@ public class User implements Serializable {
     private String phone;
 
     private Integer role;
+
+    @TableField("is_resident")
+    private Boolean isResident;
+
+    @TableField("home_area")
+    private String homeArea;
+
+    @TableField("notify_enabled")
+    private Boolean notifyEnabled;
+
+    @TableField("push_cid")
+    private String pushCid;
 }

@@ -9,9 +9,12 @@ import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.param.alarm.UpdateAlarmParam;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.*;
 import com.sipc.monitoringsystem.model.dto.res.BlankRes;
+import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
 import com.sipc.monitoringsystem.model.po.User.User;
+import com.sipc.monitoringsystem.service.AlarmPushRecordService;
 import com.sipc.monitoringsystem.service.AlarmService;
+import com.sipc.monitoringsystem.service.SystemMessageService;
 import com.sipc.monitoringsystem.util.HttpUtils;
 import com.sipc.monitoringsystem.util.JwtUtils;
 import com.sipc.monitoringsystem.util.TokenThreadLocalUtil;
@@ -59,6 +62,12 @@ public class AlarmController {
     @Autowired
     MonitorService monitorService;
 
+    @Autowired
+    SystemMessageService systemMessageService;
+
+    @Autowired
+    AlarmPushRecordService alarmPushRecordService;
+
     @PostMapping("/receive")
     @ClearRedis
     @Pass
@@ -69,52 +78,59 @@ public class AlarmController {
         // 1. 保存报警到数据库
         SqlGetAlarm alarm = alarmService.receiveAlarm(cameraId, caseType, clipId);
 
-        if (alarm != null) {
-            // 2. 通过 WebSocket 广播报警通知给所有在线用户
-            /*
-             * Map<String, Object> alarmMessage = new HashMap<>();
-             * alarmMessage.put("type", "NEW_ALARM");
-             * alarmMessage.put("cameraId", cameraId);
-             * alarmMessage.put("caseType", caseType);
-             * alarmMessage.put("clipId", clipId);
-             * alarmMessage.put("time",
-             * LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-             * ));
-             * alarmMessage.put("message", "您有一条新的报警信息，请及时处理");
-             */
-
-            GetAlarmRes alarmRes = new GetAlarmRes(alarm);
-
-            // Fix: Wrap in a Map to include "type" and "message" for frontend compatibility
-            Map<String, Object> socketMessage = new HashMap<>();
-            socketMessage.put("type", "NEW_ALARM");
-            socketMessage.put("message", "您有一条新的报警信息，请及时处理");
-            socketMessage.put("data", alarmRes); // Include detailed data
-
-            // 获取推送目标（负责人及所有管理员）
-            List<String> targetUserIds = new ArrayList<>();
-            Monitor monitor = monitorService.getMonitorById(cameraId);
-            if (monitor != null && monitor.getLeader() != null) {
-                User leaderUser = userService.getOne(new QueryWrapper<User>().eq("user_name", monitor.getLeader()));
-                if (leaderUser != null) {
-                    targetUserIds.add(String.valueOf(leaderUser.getId()));
-                }
-            }
-            List<User> admins = userService.list(new QueryWrapper<User>().eq("role", 0));
-            for (User admin : admins) {
-                targetUserIds.add(String.valueOf(admin.getId()));
-            }
-
-            AlarmWebSocketServer.sendToUsers(targetUserIds, socketMessage);
-            log.info("WebSocket 定向推送报警: cameraId={}, caseType={}, targets={}", cameraId, caseType, targetUserIds);
-
-            // 3. 同时发送 UniPush 手机推送通知
-            // sendUniPushNotification();
-
-            return CommonResult.success("接收成功");
-        } else {
+        if (alarm == null) {
             return CommonResult.fail("接收失败");
         }
+
+        GetAlarmRes alarmRes = new GetAlarmRes(alarm);
+        Monitor monitor = monitorService.getMonitorById(cameraId);
+
+        // 2. 定向推送给负责人和管理员（现有流程）
+        Map<String, Object> managerSocketMessage = new HashMap<>();
+        managerSocketMessage.put("type", "NEW_ALARM");
+        managerSocketMessage.put("message", "您有一条新的报警信息，请及时处理");
+        managerSocketMessage.put("data", alarmRes);
+
+        Set<Integer> managerIds = collectManagerTargets(monitor);
+        if (!managerIds.isEmpty()) {
+            AlarmWebSocketServer.sendToUsers(
+                    managerIds.stream().map(String::valueOf).collect(Collectors.toList()),
+                    managerSocketMessage);
+            for (Integer userId : managerIds) {
+                alarmPushRecordService.saveRecord(alarm.getId(), userId, "ws", "success", "manager_or_admin");
+            }
+        }
+
+        // 3. 同区域居民推送（新增）
+        Set<Integer> residentIds = collectResidentTargets(monitor);
+        if (!residentIds.isEmpty()) {
+            Map<String, Object> residentSocketMessage = new HashMap<>();
+            residentSocketMessage.put("type", "NEW_ALARM");
+            residentSocketMessage.put("message", buildResidentMessage(alarm, monitor));
+            residentSocketMessage.put("data", alarmRes);
+
+            AlarmWebSocketServer.sendToUsers(
+                    residentIds.stream().map(String::valueOf).collect(Collectors.toList()),
+                    residentSocketMessage);
+
+            for (Integer residentId : residentIds) {
+                SystemMessage residentNotice = new SystemMessage();
+                residentNotice.setReceiverUserId(residentId);
+                residentNotice.setMessage(buildResidentMessage(alarm, monitor));
+                systemMessageService.addMessage(residentNotice);
+                alarmPushRecordService.saveRecord(alarm.getId(), residentId, "ws", "success", "resident_by_area");
+                alarmPushRecordService.saveRecord(alarm.getId(), residentId, "system_message", "success",
+                        "resident_by_area");
+            }
+        }
+
+        log.info("报警推送完成: cameraId={}, caseType={}, managerTargets={}, residentTargets={}",
+                cameraId, caseType, managerIds.size(), residentIds.size());
+
+        // 4. 同时发送 UniPush 手机推送通知（按需启用）
+        // sendUniPushNotification();
+
+        return CommonResult.success("接收成功");
     }
 
     /**
@@ -279,4 +295,39 @@ public class AlarmController {
         return ResponseEntity.ok().body(bytes);
     }
 
+    private Set<Integer> collectManagerTargets(Monitor monitor) {
+        Set<Integer> targetIds = new LinkedHashSet<>();
+        if (monitor != null && monitor.getLeader() != null) {
+            User leaderUser = userService.getOne(new QueryWrapper<User>().eq("user_name", monitor.getLeader()));
+            if (leaderUser != null) {
+                targetIds.add(leaderUser.getId());
+            }
+        }
+        List<User> admins = userService.list(new QueryWrapper<User>().eq("role", 0));
+        for (User admin : admins) {
+            targetIds.add(admin.getId());
+        }
+        return targetIds;
+    }
+
+    private Set<Integer> collectResidentTargets(Monitor monitor) {
+        Set<Integer> targetIds = new LinkedHashSet<>();
+        if (monitor == null || monitor.getArea() == null || monitor.getArea().isBlank()) {
+            return targetIds;
+        }
+        List<User> residents = userService.list(new QueryWrapper<User>()
+                .eq("is_resident", 1)
+                .eq("notify_enabled", 1)
+                .eq("home_area", monitor.getArea()));
+        for (User resident : residents) {
+            targetIds.add(resident.getId());
+        }
+        return targetIds;
+    }
+
+    private String buildResidentMessage(SqlGetAlarm alarm, Monitor monitor) {
+        String area = monitor == null || monitor.getArea() == null ? "附近区域" : monitor.getArea();
+        String caseName = alarm.getCaseTypeName() == null ? "异常事件" : alarm.getCaseTypeName();
+        return "【" + area + "】发生" + caseName + "，请注意安全并留意物业通知。";
+    }
 }

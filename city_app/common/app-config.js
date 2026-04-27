@@ -10,7 +10,7 @@ export const APP_CONFIG = {
     loginApi: '/api/v1/user/login',
     successUrl: '/pages/owner/home/index',
     appType: 'owner',
-    enableWebsocket: false,
+    enableWebsocket: true,
     useSwitchTab: false,
   },
 };

@@ -4,7 +4,12 @@
       <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
     </view>
     <view class="map-panel">
-      <MonitorMap :monitorList="filteredList" :compact="true" />
+      <MonitorMap
+        :monitorList="filteredList"
+        :alarmList="alarms"
+        :pulseTick="mapPulseTick"
+        :compact="true"
+      />
     </view>
 
     <view class="list-panel">
@@ -46,9 +51,14 @@ export default {
     return {
       statusBarHeight: 0,
       monitors: [],
+      alarms: [],
       keyword: "",
       pageNum: 1,
       pageSize: 3,
+      mapPulseTick: 0,
+      alarmRefreshTimer: null,
+      monitorRefreshTimer: null,
+      mapPulseTimer: null,
     };
   },
   computed: {
@@ -74,13 +84,114 @@ export default {
     this.statusBarHeight = info.statusBarHeight || 20;
   },
   onShow() {
-    this.getMonitors();
+    this.startRealtimeMap();
+  },
+  onHide() {
+    this.stopRealtimeMap();
+  },
+  onUnload() {
+    this.stopRealtimeMap();
   },
   methods: {
+    startRealtimeMap() {
+      this.stopRealtimeMap();
+      this.getMonitors();
+      this.getPendingAlerts();
+
+      this.alarmRefreshTimer = setInterval(() => {
+        this.getPendingAlerts();
+      }, 10000);
+
+      this.monitorRefreshTimer = setInterval(() => {
+        this.getMonitors();
+      }, 30000);
+
+      this.mapPulseTimer = setInterval(() => {
+        this.mapPulseTick += 1;
+      }, 900);
+    },
+    stopRealtimeMap() {
+      if (this.alarmRefreshTimer) {
+        clearInterval(this.alarmRefreshTimer);
+        this.alarmRefreshTimer = null;
+      }
+      if (this.monitorRefreshTimer) {
+        clearInterval(this.monitorRefreshTimer);
+        this.monitorRefreshTimer = null;
+      }
+      if (this.mapPulseTimer) {
+        clearInterval(this.mapPulseTimer);
+        this.mapPulseTimer = null;
+      }
+    },
+    buildTodayRange() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      return {
+        startTime: `${y}-${m}-${d} 00:00:00`,
+        endTime: `${y}-${m}-${d} 23:59:59`,
+      };
+    },
+    mergeMonitorPosition(monitorList, monitorPosList) {
+      const monitors = Array.isArray(monitorList) ? monitorList : [];
+      const posList = Array.isArray(monitorPosList) ? monitorPosList : [];
+      if (!monitors.length) return [];
+      if (!posList.length) return monitors;
+
+      return monitors.map((monitor) => {
+        const matched =
+          posList.find((item) => Number(item.monitorId) === Number(monitor.id)) ||
+          posList.find((item) => Number(item.id) === Number(monitor.id)) ||
+          posList.find((item) => item.name && monitor.name && item.name === monitor.name) ||
+          posList.find((item) => item.area && monitor.department && item.area === monitor.department);
+
+        const lon = Number(matched && matched.longitude);
+        const lat = Number(matched && matched.latitude);
+        return {
+          ...monitor,
+          longitude: Number.isFinite(lon) ? lon : monitor.longitude,
+          latitude: Number.isFinite(lat) ? lat : monitor.latitude,
+        };
+      });
+    },
     async getMonitors() {
-      const { data } = await uni.$http.get('/api/v1/monitor');
-      this.monitors = (data && data.data) || [];
-      this.pageNum = 1;
+      try {
+        const { data: monitorRes } = await uni.$http.get('/api/v1/monitor');
+        const monitorList = (monitorRes && monitorRes.data) || [];
+
+        let monitorPosList = [];
+        try {
+          const { data: mapRes } = await uni.$http.get('/api/v1/monitor/map');
+          const mapData = (mapRes && mapRes.data) || {};
+          monitorPosList = Array.isArray(mapData) ? mapData : mapData.monitorPosList || [];
+        } catch (mapError) {
+          console.warn("[monitor-map] 获取监控坐标失败：", mapError);
+        }
+
+        this.monitors = this.mergeMonitorPosition(monitorList, monitorPosList);
+        this.pageNum = 1;
+      } catch (error) {
+        console.warn("[monitor-map] 获取监控地图信息失败：", error);
+      }
+    },
+    async getPendingAlerts() {
+      try {
+        const range = this.buildTodayRange();
+        const query = {
+          pageNum: 1,
+          pageSize: 100,
+          status: 0,
+          startTime: range.startTime,
+          endTime: range.endTime,
+        };
+        const { data } = await uni.$http.get("/api/v1/alarm/query", query);
+        const list = (data && data.data && data.data.alarmList) || [];
+        this.alarms = list.filter((item) => item.caseType !== 13);
+      } catch (error) {
+        console.warn("[monitor-map] 获取实时警情失败：", error);
+      }
     },
     onSearch() {
       this.pageNum = 1;

@@ -1,6 +1,30 @@
 <script>
 import websocket from '@/common/websocket.js';
 
+const resolveLaunchTarget = () => {
+  const token = uni.getStorageSync("token");
+  const appType = uni.getStorageSync("appType");
+
+  if (!token) {
+    return {
+      navType: "reLaunch",
+      url: "/pages/shared/select/index",
+    };
+  }
+
+  if (appType === "owner") {
+    return {
+      navType: "reLaunch",
+      url: "/pages/owner/home/index",
+    };
+  }
+
+  return {
+    navType: "switchTab",
+    url: "/pages/manage/controls/controls",
+  };
+};
+
 export default {
   onLaunch: function () {
     // console.log("App Launch");
@@ -59,30 +83,20 @@ export default {
     }
     // #endif
     
-    const token = uni.getStorageSync("token");
     const userId = uni.getStorageSync("userId");
     const appType = uni.getStorageSync("appType");
+    const token = uni.getStorageSync("token");
 
-    if (!token) {
-      uni.redirectTo({
-        url: "/pages/shared/select/index",
-      });
-      return;
-    }
-
-    if (appType === "owner") {
-      uni.switchTab({
-        url: "/pages/owner/home/index",
-      });
-      return;
-    }
-
-    if (userId) {
+    if (token && userId) {
       websocket.connect(userId);
     }
 
-    uni.switchTab({
-      url: "/pages/manage/controls/controls",
+    const launchTarget = resolveLaunchTarget();
+    uni.setStorageSync("__launch_target__", launchTarget);
+
+    // 启动动画页作为统一入口，动画结束后再跳转业务页
+    uni.reLaunch({
+      url: "/pages/shared/launch/index",
     });
   },
   onShow: function () {
@@ -91,7 +105,7 @@ export default {
     const token = uni.getStorageSync("token");
     const userId = uni.getStorageSync("userId");
     const appType = uni.getStorageSync("appType");
-    if (appType !== "owner" && token && userId && !websocket.getStatus()) {
+    if (token && userId && !websocket.getStatus()) {
       websocket.connect(userId);
     }
   },

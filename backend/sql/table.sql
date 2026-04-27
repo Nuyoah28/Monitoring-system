@@ -136,9 +136,37 @@ CREATE TABLE `user_info` (
   `password` varchar(255) NOT NULL,
   `phone` varchar(255),
   `role` int NOT NULL,
+  `is_resident` tinyint(1) NOT NULL DEFAULT 0,
+  `home_area` varchar(50) DEFAULT NULL,
+  `notify_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `push_cid` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `system_message`;
+CREATE TABLE `system_message` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `message` varchar(255) NOT NULL,
+  `receiver_user_id` int DEFAULT NULL,
+  `timestamp` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `alarm_push_record`;
+CREATE TABLE `alarm_push_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `alarm_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `push_type` varchar(20) NOT NULL,
+  `push_status` varchar(20) NOT NULL,
+  `push_detail` varchar(255) DEFAULT NULL,
+  `created_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_alarm_user_type` (`alarm_id`,`user_id`,`push_type`),
+  KEY `idx_alarm_id` (`alarm_id`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `user_info`
@@ -146,7 +174,9 @@ CREATE TABLE `user_info` (
 
 LOCK TABLES `user_info` WRITE;
 /*!40000 ALTER TABLE `user_info` DISABLE KEYS */;
-INSERT INTO `user_info` VALUES (1,'root','42f641872ae4070ed059696b1df93394','',0),(2,'zbw','42f641872ae4070ed059696b1df93394','',1);
+INSERT INTO `user_info` (`id`,`user_name`,`password`,`phone`,`role`) VALUES
+(1,'root','42f641872ae4070ed059696b1df93394','',0),
+(2,'zbw','42f641872ae4070ed059696b1df93394','',1);
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

@@ -132,6 +132,10 @@ CREATE TABLE `user_info` (
   `password` varchar(255) NOT NULL,
   `phone` varchar(255),
   `role` int NOT NULL,
+  `is_resident` tinyint(1) NOT NULL DEFAULT 0,
+  `home_area` varchar(50) DEFAULT NULL,
+  `notify_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `push_cid` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -140,8 +144,24 @@ drop table if exists system_message;
 create table `system_message`(
   `id` int not null auto_increment,
   `message` varchar(255) not null,
+  `receiver_user_id` int default null,
   `timestamp` datetime not null default current_timestamp,
   primary key(`id`)
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_general_ci;
+
+drop table if exists alarm_push_record;
+create table `alarm_push_record`(
+  `id` bigint not null auto_increment,
+  `alarm_id` int not null,
+  `user_id` int not null,
+  `push_type` varchar(20) not null,
+  `push_status` varchar(20) not null,
+  `push_detail` varchar(255) default null,
+  `created_time` datetime not null default current_timestamp,
+  primary key(`id`),
+  unique key `uk_alarm_user_type` (`alarm_id`,`user_id`,`push_type`),
+  key `idx_alarm_id` (`alarm_id`),
+  key `idx_user_id` (`user_id`)
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_general_ci;
 
 --
@@ -150,7 +170,9 @@ create table `system_message`(
 
 LOCK TABLES `user_info` WRITE;
 /*!40000 ALTER TABLE `user_info` DISABLE KEYS */;
-INSERT INTO `user_info` VALUES (1,'root','42f641872ae4070ed059696b1df93394','000000',0),(2,'zbw','42f641872ae4070ed059696b1df93394','111111',1);
+INSERT INTO `user_info` (`id`,`user_name`,`password`,`phone`,`role`) VALUES
+(1,'root','42f641872ae4070ed059696b1df93394','000000',0),
+(2,'zbw','42f641872ae4070ed059696b1df93394','111111',1);
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

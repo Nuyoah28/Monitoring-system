@@ -39,7 +39,12 @@
                 </button>
               </div>
             </div>
-            <div class="table-wrap detail-table-wrap">
+            <div
+              ref="alarmTableWrapRef"
+              class="table-wrap detail-table-wrap"
+              @mouseenter="pauseAlarmAutoScroll"
+              @mouseleave="resumeAlarmAutoScroll"
+            >
               <table class="info-table">
                 <thead>
                   <tr>
@@ -56,7 +61,16 @@
                     <td>{{ row.department }}</td>
                     <td>{{ row.date }}</td>
                     <td><span class="level-chip" :class="severityClass(row.level)">{{ severityText(row.level) }}</span></td>
-                    <td><span class="state-chip" :class="row.deal.includes('已') ? 'done' : 'pending'">{{ row.deal }}</span></td>
+                    <td>
+                      <span
+                        class="state-chip"
+                        :class="[row.deal.includes('已') ? 'done' : 'pending', { clickable: !row.deal.includes('已') }]"
+                        :title="row.deal.includes('已') ? '已处理' : '点击处理'"
+                        @click.stop="openProcessDialog(row)"
+                      >
+                        {{ row.deal.includes('已') ? row.deal : '去处理' }}
+                      </span>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -121,6 +135,31 @@
         </section>
 
         <dialog1 v-if="alarmDialogVisible" :item="currentAlarmItem" @updateDialogVisible1="alarmDialogVisible = $event" />
+        <div
+          v-if="processDialogVisible"
+          class="process-modal-mask"
+          role="dialog"
+          aria-modal="true"
+          @click.self="closeProcessDialog"
+        >
+          <div class="process-modal-card">
+            <h4>处理报警</h4>
+            <p class="process-meta">{{ processingRow?.eventName || '报警事件' }} · {{ processingRow?.department || '未标注区域' }}</p>
+            <textarea
+              v-model.trim="processingContent"
+              class="process-textarea"
+              rows="4"
+              maxlength="120"
+              placeholder="请输入处理说明（必填）"
+            ></textarea>
+            <div class="process-actions">
+              <button class="mini-action" type="button" @click="closeProcessDialog">取消</button>
+              <button class="btn" type="button" :disabled="processingSubmitting" @click="submitProcessDialog">
+                {{ processingSubmitting ? '提交中...' : '确认处理' }}
+              </button>
+            </div>
+          </div>
+        </div>
 
         <section v-show="activeTab === 'video'" class="panel video-panel">
           <article class="card video-main">
@@ -158,7 +197,7 @@
           <article class="card video-side">
             <h3 class="map-title">点位地图联动 <span class="live-dot"></span></h3>
             <div class="map-square">
-              <AMapLinkage3D :points="mapPoints" @point-click="onMapPointClick" />
+              <AMapLinkage3D :points="mapPoints" :alarm-counts="mapAlarmCounts" @point-click="onMapPointClick" />
             </div>
             <div class="video-stats-grid">
               <div class="mini-kpi kpi-online"><span>在线</span><strong>{{ onlineCount }}</strong></div>
@@ -172,10 +211,16 @@
                 <span class="event-stream-count">{{ recentEvents.length }} 条</span>
               </div>
               <div class="event-stream-list">
-                <div v-for="(ev, idx) in recentEvents" :key="idx" class="event-item" :class="'event-' + ev.severity">
+                <div
+                  v-for="ev in recentEvents"
+                  :key="ev.id"
+                  class="event-item"
+                  :class="['event-' + ev.severity, { 'event-item-pending': ev.isPending, 'event-item-done': !ev.isPending }]"
+                >
                   <span class="event-time">{{ ev.time }}</span>
-                  <span class="event-dot" :class="'dot-' + ev.severity"></span>
+                  <span class="event-dot" :class="['dot-' + ev.severity, { 'dot-pulse': ev.isPending }]"></span>
                   <span class="event-text">{{ ev.text }}</span>
+                  <span class="event-deal" :class="ev.isPending ? 'pending' : 'done'">{{ ev.dealText }}</span>
                 </div>
                 <div v-if="!recentEvents.length" class="event-item event-empty">
                   <span class="event-text">暂无事件，系统运行正常</span>
@@ -267,6 +312,39 @@
             </div>
           </article>
 
+          <article class="card env-dual-card">
+            <div class="panel-headline small">
+              <h3>环境与车位快览</h3>
+              <span>{{ envParkingDataModeLabel }} · {{ envParkingRefreshSeconds }}s 刷新</span>
+            </div>
+            <div class="dual-card-grid">
+              <section class="dual-mini-block">
+                <header>
+                  <strong>AQI日内波动</strong>
+                  <span>{{ envCurrentValues.aqi }} 指数</span>
+                </header>
+                <div class="dual-mini-chart">
+                  <div v-for="(point, idx) in aqiMiniBars" :key="`${point.label}-${idx}`" class="mini-col">
+                    <i :style="{ height: `${point.height}%` }"></i>
+                    <span>{{ showParkingTrendLabel(idx, aqiMiniBars.length) ? point.label : '' }}</span>
+                  </div>
+                </div>
+              </section>
+              <section class="dual-mini-block">
+                <header>
+                  <strong>车位占用动态</strong>
+                  <span>{{ parkingOccupancy }}%</span>
+                </header>
+                <div class="dual-mini-chart">
+                  <div v-for="(point, idx) in parkingMiniBars" :key="`${point.label}-${idx}`" class="mini-col">
+                    <i class="parking" :style="{ height: `${point.height}%` }"></i>
+                    <span>{{ showParkingTrendLabel(idx, parkingMiniBars.length) ? point.label : '' }}</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </article>
+
           <article class="card env-slot-card">
             <h3>车位占用数据</h3>
             <div class="parking-dashboard">
@@ -294,6 +372,23 @@
                   <span>{{ item.name }}</span>
                   <div class="bar"><i :style="{ width: `${item.percent}%` }"></i></div>
                   <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+            </div>
+            <div class="parking-map">
+              <div class="parking-map-head">
+                <h4>车位地图（示意）</h4>
+                <span>总车位 {{ parkingTotal }} · 已占 {{ parkingUsed }} · 空闲 {{ parkingFree }}</span>
+              </div>
+              <div class="parking-zone-grid">
+                <div v-for="zone in parkingMapZones" :key="zone.name" class="parking-zone-card">
+                  <div class="zone-top">
+                    <strong>{{ zone.name }}</strong>
+                    <span>{{ zone.used }}/{{ zone.capacity }}</span>
+                  </div>
+                  <div class="zone-slots">
+                    <i v-for="slot in zone.sampleSlots" :key="slot.id" :class="{ busy: slot.busy }"></i>
+                  </div>
                 </div>
               </div>
             </div>
@@ -545,8 +640,11 @@ interface MonitorStreamItem {
 }
 
 interface MapPointItem {
+  id?: number | string
+  monitorId?: number | string
   title: string
   camera: string
+  department?: string
   className: string
   streamUrl?: string
   longitude?: number
@@ -555,6 +653,16 @@ interface MapPointItem {
     left?: string
     top?: string
   }
+}
+
+interface RecentEventItem {
+  id: string
+  time: string
+  text: string
+  severity: 'low' | 'mid' | 'high'
+  isPending: boolean
+  dealText: string
+  timestamp: number
 }
 
 const router = useRouter()
@@ -573,10 +681,64 @@ const currentTabLabel = computed(() => tabs.find(item => item.key === activeTab.
 const focusVisible = ref(false)
 const alarmDialogVisible = ref(false)
 const currentAlarmItem = ref<any>(null)
+const processDialogVisible = ref(false)
+const processingRow = ref<any>(null)
+const processingContent = ref('')
+const processingSubmitting = ref(false)
+const alarmTableWrapRef = ref<HTMLDivElement | null>(null)
 
 const openAlarmDetail = (row: any) => {
   currentAlarmItem.value = row
   alarmDialogVisible.value = true
+}
+
+const openProcessDialog = (row: any) => {
+  if (!row || row.deal?.includes('已')) return
+  processingRow.value = row
+  processingContent.value = ''
+  processDialogVisible.value = true
+}
+
+const closeProcessDialog = () => {
+  processDialogVisible.value = false
+  processingRow.value = null
+  processingContent.value = ''
+  processingSubmitting.value = false
+}
+
+const submitProcessDialog = async () => {
+  const current = processingRow.value
+  const content = processingContent.value.trim()
+  if (!current?.id || !content) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.warning('请填写处理说明后再提交')
+    return
+  }
+  if (processingSubmitting.value) return
+  processingSubmitting.value = true
+  try {
+    const { data } = await axios.put('/alarm/update', {
+      id: current.id,
+      status: true,
+      processingContent: content,
+    })
+    if (data?.code === '00000') {
+      const { ElMessage } = await import('element-plus')
+      ElMessage.success('报警已标记为已处理')
+      closeProcessDialog()
+      await fetchAlarmList()
+      await fetchRecentEventStream()
+      return
+    }
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error(data?.message || '处理失败，请稍后重试')
+  } catch (err) {
+    void err
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error('处理失败，请检查网络或登录状态')
+  } finally {
+    processingSubmitting.value = false
+  }
 }
 
 const focusText = ref('监控大屏')
@@ -600,6 +762,14 @@ const mapPoints = ref<MapPointItem[]>([
   { title: '车库监测点', camera: '2号机位 - 车库入口实时画面', className: 'p3' },
 ])
 
+const RECENT_EVENT_LIMIT = 6
+const RECENT_EVENT_POLL_MS = 8000
+const RECENT_EVENT_DONE_REMOVE_MS = 12000
+const recentEvents = ref<RecentEventItem[]>([])
+const recentEventInitialized = ref(false)
+let recentEventPollTimer: number | null = null
+const recentEventResolvedAt = new Map<string, number>()
+
 const withNoCache = (url: string) => {
   if (!url) return url
   const [base, hash = ''] = url.split('#')
@@ -608,8 +778,111 @@ const withNoCache = (url: string) => {
   return hash ? `${nextUrl}#${hash}` : nextUrl
 }
 
+const parseAlarmTimestamp = (item: any): number => {
+  const raw = item?.createTime || item?.date || item?.time || ''
+  if (!raw) return 0
+  const normalized = String(raw).trim()
+  if (!normalized) return 0
+  const mmddTimeMatch = normalized.match(/^(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/)
+  if (mmddTimeMatch) {
+    const [, month, day, hour, minute] = mmddTimeMatch
+    const year = new Date().getFullYear()
+    const timestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`).getTime()
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+  const value = new Date(normalized).getTime()
+  if (!Number.isNaN(value)) return value
+  const fallbackValue = new Date(normalized.replace(/-/g, '/')).getTime()
+  return Number.isNaN(fallbackValue) ? 0 : fallbackValue
+}
+
+const toSeverity = (value: unknown): 'low' | 'mid' | 'high' => {
+  const level = Number(value || 1)
+  if (level >= 3) return 'high'
+  if (level === 2) return 'mid'
+  return 'low'
+}
+
+const toTimeLabel = (timestamp: number): string => {
+  if (!timestamp) return '--:--'
+  const d = new Date(timestamp)
+  if (Number.isNaN(d.getTime())) return '--:--'
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+const isAlarmPending = (item: any): boolean => {
+  const dealText = String(item?.deal || item?.statusText || '')
+  const hasDoneText = dealText.includes('已') || dealText.includes('完成')
+  if (hasDoneText) return false
+  if (item?.status === 1 || item?.status === true) return false
+  return true
+}
+
+const syncRecentEvents = (rawList: any[]): void => {
+  if (!Array.isArray(rawList)) return
+  const seenIds = new Set<string>()
+  const now = Date.now()
+
+  const normalized = rawList
+    .filter(item => item && item.caseType !== 13)
+    .map((item, idx) => {
+      const timestamp = parseAlarmTimestamp(item)
+      const fallbackId = `${item?.eventName || '事件'}-${timestamp}-${idx}`
+      const id = String(item?.id ?? fallbackId)
+      return {
+        ...item,
+        __id: id,
+        __ts: timestamp,
+      }
+    })
+    .sort((a, b) => {
+      if (b.__ts !== a.__ts) return b.__ts - a.__ts
+      return Number(b.id || 0) - Number(a.id || 0)
+    })
+    .filter(item => {
+      if (seenIds.has(item.__id)) return false
+      seenIds.add(item.__id)
+      return true
+    })
+
+  const mapped = normalized.map(item => {
+    const pending = isAlarmPending(item)
+    if (pending) {
+      recentEventResolvedAt.delete(item.__id)
+    } else if (!recentEventResolvedAt.has(item.__id)) {
+      recentEventResolvedAt.set(item.__id, now)
+    }
+    return {
+      id: item.__id,
+      time: toTimeLabel(item.__ts),
+      text: `${item.department || item.location || '未标注'} ${item.eventName || '事件'}`,
+      severity: toSeverity(item.level),
+      isPending: pending,
+      dealText: pending ? '未处理' : '已处理',
+      timestamp: item.__ts,
+    }
+  })
+
+  const visibleEvents: RecentEventItem[] = mapped
+    .filter(item => {
+      if (item.isPending) return true
+      const resolvedAt = recentEventResolvedAt.get(item.id)
+      return resolvedAt === undefined ? false : now - resolvedAt < RECENT_EVENT_DONE_REMOVE_MS
+    })
+    .slice(0, RECENT_EVENT_LIMIT)
+
+  recentEvents.value = visibleEvents
+
+  const visibleIds = new Set(mapped.map(item => item.id))
+  for (const id of recentEventResolvedAt.keys()) {
+    if (!visibleIds.has(id)) {
+      recentEventResolvedAt.delete(id)
+    }
+  }
+}
+
 const alarmPageNum = ref(1)
-const alarmPageSize = ref(60)
+const alarmPageSize = ref(200)
 
 const fetchAlarmList = async () => {
   try {
@@ -617,22 +890,61 @@ const fetchAlarmList = async () => {
       params: {
         pageNum: alarmPageNum.value,
         pageSize: alarmPageSize.value,
-        status: 0,
       },
     })
     console.log('报警API返回:', data)
     const list = data?.data?.alarmList || data?.data?.list || []
-    if (Array.isArray(list) && list.length > 0) {
+    if (Array.isArray(list)) {
       alarmStore.setAlarmList(list)
       alarmStore.updateStatisticsFromAlarms()
     } else {
-      console.log('后端返回空数据，使用模拟数据')
-      useMockData()
+      alarmStore.setAlarmList([])
+      alarmStore.resetStatistics()
     }
   } catch (e) {
     console.log('请求失败，使用模拟数据', e)
     useMockData()
   }
+}
+
+const ALARM_AUTO_SCROLL_INTERVAL_MS = 45
+const ALARM_AUTO_SCROLL_STEP = 0.58
+let alarmAutoScrollTimer: number | null = null
+const alarmAutoScrollPaused = ref(false)
+
+const stopAlarmAutoScroll = () => {
+  if (alarmAutoScrollTimer !== null) {
+    window.clearInterval(alarmAutoScrollTimer)
+    alarmAutoScrollTimer = null
+  }
+}
+
+const startAlarmAutoScroll = () => {
+  stopAlarmAutoScroll()
+  const wrapEl = alarmTableWrapRef.value
+  if (!wrapEl || activeTab.value !== 'alarm') return
+  if (filteredAlarmRows.value.length < 7) return
+  if (wrapEl.scrollHeight - wrapEl.clientHeight < 12) return
+  alarmAutoScrollTimer = window.setInterval(() => {
+    if (alarmAutoScrollPaused.value) return
+    const el = alarmTableWrapRef.value
+    if (!el) return
+    const maxScrollTop = el.scrollHeight - el.clientHeight
+    if (maxScrollTop < 12) return
+    if (el.scrollTop >= maxScrollTop - 1) {
+      el.scrollTop = 0
+      return
+    }
+    el.scrollTop += ALARM_AUTO_SCROLL_STEP
+  }, ALARM_AUTO_SCROLL_INTERVAL_MS)
+}
+
+const pauseAlarmAutoScroll = () => {
+  alarmAutoScrollPaused.value = true
+}
+
+const resumeAlarmAutoScroll = () => {
+  alarmAutoScrollPaused.value = false
 }
 
 const useMockData = () => {
@@ -671,6 +983,48 @@ const useMockData = () => {
   alarmStore.setAlarmList(mockAlarms)
   alarmStore.updateStatisticsFromAlarms()
   console.log('使用模拟报警数据（演示模式）')
+}
+
+const fetchRecentEventStream = async (): Promise<void> => {
+  try {
+    const { data } = await axios.get('/alarm/query', {
+      params: {
+        pageNum: 1,
+        pageSize: 30,
+      },
+    })
+    const list = data?.data?.alarmList || data?.data?.list || []
+    if (Array.isArray(list) && list.length) {
+      syncRecentEvents(list)
+      recentEventInitialized.value = true
+    }
+  } catch (e) {
+    if (!recentEventInitialized.value) {
+      const fallbackList = alarmStore.getAlarmList || []
+      if (Array.isArray(fallbackList) && fallbackList.length) {
+        syncRecentEvents(fallbackList)
+        recentEventInitialized.value = true
+      }
+    }
+  }
+}
+
+const startRecentEventPolling = (): void => {
+  if (recentEventPollTimer !== null) {
+    window.clearInterval(recentEventPollTimer)
+  }
+  void fetchRecentEventStream()
+  recentEventPollTimer = window.setInterval(() => {
+    void fetchRecentEventStream()
+  }, RECENT_EVENT_POLL_MS)
+}
+
+const stopRecentEventPolling = (): void => {
+  if (recentEventPollTimer !== null) {
+    window.clearInterval(recentEventPollTimer)
+    recentEventPollTimer = null
+  }
+  recentEventResolvedAt.clear()
 }
 
 // 隐藏遥控器通信
@@ -742,6 +1096,8 @@ const _handleSimulate = (type: string) => {
     list.unshift(newAlarm);
     alarmStore.setAlarmList(list);
     alarmStore.updateStatisticsFromAlarms();
+    syncRecentEvents(list);
+    recentEventInitialized.value = true;
     
     // 触发全局报警事件，例如播放提示音或动画
     const bus = (window as any).$bus;
@@ -812,7 +1168,7 @@ const kpis = computed(() => {
 })
 
 const alarmTableRows = computed(() => {
-  const rows = (alarmStore.getAlarmList || []).slice(0, 10)
+  const rows = alarmStore.getAlarmList || []
   if (!rows.length) {
     return [{ eventName: '暂无报警', department: '--', date: '--', level: 1, deal: '已处理' }]
   }
@@ -895,12 +1251,27 @@ const severityText = (level: number) => {
   return '低'
 }
 
-const parkingBars = ref([
-  { name: '地库A区', value: 38, percent: 78 },
-  { name: '地库B区', value: 21, percent: 52 },
-  { name: '地面东侧', value: 15, percent: 46 },
-  { name: '地面西侧', value: 9, percent: 28 },
-])
+const ENV_PARKING_DATA_MODE: 'mock' | 'api' = 'mock'
+const ENV_PARKING_REFRESH_MS = 6000
+const envParkingRefreshSeconds = Math.round(ENV_PARKING_REFRESH_MS / 1000)
+const envParkingDataModeLabel = computed(() => (ENV_PARKING_DATA_MODE === 'mock' ? '模拟数据' : '实时接口'))
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+const randDelta = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const toHmLabel = (date: Date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+
+interface ParkingZone {
+  name: string
+  capacity: number
+  used: number
+}
+
+interface ParkingDayPoint {
+  label: string
+  occupancy: number
+  used: number
+}
 
 const envTrendRange = ref<'day' | 'week' | 'month'>('week')
 
@@ -919,15 +1290,15 @@ interface EnvPoint {
   pm25: number
 }
 
-const envTrendData: Record<'day' | 'week' | 'month', EnvPoint[]> = {
+const envTrendDataState = ref<Record<'day' | 'week' | 'month', EnvPoint[]>>({
   day: [
-    { label: '00:00', aqi: 74, humidity: 61, pm25: 46 },
-    { label: '04:00', aqi: 78, humidity: 64, pm25: 49 },
-    { label: '08:00', aqi: 71, humidity: 59, pm25: 44 },
-    { label: '12:00', aqi: 83, humidity: 55, pm25: 53 },
-    { label: '16:00', aqi: 88, humidity: 52, pm25: 58 },
-    { label: '20:00', aqi: 79, humidity: 57, pm25: 50 },
-    { label: '24:00', aqi: 73, humidity: 60, pm25: 45 },
+    { label: '00:00', aqi: 72, humidity: 63, pm25: 42 },
+    { label: '04:00', aqi: 76, humidity: 64, pm25: 46 },
+    { label: '08:00', aqi: 79, humidity: 58, pm25: 48 },
+    { label: '12:00', aqi: 84, humidity: 54, pm25: 55 },
+    { label: '16:00', aqi: 87, humidity: 52, pm25: 59 },
+    { label: '20:00', aqi: 80, humidity: 57, pm25: 50 },
+    { label: '24:00', aqi: 75, humidity: 61, pm25: 45 },
   ],
   week: [
     { label: '周一', aqi: 76, humidity: 62, pm25: 47 },
@@ -947,9 +1318,9 @@ const envTrendData: Record<'day' | 'week' | 'month', EnvPoint[]> = {
     { label: '4/25', aqi: 73, humidity: 63, pm25: 44 },
     { label: '4/30', aqi: 77, humidity: 61, pm25: 48 },
   ],
-}
+})
 
-const envTrendSeries = computed(() => envTrendData[envTrendRange.value])
+const envTrendSeries = computed(() => envTrendDataState.value[envTrendRange.value])
 
 interface TrendTick {
   value: number
@@ -1011,30 +1382,142 @@ const envTrendCharts = computed<Record<EnvMetricKey, TrendRenderData>>(() => ({
   pm25: buildTrendRender('pm25'),
 }))
 
-const onlineCount = computed(() => monitors.value.filter(item => item.status === 1 || item.status === 'online').length)
-const offlineCount = computed(() => Math.max(monitors.value.length - onlineCount.value, 0))
+const parkingZoneState = ref<ParkingZone[]>([
+  { name: '地库A区', capacity: 62, used: 38 },
+  { name: '地库B区', capacity: 44, used: 23 },
+  { name: '地面东侧', capacity: 30, used: 16 },
+  { name: '地面西侧', capacity: 24, used: 11 },
+])
 
-// ====== 新增：视频页 AI 事件流 ======
-const recentEvents = computed(() => {
-  const list = alarmStore.getAlarmList || []
-  return list.slice(0, 5).map((item: any) => {
-    const raw = item.date || item.createTime || ''
-    let time = '--:--'
-    if (raw) {
-      const d = new Date(raw)
-      if (!isNaN(d.getTime())) {
-        time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-      }
-    }
-    const level = Number(item.level || 1)
-    const severity = level >= 3 ? 'high' : level === 2 ? 'mid' : 'low'
-    return {
-      time,
-      text: `${item.department || '未标注'} ${item.eventName || '事件'}`,
-      severity,
+const parkingBars = computed(() => parkingZoneState.value.map((item) => ({
+  name: item.name,
+  value: item.used,
+  percent: Math.round((item.used / Math.max(item.capacity, 1)) * 100),
+})))
+
+const parkingDayTrend = ref<ParkingDayPoint[]>([
+  { label: '00:00', occupancy: 41, used: 66 },
+  { label: '04:00', occupancy: 37, used: 59 },
+  { label: '08:00', occupancy: 55, used: 88 },
+  { label: '12:00', occupancy: 67, used: 107 },
+  { label: '16:00', occupancy: 73, used: 117 },
+  { label: '20:00', occupancy: 61, used: 98 },
+  { label: '24:00', occupancy: 48, used: 77 },
+])
+
+const parkingTrendBars = computed(() => parkingDayTrend.value.slice(-8))
+const aqiMiniBars = computed(() => {
+  const series = envTrendDataState.value.day.slice(-8)
+  if (!series.length) return []
+  const values = series.map(item => item.aqi)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const diff = Math.max(max - min, 1)
+  return series.map((item) => ({
+    label: item.label,
+    height: clamp(Math.round(((item.aqi - min) / diff) * 80 + 20), 16, 100),
+  }))
+})
+const parkingMiniBars = computed(() => parkingTrendBars.value.map((item) => ({
+  label: item.label,
+  height: clamp(item.occupancy, 16, 100),
+})))
+const showParkingTrendLabel = (idx: number, total: number): boolean => {
+  if (idx === total - 1) return true
+  return idx % 2 === 0
+}
+const parkingMapZones = computed(() => parkingZoneState.value.map((zone) => {
+  const sampleCount = Math.min(zone.capacity, 24)
+  const ratio = zone.capacity > 0 ? zone.used / zone.capacity : 0
+  const busyCount = Math.round(ratio * sampleCount)
+  return {
+    ...zone,
+    sampleSlots: Array.from({ length: sampleCount }, (_, idx) => ({
+      id: `${zone.name}-${idx}`,
+      busy: idx < busyCount,
+    })),
+  }
+}))
+
+const syncEnvParkingFromApi = async (): Promise<boolean> => {
+  if (ENV_PARKING_DATA_MODE !== 'api') return false
+  try {
+    // 预留后端接口位：接入后将返回值写入 envTrendDataState / parkingZoneState / parkingDayTrend
+    await Promise.all([
+      axios.get('/env/realtime'),
+      axios.get('/env/trend', { params: { range: envTrendRange.value } }),
+      axios.get('/parking/realtime'),
+      axios.get('/parking/trend', { params: { range: 'day' } }),
+    ])
+    return true
+  } catch (error) {
+    void error
+    return false
+  }
+}
+
+const stepMockEnvParking = () => {
+  const now = new Date()
+  const daySeries = envTrendDataState.value.day
+  const last = daySeries[daySeries.length - 1] || { label: '00:00', aqi: 72, humidity: 62, pm25: 44 }
+  const nextPoint: EnvPoint = {
+    label: toHmLabel(now),
+    aqi: clamp(last.aqi + randDelta(-4, 5), 45, 135),
+    humidity: clamp(last.humidity + randDelta(-3, 3), 35, 82),
+    pm25: clamp(last.pm25 + randDelta(-4, 4), 18, 96),
+  }
+  daySeries.push(nextPoint)
+  if (daySeries.length > 24) daySeries.shift()
+
+  ;(['week', 'month'] as const).forEach((range) => {
+    const scoped = envTrendDataState.value[range]
+    if (!scoped.length) return
+    const idx = scoped.length - 1
+    const prev = scoped[idx]
+    scoped[idx] = {
+      ...prev,
+      aqi: clamp(Math.round((prev.aqi * 4 + nextPoint.aqi) / 5 + randDelta(-1, 1)), 45, 135),
+      humidity: clamp(Math.round((prev.humidity * 4 + nextPoint.humidity) / 5 + randDelta(-1, 1)), 35, 82),
+      pm25: clamp(Math.round((prev.pm25 * 4 + nextPoint.pm25) / 5 + randDelta(-1, 1)), 18, 96),
     }
   })
-})
+
+  const hour = now.getHours()
+  const trafficBias = (hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 21) ? 1 : -1
+  parkingZoneState.value = parkingZoneState.value.map((zone) => {
+    const nextUsed = clamp(zone.used + randDelta(-2, 2) + trafficBias, 4, zone.capacity - 1)
+    return { ...zone, used: nextUsed }
+  })
+
+  const total = parkingZoneState.value.reduce((sum, zone) => sum + zone.capacity, 0)
+  const used = parkingZoneState.value.reduce((sum, zone) => sum + zone.used, 0)
+  const occupancy = total > 0 ? Math.round((used / total) * 100) : 0
+  parkingDayTrend.value.push({ label: toHmLabel(now), occupancy, used })
+  if (parkingDayTrend.value.length > 24) parkingDayTrend.value.shift()
+}
+
+const refreshEnvParkingData = async () => {
+  const synced = await syncEnvParkingFromApi()
+  if (!synced) stepMockEnvParking()
+}
+
+let envParkingTimer: number | null = null
+const startEnvParkingRefresh = () => {
+  if (envParkingTimer !== null) return
+  void refreshEnvParkingData()
+  envParkingTimer = window.setInterval(() => {
+    void refreshEnvParkingData()
+  }, ENV_PARKING_REFRESH_MS)
+}
+
+const stopEnvParkingRefresh = () => {
+  if (envParkingTimer === null) return
+  window.clearInterval(envParkingTimer)
+  envParkingTimer = null
+}
+
+const onlineCount = computed(() => monitors.value.filter(item => item.status === 1 || item.status === 'online').length)
+const offlineCount = computed(() => Math.max(monitors.value.length - onlineCount.value, 0))
 
 const tileHasAlert = (tileName: string) => {
   const list = alarmStore.getAlarmList || []
@@ -1045,9 +1528,69 @@ const tileHasAlert = (tileName: string) => {
   })
 }
 
-// ====== 新增：环境实时数值 ======
+const normalizeName = (value: unknown): string => String(value || '').replace(/\s+/g, '').toLowerCase()
+
+const mapAlarmCounts = computed(() => {
+  const list = alarmStore.getAlarmList || []
+  const monitorList = monitors.value || []
+  const countsByCamera: Record<string, number> = {}
+  const countsByArea: Record<string, number> = {}
+
+  list.forEach((item: any) => {
+    const pending = !(item?.status === 1 || item?.status === true || String(item?.deal || '').includes('已'))
+    if (!pending) return
+
+    const cameraName = String(item?.name || '').trim()
+    if (cameraName) {
+      countsByCamera[cameraName] = (countsByCamera[cameraName] || 0) + 1
+      return
+    }
+
+    const dept = String(item?.department || item?.location || '').trim()
+    if (!dept) return
+    const deptKey = normalizeName(dept)
+    const matched = monitorList.find((monitor) => {
+      const monitorName = normalizeName(monitor.name)
+      const monitorDept = normalizeName(monitor.department)
+      return (
+        deptKey === monitorDept ||
+        (monitorName && (monitorName.includes(deptKey) || deptKey.includes(monitorName)))
+      )
+    })
+    if (matched?.name) {
+      countsByCamera[matched.name] = (countsByCamera[matched.name] || 0) + 1
+      return
+    }
+
+    countsByArea[dept] = (countsByArea[dept] || 0) + 1
+  })
+
+  return [
+    ...Object.entries(countsByCamera).map(([camera, count]) => ({ camera, count })),
+    ...Object.entries(countsByArea).map(([camera, count]) => ({ camera, count })),
+  ]
+})
+
+const ALARM_REFRESH_INTERVAL_MS = 10000
+let alarmCountRefreshTimer: number | null = null
+
+const startAlarmCountRefresh = () => {
+  if (alarmCountRefreshTimer !== null) return
+  alarmCountRefreshTimer = window.setInterval(() => {
+    void fetchAlarmList()
+  }, ALARM_REFRESH_INTERVAL_MS)
+}
+
+const stopAlarmCountRefresh = () => {
+  if (alarmCountRefreshTimer !== null) {
+    window.clearInterval(alarmCountRefreshTimer)
+    alarmCountRefreshTimer = null
+  }
+}
+
+// ====== 环境实时数值 ======
 const envCurrentValues = computed(() => {
-  const series = envTrendSeries.value
+  const series = envTrendDataState.value.day
   const last = series[series.length - 1]
   return {
     aqi: last?.aqi ?? 0,
@@ -1056,11 +1599,14 @@ const envCurrentValues = computed(() => {
   }
 })
 
-// ====== 新增：车位仪表盘 ======
-const parkingTotal = 160
-const parkingUsed = computed(() => parkingBars.value.reduce((sum, item) => sum + item.value, 0))
-const parkingFree = computed(() => Math.max(parkingTotal - parkingUsed.value, 0))
-const parkingOccupancy = computed(() => Math.round((parkingUsed.value / parkingTotal) * 100))
+// ====== 车位仪表盘 ======
+const parkingTotal = computed(() => parkingZoneState.value.reduce((sum, item) => sum + item.capacity, 0))
+const parkingUsed = computed(() => parkingZoneState.value.reduce((sum, item) => sum + item.used, 0))
+const parkingFree = computed(() => Math.max(parkingTotal.value - parkingUsed.value, 0))
+const parkingOccupancy = computed(() => {
+  if (!parkingTotal.value) return 0
+  return Math.round((parkingUsed.value / parkingTotal.value) * 100)
+})
 const parkingOccupancyColor = computed(() => {
   const pct = parkingOccupancy.value
   if (pct > 80) return '#ff8d8d'
@@ -1068,7 +1614,7 @@ const parkingOccupancyColor = computed(() => {
   return '#53d5a5'
 })
 
-// ====== 新增：环境舒适度评分 ======
+// ====== 环境舒适度评分 ======
 const comfortScore = computed(() => {
   const { aqi, humidity, pm25 } = envCurrentValues.value
   const aqiScore = Math.max(0, 100 - aqi)
@@ -1319,6 +1865,76 @@ const handleRealtimeConversationChange = (value: boolean): void => {
   }
 }
 
+const MAP_BASE_CENTER: [number, number] = [117.01187872107023, 39.1443426861701]
+const MAP_FALLBACK_SPOTS: Array<[number, number]> = [
+  [117.01278, 39.14495],
+  [117.01305, 39.1444],
+  [117.01268, 39.14382],
+  [117.01195, 39.14365],
+  [117.0112, 39.14388],
+  [117.01072, 39.14442],
+  [117.01098, 39.14502],
+  [117.01178, 39.14516],
+  [117.0123, 39.14468],
+  [117.01222, 39.1441],
+]
+
+const hashCode = (text: string): number => {
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0
+  }
+  return hash
+}
+
+const inferPseudoLngLat = (camera: string, department: string, index: number): [number, number] => {
+  const merged = `${department || ''} ${camera || ''}`
+  const text = merged.replace(/\s+/g, '')
+  const baseLng = MAP_BASE_CENTER[0]
+  const baseLat = MAP_BASE_CENTER[1]
+
+  let lng = MAP_FALLBACK_SPOTS[index % MAP_FALLBACK_SPOTS.length][0]
+  let lat = MAP_FALLBACK_SPOTS[index % MAP_FALLBACK_SPOTS.length][1]
+
+  if (/东门|东侧|东区|东/.test(text)) {
+    lng = baseLng + 0.00095
+    lat = baseLat + 0.00025
+  } else if (/西门|西侧|西区|西/.test(text)) {
+    lng = baseLng - 0.00095
+    lat = baseLat + 0.00018
+  } else if (/南门|南侧|南区|南/.test(text)) {
+    lng = baseLng + 0.00012
+    lat = baseLat - 0.00095
+  } else if (/北门|北侧|北区|北/.test(text)) {
+    lng = baseLng + 0.00012
+    lat = baseLat + 0.00095
+  } else if (/车库|停车/.test(text)) {
+    lng = baseLng - 0.00055
+    lat = baseLat - 0.00078
+  } else if (/电梯/.test(text)) {
+    lng = baseLng + 0.0006
+    lat = baseLat - 0.00028
+  } else if (/楼道/.test(text)) {
+    lng = baseLng + 0.00025
+    lat = baseLat + 0.00008
+  } else {
+    const buildingMatch = text.match(/(\d+)号楼/)
+    if (buildingMatch) {
+      const buildingNo = Number(buildingMatch[1])
+      const angle = ((buildingNo * 47) % 360) * (Math.PI / 180)
+      const radiusLng = 0.00086
+      const radiusLat = 0.00064
+      lng = baseLng + Math.cos(angle) * radiusLng
+      lat = baseLat + Math.sin(angle) * radiusLat
+    }
+  }
+
+  const h = hashCode(text || `idx-${index}`)
+  const jitterLng = ((h % 17) - 8) * 0.000018
+  const jitterLat = (((Math.floor(h / 17) % 17) - 8) * 0.000014)
+  return [lng + jitterLng, lat + jitterLat]
+}
+
 const fetchMonitors = async () => {
   try {
     const [{ data: listRes }, { data: mapRes }] = await Promise.all([
@@ -1345,29 +1961,37 @@ const fetchMonitors = async () => {
     }
 
     if (mapRes.code === '00000') {
-      const points: Array<{ id?: number | string; monitorId?: number | string; name: string; location?: string; longitude?: number; latitude?: number }> = mapRes.data || []
-      mapPoints.value = points.slice(0, 6).map((item, idx) => ({
-        ...(() => {
-          const key = item.monitorId ?? item.id
-          const matched =
-            monitorList.find(m => key !== undefined && m.id === key) ||
-            monitorList[idx] ||
-            monitorList.find(m => m.name === item.name) ||
-            monitorList.find(m => item.name && m.name.includes(item.name)) ||
-            monitorList.find(m => item.name && item.name.includes(m.name))
-          return {
-            camera: matched?.name || item.name || item.location || `监测点${idx + 1}`,
-            streamUrl: matched?.streamUrl || '',
-          }
-        })(),
-        title: item.location || item.name,
-        className: `p${(idx % 3) + 1}`,
-        longitude: item.longitude,
-        latitude: item.latitude,
-        style: item.longitude !== undefined && item.latitude !== undefined
-          ? { left: `${item.longitude}%`, top: `${item.latitude}%` }
-          : undefined,
-      }))
+      const rawMap = mapRes.data
+      const points: Array<{ id?: number | string; monitorId?: number | string; name?: string; area?: string; location?: string; longitude?: number; latitude?: number }> =
+        Array.isArray(rawMap) ? rawMap : (rawMap?.monitorPosList || [])
+      const source = points.length
+        ? points
+        : monitorList.map(item => ({ id: item.id, name: item.name, area: item.department }))
+
+      mapPoints.value = source.map((item, idx) => {
+        const key = item.monitorId ?? item.id
+        const matched =
+          monitorList.find(m => key !== undefined && m.id === key) ||
+          monitorList.find(m => item.name && m.name === item.name) ||
+          monitorList.find(m => item.area && m.department === item.area) ||
+          monitorList.find(m => item.name && m.name.includes(item.name)) ||
+          monitorList.find(m => item.name && item.name.includes(m.name))
+        const camera = matched?.name || item.name || item.area || item.location || `监测点${idx + 1}`
+        const department = matched?.department || item.area || item.location || ''
+        const hasGeo = typeof item.longitude === 'number' && typeof item.latitude === 'number'
+        const [fallbackLng, fallbackLat] = inferPseudoLngLat(camera, department, idx)
+        return {
+          id: key ?? matched?.id ?? idx + 1,
+          monitorId: matched?.id ?? key,
+          camera,
+          department,
+          streamUrl: matched?.streamUrl || '',
+          title: item.location || item.area || item.name || `监测点${idx + 1}`,
+          className: `p${(idx % 3) + 1}`,
+          longitude: hasGeo ? item.longitude : fallbackLng,
+          latitude: hasGeo ? item.latitude : fallbackLat,
+        }
+      })
     }
   } catch (e) {
     void e
@@ -1510,9 +2134,23 @@ const closeMonitorModal = () => {
   monitorModalVisible.value = false
 }
 
+watch(
+  () => alarmStore.getAlarmList,
+  (list) => {
+    if (!recentEventInitialized.value && Array.isArray(list) && list.length > 0) {
+      syncRecentEvents(list)
+      recentEventInitialized.value = true
+    }
+  },
+  { deep: true },
+)
+
 onMounted(() => {
   fetchAlarmList()
   fetchMonitors()
+  startRecentEventPolling()
+  startAlarmCountRefresh()
+  startEnvParkingRefresh()
   refreshSummaryNow()
   if (activeTab.value === 'agent') {
     nextTick(() => {
@@ -1521,11 +2159,16 @@ onMounted(() => {
   }
   nextTick(() => {
     initTilePlayers()
+    startAlarmAutoScroll()
   })
 })
 
 onBeforeUnmount(() => {
   clearStatusTimer()
+  stopRecentEventPolling()
+  stopAlarmCountRefresh()
+  stopEnvParkingRefresh()
+  stopAlarmAutoScroll()
 })
 
 onUnmounted(() => {
@@ -1538,6 +2181,16 @@ watch(
   () => {
     nextTick(() => {
       initTilePlayers()
+    })
+  },
+  { deep: true },
+)
+
+watch(
+  [filteredAlarmRows, activeTab],
+  () => {
+    nextTick(() => {
+      startAlarmAutoScroll()
     })
   },
   { deep: true },
@@ -1985,22 +2638,95 @@ watch(activeTab, (tab) => {
 .env-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: minmax(180px, auto);
-  gap: 8px;
-}
-
-.env-panel > .env-metric-card:first-child {
-  grid-column: 1 / -1;
+  grid-auto-rows: minmax(228px, auto);
+  gap: 10px;
+  align-content: start;
 }
 
 .env-slot-card {
   min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 12px;
 }
 
 .env-metric-card {
   display: grid;
   grid-template-rows: auto 1fr;
+  min-height: 248px;
+}
+
+.env-dual-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 248px;
+}
+
+.dual-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   min-height: 0;
+}
+
+.dual-mini-block {
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(10, 36, 61, 0.58);
+  padding: 8px 9px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+}
+
+.dual-mini-block header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dual-mini-block strong {
+  font-size: 12px;
+  color: #d8ecff;
+}
+
+.dual-mini-block span {
+  font-size: 11px;
+  color: rgba(214, 230, 255, 0.72);
+}
+
+.dual-mini-chart {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+  min-height: 88px;
+}
+
+.mini-col {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.mini-col i {
+  width: 100%;
+  min-height: 7px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, rgba(99, 184, 255, 0.95), rgba(99, 184, 255, 0.38));
+}
+
+.mini-col i.parking {
+  background: linear-gradient(180deg, rgba(83, 213, 165, 0.95), rgba(83, 213, 165, 0.35));
+}
+
+.mini-col span {
+  min-height: 10px;
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(214, 230, 255, 0.52);
 }
 
 .env-metric-head {
@@ -2190,7 +2916,9 @@ watch(activeTab, (tab) => {
   border-radius: 10px;
   background: rgba(10, 30, 52, 0.6);
   padding: 8px 10px;
-  max-height: 200px;
+  height: 220px;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -2214,11 +2942,27 @@ watch(activeTab, (tab) => {
 }
 
 .event-stream-list {
+  min-height: 0;
   overflow-y: auto;
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-right: 2px;
+}
+
+.event-stream-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.event-stream-list::-webkit-scrollbar-track {
+  background: rgba(126, 197, 255, 0.08);
+  border-radius: 999px;
+}
+
+.event-stream-list::-webkit-scrollbar-thumb {
+  background: rgba(126, 197, 255, 0.48);
+  border-radius: 999px;
 }
 
 .event-item {
@@ -2230,6 +2974,16 @@ watch(activeTab, (tab) => {
   background: rgba(17, 47, 75, 0.5);
   font-size: 11px;
   transition: background 0.2s;
+}
+
+.event-item-pending {
+  border: 1px solid rgba(255, 141, 141, 0.72);
+  background: rgba(86, 26, 38, 0.6);
+  animation: event-breathe 1.2s ease-in-out infinite;
+}
+
+.event-item-done {
+  opacity: 0.76;
 }
 
 .event-item:hover {
@@ -2249,6 +3003,11 @@ watch(activeTab, (tab) => {
   flex-shrink: 0;
 }
 
+.dot-pulse {
+  animation: event-dot-pulse 0.9s ease-in-out infinite;
+  box-shadow: 0 0 12px currentColor;
+}
+
 .dot-low { background: #53d5a5; }
 .dot-mid { background: #f8cb71; }
 .dot-high { background: #ff8d8d; }
@@ -2258,11 +3017,55 @@ watch(activeTab, (tab) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.event-deal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.event-deal.pending {
+  color: #ff9fa9;
+  border: 1px solid rgba(255, 123, 136, 0.58);
+  background: rgba(255, 78, 102, 0.2);
+}
+
+.event-deal.done {
+  color: #6ce2b2;
+  border: 1px solid rgba(108, 226, 178, 0.45);
+  background: rgba(108, 226, 178, 0.12);
 }
 
 .event-empty {
   justify-content: center;
   color: rgba(214, 230, 255, 0.4);
+}
+
+@keyframes event-breathe {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(255, 128, 146, 0);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 98, 122, 0.45);
+  }
+}
+
+@keyframes event-dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.85);
+    opacity: 0.4;
+  }
 }
 
 /* ====== 5. 环境实时数值徽章 ====== */
@@ -2313,6 +3116,119 @@ watch(activeTab, (tab) => {
 .parking-summary strong {
   color: #eaf6ff;
   margin-left: 2px;
+}
+
+.parking-day-trend {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(11, 39, 66, 0.58);
+  padding: 8px 10px 6px;
+}
+
+.parking-day-trend-head {
+  display: flex;
+  justify-content: space-between;
+  color: rgba(214, 230, 255, 0.8);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.parking-day-trend-bars {
+  height: 74px;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-items: end;
+  gap: 4px;
+}
+
+.trend-col {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+
+.trend-col i {
+  width: 100%;
+  border-radius: 6px 6px 2px 2px;
+  min-height: 5px;
+  background: linear-gradient(180deg, rgba(126, 197, 255, 0.95), rgba(83, 213, 165, 0.9));
+  box-shadow: 0 0 10px rgba(83, 213, 165, 0.22);
+}
+
+.trend-col span {
+  color: rgba(214, 230, 255, 0.55);
+  font-size: 10px;
+  line-height: 1;
+  min-height: 10px;
+}
+
+.parking-map {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(10, 33, 55, 0.62);
+  padding: 8px 10px;
+}
+
+.parking-map-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.parking-map-head h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.parking-map-head span {
+  color: var(--sub);
+  font-size: 11px;
+}
+
+.parking-zone-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.parking-zone-card {
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 8px;
+  padding: 6px;
+  background: rgba(12, 40, 68, 0.52);
+}
+
+.zone-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(214, 230, 255, 0.84);
+  margin-bottom: 5px;
+}
+
+.zone-top strong {
+  font-size: 12px;
+}
+
+.zone-slots {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.zone-slots i {
+  height: 6px;
+  border-radius: 2px;
+  background: rgba(83, 213, 165, 0.25);
+  border: 1px solid rgba(83, 213, 165, 0.3);
+}
+
+.zone-slots i.busy {
+  background: rgba(255, 128, 146, 0.35);
+  border-color: rgba(255, 128, 146, 0.45);
 }
 
 /* ====== 7. 环境舒适度评分卡 ====== */
@@ -2873,6 +3789,11 @@ watch(activeTab, (tab) => {
 .info-table th {
   color: #cde8ff;
   font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(13, 44, 73, 0.95);
+  backdrop-filter: blur(2px);
 }
 
 .state-chip {
@@ -2891,9 +3812,81 @@ watch(activeTab, (tab) => {
 }
 
 .state-chip.pending {
-  color: #f8cb71;
-  border: 1px solid rgba(248, 203, 113, 0.45);
-  background: rgba(248, 203, 113, 0.12);
+  color: #ff9fa9;
+  border: 1px solid rgba(255, 123, 136, 0.58);
+  background: rgba(255, 78, 102, 0.2);
+}
+
+.state-chip.clickable {
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+
+.state-chip.clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px rgba(255, 120, 132, 0.24);
+}
+
+.process-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 13000;
+  background: rgba(2, 10, 20, 0.62);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.process-modal-card {
+  width: min(420px, 92vw);
+  border-radius: 14px;
+  border: 1px solid rgba(118, 183, 255, 0.3);
+  background: linear-gradient(180deg, rgba(14, 43, 74, 0.95), rgba(9, 31, 54, 0.95));
+  box-shadow: 0 22px 48px rgba(3, 16, 30, 0.48);
+  padding: 14px;
+}
+
+.process-modal-card h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #eaf5ff;
+}
+
+.process-meta {
+  margin: 6px 0 10px;
+  font-size: 12px;
+  color: #9ec5e8;
+}
+
+.process-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 84px;
+  border-radius: 10px;
+  border: 1px solid rgba(126, 197, 255, 0.3);
+  background: rgba(7, 28, 50, 0.8);
+  color: #dff0ff;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px;
+  outline: none;
+}
+
+.process-textarea:focus {
+  border-color: rgba(126, 197, 255, 0.7);
+  box-shadow: 0 0 0 2px rgba(88, 157, 225, 0.2);
+}
+
+.process-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.process-actions .btn[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .btn {
@@ -3095,6 +4088,10 @@ watch(activeTab, (tab) => {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .dual-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -3114,6 +4111,19 @@ watch(activeTab, (tab) => {
   .focus-grid {
     grid-template-columns: 1fr;
   }
+
+  .parking-dashboard {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .parking-zone-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dual-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -3124,5 +4134,6 @@ watch(activeTab, (tab) => {
   .focus-shell {
     grid-template-columns: 1fr;
   }
+
 }
 </style>

@@ -20,25 +20,25 @@
     <view class="quick-grid">
       <view class="quick-item" @tap="goPage('/pages/manage/statistics/index')">
         <view class="quick-icon quick-icon--red">
-          <image class="quick-icon-image" src="/static/alarm.png" mode="aspectFit"></image>
+          <image class="quick-icon-image" src="/static/chosenTabBar/realtime.png" mode="aspectFit"></image>
         </view>
         <text>警情统计</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/ai/index')">
         <view class="quick-icon quick-icon--purple">
-          <image class="quick-icon-image" src="/static/ai.png" mode="aspectFit"></image>
+          <image class="quick-icon-image" src="/static/chosenTabBar/GPT.png" mode="aspectFit"></image>
         </view>
         <text>AI 助手</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/property/parking/index')">
         <view class="quick-icon quick-icon--blue">
-          <image class="quick-icon-image" src="/static/locate.png" mode="aspectFit"></image>
+          <image class="quick-icon-image" src="/static/locate-blue.png" mode="aspectFit"></image>
         </view>
         <text>车位引导</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/environment/index')">
         <view class="quick-icon quick-icon--green">
-          <image class="quick-icon-image" src="/static/analysis.png" mode="aspectFit"></image>
+          <image class="quick-icon-image" src="/static/chosenTabBar/chart.png" mode="aspectFit"></image>
         </view>
         <text>环境检测</text>
       </view>
@@ -54,7 +54,12 @@
         </view>
       </view>
       <view class="map-wrap">
-        <MonitorMap :monitorList="monitorList" :compact="true" />
+        <MonitorMap
+          :monitorList="monitorList"
+          :alarmList="alarms"
+          :pulseTick="mapPulseTick"
+          :compact="true"
+        />
       </view>
     </view>
 
@@ -148,6 +153,10 @@ export default {
       monitorList: [],
       alarms: [],
       activeLevel: 'urgent',
+      mapPulseTick: 0,
+      alarmRefreshTimer: null,
+      monitorRefreshTimer: null,
+      mapPulseTimer: null,
     };
   },
   computed: {
@@ -177,10 +186,68 @@ export default {
     this.statusBarHeight = info.statusBarHeight || 20;
   },
   onShow() {
-    this.getMonitor();
-    this.getPendingAlerts();
+    this.startRealtimeMap();
+  },
+  onHide() {
+    this.stopRealtimeMap();
+  },
+  onUnload() {
+    this.stopRealtimeMap();
   },
   methods: {
+    startRealtimeMap() {
+      this.stopRealtimeMap();
+      this.getMonitor();
+      this.getPendingAlerts();
+
+      this.alarmRefreshTimer = setInterval(() => {
+        this.getPendingAlerts();
+      }, 10000);
+
+      this.monitorRefreshTimer = setInterval(() => {
+        this.getMonitor();
+      }, 30000);
+
+      this.mapPulseTimer = setInterval(() => {
+        this.mapPulseTick += 1;
+      }, 900);
+    },
+    stopRealtimeMap() {
+      if (this.alarmRefreshTimer) {
+        clearInterval(this.alarmRefreshTimer);
+        this.alarmRefreshTimer = null;
+      }
+      if (this.monitorRefreshTimer) {
+        clearInterval(this.monitorRefreshTimer);
+        this.monitorRefreshTimer = null;
+      }
+      if (this.mapPulseTimer) {
+        clearInterval(this.mapPulseTimer);
+        this.mapPulseTimer = null;
+      }
+    },
+    mergeMonitorPosition(monitorList, monitorPosList) {
+      const monitors = Array.isArray(monitorList) ? monitorList : [];
+      const posList = Array.isArray(monitorPosList) ? monitorPosList : [];
+      if (!monitors.length) return [];
+      if (!posList.length) return monitors;
+
+      return monitors.map((monitor) => {
+        const matched =
+          posList.find((item) => Number(item.monitorId) === Number(monitor.id)) ||
+          posList.find((item) => Number(item.id) === Number(monitor.id)) ||
+          posList.find((item) => item.name && monitor.name && item.name === monitor.name) ||
+          posList.find((item) => item.area && monitor.department && item.area === monitor.department);
+
+        const lon = Number(matched && matched.longitude);
+        const lat = Number(matched && matched.latitude);
+        return {
+          ...monitor,
+          longitude: Number.isFinite(lon) ? lon : monitor.longitude,
+          latitude: Number.isFinite(lat) ? lat : monitor.latitude,
+        };
+      });
+    },
     buildTodayRange() {
       const now = new Date();
       const y = now.getFullYear();
@@ -192,21 +259,40 @@ export default {
       };
     },
     async getMonitor() {
-      const { data } = await uni.$http.get("/api/v1/monitor");
-      this.monitorList = (data && data.data) || [];
+      try {
+        const { data: monitorRes } = await uni.$http.get("/api/v1/monitor");
+        const monitorList = (monitorRes && monitorRes.data) || [];
+
+        let monitorPosList = [];
+        try {
+          const { data: mapRes } = await uni.$http.get("/api/v1/monitor/map");
+          const mapData = (mapRes && mapRes.data) || {};
+          monitorPosList = Array.isArray(mapData) ? mapData : mapData.monitorPosList || [];
+        } catch (mapError) {
+          console.warn("[controls] 获取监控坐标失败：", mapError);
+        }
+
+        this.monitorList = this.mergeMonitorPosition(monitorList, monitorPosList);
+      } catch (error) {
+        console.warn("[controls] 获取监控地图信息失败：", error);
+      }
     },
     async getPendingAlerts() {
-      const range = this.buildTodayRange();
-      const query = {
-        pageNum: 1,
-        pageSize: 50,
-        status: 0,
-        startTime: range.startTime,
-        endTime: range.endTime,
-      };
-      const { data } = await uni.$http.get("/api/v1/alarm/query", query);
-      const list = (data && data.data && data.data.alarmList) || [];
-      this.alarms = list.filter((item) => item.caseType !== 13);
+      try {
+        const range = this.buildTodayRange();
+        const query = {
+          pageNum: 1,
+          pageSize: 50,
+          status: 0,
+          startTime: range.startTime,
+          endTime: range.endTime,
+        };
+        const { data } = await uni.$http.get("/api/v1/alarm/query", query);
+        const list = (data && data.data && data.data.alarmList) || [];
+        this.alarms = list.filter((item) => item.caseType !== 13);
+      } catch (error) {
+        console.warn("[controls] 获取实时警情失败：", error);
+      }
     },
     levelText(item) {
       const level = Number(item.level) || 3;
@@ -342,26 +428,26 @@ export default {
 // ─── Quick Grid ───
 .quick-grid {
   margin-top: 20rpx;
-  background: rgba(236, 246, 255, 0.7);
+  background: linear-gradient(145deg, rgba(241, 248, 255, 0.95), rgba(232, 242, 255, 0.9));
   border-radius: 24rpx;
-  padding: 16rpx;
+  padding: 16rpx 14rpx;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4rpx 16rpx rgba(40, 91, 150, 0.07);
+  border: 1rpx solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6rpx 18rpx rgba(40, 91, 150, 0.07);
 }
 
 .quick-item {
   background: #ffffff;
   border-radius: 18rpx;
-  height: 148rpx;
+  height: 154rpx;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4rpx 16rpx rgba(52, 117, 185, 0.08);
-  border: 1rpx solid rgba(200, 225, 248, 0.6);
+  box-shadow: 0 6rpx 14rpx rgba(52, 117, 185, 0.08);
+  border: 1rpx solid rgba(200, 225, 248, 0.7);
   transition: all 0.15s;
   width: calc(25% - 9rpx);
 
@@ -371,32 +457,47 @@ export default {
   }
 
   text {
-    margin-top: 12rpx;
+    margin-top: 11rpx;
     color: #2c4a68;
-    font-size: 24rpx;
+    font-size: 25rpx;
     font-weight: 700;
     line-height: 1.2;
+    letter-spacing: 0.2px;
   }
 }
 
 .quick-icon {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 18rpx;
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 20rpx;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.85), 0 5rpx 12rpx rgba(58, 113, 177, 0.12);
+  border: 1rpx solid transparent;
 
-  &--red    { background: linear-gradient(140deg, #ff6b6b 0%, #ef4444 100%); }
-  &--purple { background: linear-gradient(140deg, #a78bfa 0%, #7c3aed 100%); }
-  &--blue   { background: linear-gradient(140deg, #38b6ff 0%, #0e6ecf 100%); }
-  &--green  { background: linear-gradient(140deg, #34d399 0%, #059669 100%); }
+  &--red {
+    background: linear-gradient(140deg, #fff4f5 0%, #ffe8eb 100%);
+    border-color: #fecdd3;
+  }
+  &--purple {
+    background: linear-gradient(140deg, #f6f3ff 0%, #ede9fe 100%);
+    border-color: #ddd6fe;
+  }
+  &--blue {
+    background: linear-gradient(140deg, #eef6ff 0%, #e2eeff 100%);
+    border-color: #bfdbfe;
+  }
+  &--green {
+    background: linear-gradient(140deg, #f0fdf4 0%, #e3f9eb 100%);
+    border-color: #bbf7d0;
+  }
 }
 
 .quick-icon-image {
-  width: 34rpx;
-  height: 34rpx;
+  width: 38rpx;
+  height: 38rpx;
+  opacity: 0.96;
 }
 
 // ─── Section Card ───
