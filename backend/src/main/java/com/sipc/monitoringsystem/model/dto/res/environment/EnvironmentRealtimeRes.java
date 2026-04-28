@@ -10,10 +10,10 @@ import java.sql.Timestamp;
 public class EnvironmentRealtimeRes {
     private Integer monitorId;
     private String deviceCode;
-    private String weather;
     private Float temperature;
     private Float humidity;
     private Float pm25;
+    private Float combustibleGas;
     private Integer aqi;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -22,11 +22,10 @@ public class EnvironmentRealtimeRes {
     public EnvironmentRealtimeRes(EnvironmentRecord record) {
         this.monitorId = record.getMonitorId();
         this.deviceCode = record.getDeviceCode();
-        this.weather = record.getWeather();
         this.temperature = record.getTemperature();
         this.humidity = record.getHumidity();
         this.pm25 = record.getPm25();
-        this.aqi = record.getAqi();
+        this.combustibleGas = record.getCombustibleGas();
         this.createTime = record.getCreateTime();
     }
 }

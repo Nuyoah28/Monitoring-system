@@ -1,4 +1,4 @@
-package com.sipc.monitoringsystem.model.po.Environment;
+package com.sipc.monitoringsystem.model.po.Weather;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -11,24 +11,22 @@ import lombok.Data;
 import java.sql.Timestamp;
 
 @Data
-@TableName("environment_sensor_record")
-public class EnvironmentRecord {
+@TableName("weather_region_config")
+public class WeatherRegionConfig {
     @TableId(type = IdType.AUTO)
     private Integer id;
-
     private Integer monitorId;
-
-    private String deviceCode;
-
-    private Float temperature;
-
-    private Float humidity;
-
-    private Float pm25;
-
-    private Float combustibleGas;
+    private String regionName;
+    private Double latitude;
+    private Double longitude;
+    private String timezone;
+    private Integer enabled;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(fill = FieldFill.INSERT)
     private Timestamp createTime;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private Timestamp updateTime;
 }

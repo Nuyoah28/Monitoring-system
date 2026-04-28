@@ -35,7 +35,7 @@ import { useAlarmStore } from '@/stores/alarm'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { baseUrl, webSocketBaseUrl } from '@/config/config'
+import { alarmDefaultVideo, demoAlarmVideoMap, webSocketBaseUrl } from '@/config/config'
 // 无需重新定义AlarmItem接口，使用store中定义的
 
 const router = useRouter();
@@ -56,7 +56,7 @@ const mockAlarms = ref([
     level: 2,
     location: '北门',
     createTime: new Date().toISOString(),
-    video: 'http://localhost:8848/video/电动车进楼.mp4',
+    video: demoAlarmVideoMap.bike,
     id: 1, name: '模拟设备', deal: '未处理', content: '检测到电动车进楼', phone: '13800000001'
   },
   {
@@ -66,7 +66,7 @@ const mockAlarms = ref([
     level: 3,
     location: '车库',
     createTime: new Date().toISOString(),
-    video: 'http://localhost:8848/video/火灾烟雾.mp4',
+    video: demoAlarmVideoMap.fire,
     id: 2, name: '模拟设备', deal: '未处理', content: '检测到大面积烟雾', phone: '13800000002'
   },
   {
@@ -76,7 +76,7 @@ const mockAlarms = ref([
     level: 1,
     location: '东侧',
     createTime: new Date().toISOString(),
-    video: 'http://localhost:8848/video/垃圾桶溢出.mp4',
+    video: demoAlarmVideoMap.garbage,
     id: 3, name: '模拟设备', deal: '未处理', content: '垃圾堆积如山啦', phone: '13800000003'
   }
 ]);
@@ -219,7 +219,7 @@ const showDetail = (itemData: any): void => {
     console.log('item', itemData);
     // 使用 itemData 中的视频链接，如果没有则使用默认值
     if (!itemData.video) {
-        itemData.video = baseUrl + '/video/001.flv';
+        itemData.video = alarmDefaultVideo;
     }
     item.value = itemData;
 };

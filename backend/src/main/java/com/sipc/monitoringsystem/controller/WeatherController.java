@@ -2,61 +2,63 @@ package com.sipc.monitoringsystem.controller;
 
 import com.sipc.monitoringsystem.aop.Pass;
 import com.sipc.monitoringsystem.model.dto.CommonResult;
-import com.sipc.monitoringsystem.model.dto.param.weather.CreateWeatherParam;
-import com.sipc.monitoringsystem.model.dto.res.Weather.CreateWeatherRes;
 import com.sipc.monitoringsystem.model.dto.res.Weather.GetWeatherRes;
+import com.sipc.monitoringsystem.model.dto.res.Weather.WeatherForecastDayRes;
 import com.sipc.monitoringsystem.model.po.Weather.Weather;
 import com.sipc.monitoringsystem.service.WeatherService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * @author alaner28
- * &#064;date  2026-02-05 1:25
- */
-
 @RestController
 @RequestMapping("/api/v1/weather")
 public class WeatherController {
-    @Autowired
-    private WeatherService weatherService;
+
+    private final WeatherService weatherService;
+
+    public WeatherController(WeatherService weatherService) {
+        this.weatherService = weatherService;
+    }
 
     @GetMapping("/newest/{monitorId}")
     @Pass
     public CommonResult<GetWeatherRes> getWeather(@PathVariable Integer monitorId) {
         Weather weather = weatherService.getNewestWeatherByMonitorId(monitorId);
         if (weather == null) {
-            return CommonResult.fail("获取最新天气失败");
+            return CommonResult.fail("暂无天气数据");
         }
-        GetWeatherRes getWeatherRes = new GetWeatherRes(weather);
-        return CommonResult.success(getWeatherRes);
+        return CommonResult.success(new GetWeatherRes(weather));
     }
 
     @GetMapping("/all/{monitorId}")
+    @Pass
     public CommonResult<List<GetWeatherRes>> getWeatherHistory(@PathVariable Integer monitorId) {
         List<Weather> weatherList = weatherService.getWeatherListByMonitorId(monitorId);
-        if (weatherList == null) {
-            return CommonResult.fail("获取天气列表失败");
-        }
-        List<GetWeatherRes> getWeatherResList = new ArrayList<>();
+        List<GetWeatherRes> result = new ArrayList<>();
         for (Weather weather : weatherList) {
-            GetWeatherRes getWeatherRes = new GetWeatherRes(weather);
-            getWeatherResList.add(getWeatherRes);
+            result.add(new GetWeatherRes(weather));
         }
-        return CommonResult.success(getWeatherResList);
+        return CommonResult.success(result);
     }
 
-    @PostMapping("/add")
+    @GetMapping("/forecast/{monitorId}")
     @Pass
-    public CommonResult<CreateWeatherRes> createWeather(@RequestBody CreateWeatherParam createWeatherParam) {
-        Integer id = weatherService.addWeather(createWeatherParam);
-        if (id == null) {
-            return CommonResult.fail("创建天气失败");
+    public CommonResult<List<WeatherForecastDayRes>> getForecast(@PathVariable Integer monitorId) {
+        return CommonResult.success(weatherService.getForecastByMonitorId(monitorId));
+    }
+
+    @PostMapping("/sync/{monitorId}")
+    @Pass
+    public CommonResult<GetWeatherRes> syncWeather(@PathVariable Integer monitorId) {
+        Weather weather = weatherService.syncWeatherByMonitorId(monitorId);
+        if (weather == null) {
+            return CommonResult.fail("天气同步失败");
         }
-        CreateWeatherRes createWeatherRes = new CreateWeatherRes(id);
-        return CommonResult.success(createWeatherRes);
+        return CommonResult.success(new GetWeatherRes(weather));
     }
 }

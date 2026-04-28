@@ -225,14 +225,22 @@ curl -X GET http://localhost:10215/api/v1/weather/all/1 \
   -H "Content-Type: application/json"
 ```
 
-### 添加天气数据
-**说明**: 添加新的天气数据
+### 获取天气预报
+**说明**: 后端根据监控点地区调用天气 API，返回未来天气预报
 
 ```bash
-curl -X POST http://localhost:10215/api/v1/weather/add \
+curl -X GET http://localhost:10215/api/v1/weather/forecast/1 \
   -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"monitorId":1,"temperature":25,"humidity":60,"weather":"晴"}'
+  -H "Content-Type: application/json"
+```
+
+### 手动同步天气
+**说明**: 立即触发后端按监控点地区同步一次天气数据
+
+```bash
+curl -X POST http://localhost:10215/api/v1/weather/sync/1 \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json"
 ```
 
 ---

@@ -1,26 +1,30 @@
 const { defineConfig } = require('@vue/cli-service')
+
+const trimRightSlash = (value) => String(value || '').replace(/\/+$/, '')
+const proxyTarget = trimRightSlash(
+  process.env.VUE_APP_DEV_PROXY_TARGET ||
+  process.env.VUE_APP_API_BASE_URL ||
+  'http://172.20.10.2:10215',
+)
+
 module.exports = defineConfig({
   transpileDependencies: true,
-  // vue.config.js
   publicPath: './',
   devServer: {
-    port: 8081, // 设置端口
+    port: Number(process.env.VUE_APP_DEV_SERVER_PORT || 8081),
     proxy: {
       '/api': {
-        target: 'http://172.20.10.2:10215', // 要请求的后端地址（本地联调）
+        target: proxyTarget,
         changeOrigin: true,
-        /*pathRewrite: {
-          '^/api': '', // 重写路径，如果你的请求路径是 '/api/xxx'，实际会去请求 'http://123.56.248.17:10215/xxx'
-        },*/
       },
     },
   },
   configureWebpack: {
     resolve: {
-      extensions: ['.js', '.jsx', '.ts', '.tsx', '.vue']
-    }
+      extensions: ['.js', '.jsx', '.ts', '.tsx', '.vue'],
+    },
   },
   chainWebpack: config => {
     config.plugins.delete('eslint')
-  }
+  },
 })

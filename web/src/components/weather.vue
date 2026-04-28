@@ -3,24 +3,25 @@
     <div id="demoDiv">
       <div class="temperature">
         <div class="inhouse">
-          <img src="../../public/assets/weather/inweather.png" alt="室内温度" />
-          <span>湿度</span>
+          <img src="../../public/assets/weather/inweather.png" alt="humidity" />
+          <span>Humidity</span>
           <h3>{{ humidityText }} %</h3>
         </div>
         <div class="outhouse">
-          <img src="../../public/assets/weather/outerweather.png" alt="室外温度" />
-          <span>温度</span>
-          <h3>{{ temperatureText }} °C</h3>
+          <img src="../../public/assets/weather/outerweather.png" alt="temperature" />
+          <span>Temp</span>
+          <h3>{{ temperatureText }} C</h3>
         </div>
       </div>
 
       <div class="meta-row">
+        <span>{{ regionText }}</span>
         <span>{{ weatherText }}</span>
         <span>{{ realtimeStatus }}</span>
         <span>{{ updateLabel }}</span>
       </div>
 
-      <svg class="trend-svg" viewBox="0 0 360 120" preserveAspectRatio="none" aria-label="天气趋势图">
+      <svg class="trend-svg" viewBox="0 0 360 120" preserveAspectRatio="none" aria-label="weather trend">
         <line x1="24" y1="12" x2="24" y2="100" stroke="rgba(168,198,232,0.48)" stroke-width="1" />
         <line x1="24" y1="100" x2="344" y2="100" stroke="rgba(168,198,232,0.48)" stroke-width="1" />
         <polyline :points="humidityLine" fill="none" stroke="#53d5a5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
@@ -31,7 +32,7 @@
         <div class="day" v-for="(item, index) in day" :key="index">
           <h4>{{ item.date.substring(5) }}</h4>
           <img :src="getimg(item.dayweather)" />
-          <span>{{ item.nighttemp }} ~ {{ item.daytemp }} °C</span>
+          <span>{{ item.nighttemp }} ~ {{ item.daytemp }} C</span>
         </div>
       </div>
     </div>
@@ -40,12 +41,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
 import axios from 'axios'
-import { useAlarmStore } from '@/stores/alarm'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { useUserStore } from '@/stores/user'
-import { storeToRefs } from 'pinia'
 
 interface WeatherDay {
   date: string
@@ -59,6 +57,7 @@ interface WeatherData {
   temperature: number
   humidity: number
   weather: string
+  regionName?: string
   createTime: string
 }
 
@@ -68,16 +67,12 @@ interface TrendPoint {
   humidity: number
 }
 
-const alarmStore = useAlarmStore()
 const appStore = useAppStore()
-const userStore = useUserStore()
-const { getFutureWeather } = storeToRefs(alarmStore)
-
-const day = computed<WeatherDay[]>(() => getFutureWeather.value)
-
+const day = ref<WeatherDay[]>([])
 const weatherText = ref('--')
+const regionText = ref('--')
 const updateLabel = ref('--')
-const isServerFresh = ref(false)
+const dataMode = ref<'live' | 'cached' | 'fallback'>('fallback')
 const targetTemperature = ref(24)
 const targetHumidity = ref(52)
 const displayTemperature = ref(24)
@@ -85,7 +80,7 @@ const displayHumidity = ref(52)
 const trend = ref<TrendPoint[]>([])
 
 const POLL_MS = 60 * 1000
-const TOLERANCE_MS = 60 * 1000
+const TOLERANCE_MS = 60 * 60 * 1000
 const SMOOTH_MS = 2000
 const TREND_SIZE = 24
 
@@ -116,47 +111,83 @@ const randomDrift = (value: number, min: number, max: number, span = 1.2) => {
 
 const ensureMonitorId = async () => {
   if (appStore.getMonitorId && appStore.getMonitorId !== 0) return appStore.getMonitorId
-  const { data } = await axios.get('/api/v1/monitor')
+  const { data } = await axios.get('/monitor')
   const list = data?.data || []
-  return list[0]?.id || 0
+  const monitorId = Number(list[0]?.id || 0)
+  if (monitorId) {
+    appStore.setMonitorId(monitorId)
+  }
+  return monitorId
 }
 
-const applyFreshData = (data: WeatherData) => {
+const applyCurrentData = (data: WeatherData) => {
   targetTemperature.value = toNumber(data.temperature, targetTemperature.value)
   targetHumidity.value = toNumber(data.humidity, targetHumidity.value)
   weatherText.value = data.weather || '--'
+  regionText.value = data.regionName || '--'
   updateLabel.value = data.createTime || '--'
-  isServerFresh.value = true
+  dataMode.value = isFresh(data.createTime) ? 'live' : 'cached'
 }
 
-const applyFallbackData = () => {
+const applyFallbackCurrent = () => {
   targetTemperature.value = randomDrift(targetTemperature.value, 15, 38)
   targetHumidity.value = randomDrift(targetHumidity.value, 20, 95)
-  weatherText.value = weatherText.value === '--' ? '晴' : weatherText.value
-  updateLabel.value = `${new Date().toLocaleTimeString()} (本地平滑补偿)`
-  isServerFresh.value = false
+  weatherText.value = weatherText.value === '--' ? 'Sunny' : weatherText.value
+  regionText.value = regionText.value === '--' ? 'Local Mock' : regionText.value
+  updateLabel.value = `${new Date().toLocaleTimeString()} (local fallback)`
+  dataMode.value = 'fallback'
+}
+
+const buildFallbackForecast = () => {
+  const base = new Date()
+  const fallbackWeather = weatherText.value === '--' ? 'Sunny' : weatherText.value
+  day.value = Array.from({ length: 3 }, (_, idx) => {
+    const next = new Date(base)
+    next.setDate(base.getDate() + idx)
+    const month = String(next.getMonth() + 1).padStart(2, '0')
+    const date = String(next.getDate()).padStart(2, '0')
+    const high = Math.round(targetTemperature.value + 2 + idx)
+    const low = Math.round(targetTemperature.value - 3 + idx)
+    return {
+      date: `${next.getFullYear()}-${month}-${date}`,
+      dayweather: fallbackWeather,
+      daytemp: String(high),
+      nighttemp: String(low),
+    }
+  })
 }
 
 const fetchWeatherData = async () => {
   try {
     const monitorId = await ensureMonitorId()
     if (!monitorId) {
-      applyFallbackData()
+      applyFallbackCurrent()
+      buildFallbackForecast()
       return
     }
-    const response = await axios.get(`/api/v1/weather/newest/${monitorId}`, {
-      headers: {
-        Authorization: userStore.token,
-      },
-    })
-    const payload: WeatherData | null = response?.data?.code === '00000' ? response.data.data : null
-    if (payload && isFresh(payload.createTime)) {
-      applyFreshData(payload)
-      return
+
+    const [currentRes, forecastRes] = await Promise.all([
+      axios.get(`/weather/newest/${monitorId}`),
+      axios.get(`/weather/forecast/${monitorId}`),
+    ])
+
+    const currentPayload: WeatherData | null = currentRes?.data?.code === '00000' ? currentRes.data.data : null
+    const forecastPayload: WeatherDay[] = Array.isArray(forecastRes?.data?.data) ? forecastRes.data.data : []
+
+    if (currentPayload) {
+      applyCurrentData(currentPayload)
+    } else {
+      applyFallbackCurrent()
     }
-    applyFallbackData()
+
+    if (forecastPayload.length) {
+      day.value = forecastPayload
+    } else {
+      buildFallbackForecast()
+    }
   } catch {
-    applyFallbackData()
+    applyFallbackCurrent()
+    buildFallbackForecast()
   }
 }
 
@@ -196,23 +227,45 @@ const humidityLine = computed(() => buildLine('humidity'))
 const temperatureLine = computed(() => buildLine('temperature'))
 const humidityText = computed(() => Math.round(displayHumidity.value))
 const temperatureText = computed(() => displayTemperature.value.toFixed(1))
-const realtimeStatus = computed(() => (isServerFresh.value ? '后端实时' : '本地平滑补偿'))
+const realtimeStatus = computed(() => {
+  if (dataMode.value === 'live') return 'Backend Live'
+  if (dataMode.value === 'cached') return 'Backend Cached'
+  return 'Local Fallback'
+})
 
 const getimg = (state: string): string => {
-  if (state === '多云') return require('../../public/assets/weather/cloud.png')
-  if (state === '小雨') return require('../../public/assets/weather/smallrain.png')
-  if (state === '中雨') return require('../../public/assets/weather/midrain.png')
-  if (state === '大雨') return require('../../public/assets/weather/bigrain.png')
-  if (state === '阴') return require('../../public/assets/weather/overcastsky.png')
-  if (state === '暴雨') return require('../../public/assets/weather/rainstorm.png')
-  if (state === '雷阵雨') return require('../../public/assets/weather/thundershower.png')
+  const raw = String(state || '')
+  const normalized = raw.toLowerCase()
+  if (normalized.includes('cloud') || raw.includes('\u591A\u4E91')) {
+    return require('../../public/assets/weather/cloud.png')
+  }
+  if (normalized.includes('light rain') || raw.includes('\u5C0F\u96E8') || raw.includes('\u6BDB\u6BDB\u96E8')) {
+    return require('../../public/assets/weather/smallrain.png')
+  }
+  if (normalized.includes('moderate rain') || raw === '\u96E8') {
+    return require('../../public/assets/weather/midrain.png')
+  }
+  if (normalized.includes('heavy rain') || raw.includes('\u5927\u96E8')) {
+    return require('../../public/assets/weather/bigrain.png')
+  }
+  if (normalized.includes('overcast') || raw.includes('\u9634') || raw.includes('\u96FE')) {
+    return require('../../public/assets/weather/overcastsky.png')
+  }
+  if (normalized.includes('storm') || raw.includes('\u66B4\u96E8')) {
+    return require('../../public/assets/weather/rainstorm.png')
+  }
+  if (normalized.includes('thunder') || raw.includes('\u96F7\u9635\u96E8')) {
+    return require('../../public/assets/weather/thundershower.png')
+  }
   return require('../../public/assets/weather/sun.png')
 }
 
 onMounted(() => {
-  fetchWeatherData()
+  void fetchWeatherData()
   smoothStep()
-  pollTimer = window.setInterval(fetchWeatherData, POLL_MS)
+  pollTimer = window.setInterval(() => {
+    void fetchWeatherData()
+  }, POLL_MS)
   smoothTimer = window.setInterval(smoothStep, SMOOTH_MS)
 })
 
@@ -252,11 +305,11 @@ h2 {
 }
 
 .inhouse h3 {
-  color: #4B9DD1;
+  color: #4b9dd1;
 }
 
 .outhouse h3 {
-  color: #A04157;
+  color: #a04157;
 }
 
 .temperature img {
@@ -282,6 +335,7 @@ h3 {
   font-size: 12px;
   color: rgba(214, 230, 255, 0.9);
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .trend-svg {
@@ -304,8 +358,7 @@ h3 {
   display: block;
   width: 2.5rem;
   height: 2.5rem;
-  margin: 0 auto;
-  margin-bottom: 0.3rem;
+  margin: 0 auto 0.3rem;
 }
 
 h4 {

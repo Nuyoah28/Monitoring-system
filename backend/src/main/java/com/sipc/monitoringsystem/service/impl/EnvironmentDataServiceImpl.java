@@ -4,15 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sipc.monitoringsystem.dao.EnvironmentRecordDao;
 import com.sipc.monitoringsystem.model.dto.param.iot.ReportEnvironmentParam;
-import com.sipc.monitoringsystem.model.dto.param.weather.CreateWeatherParam;
 import com.sipc.monitoringsystem.model.dto.res.environment.EnvironmentRealtimeRes;
 import com.sipc.monitoringsystem.model.dto.res.environment.EnvironmentTrendPointRes;
 import com.sipc.monitoringsystem.model.po.Environment.EnvironmentRecord;
 import com.sipc.monitoringsystem.service.EnvironmentDataService;
-import com.sipc.monitoringsystem.service.WeatherService;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
@@ -20,40 +16,23 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Slf4j
 @Service
 public class EnvironmentDataServiceImpl extends ServiceImpl<EnvironmentRecordDao, EnvironmentRecord> implements EnvironmentDataService {
 
-    private final WeatherService weatherService;
-
-    public EnvironmentDataServiceImpl(WeatherService weatherService) {
-        this.weatherService = weatherService;
-    }
-
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public Integer report(ReportEnvironmentParam param) {
         EnvironmentRecord record = new EnvironmentRecord();
         record.setMonitorId(param.getMonitorId());
         record.setDeviceCode(param.getDeviceCode());
-        record.setWeather(defaultWeather(param.getWeather()));
         record.setTemperature(defaultFloat(param.getTemperature(), 24F));
         record.setHumidity(defaultFloat(param.getHumidity(), 50F));
         record.setPm25(defaultFloat(param.getPm25(), 35F));
-        record.setAqi(param.getAqi() == null ? 75 : param.getAqi());
+        record.setCombustibleGas(defaultFloat(param.getCombustibleGas(), 0F));
         save(record);
-
-        CreateWeatherParam weatherParam = new CreateWeatherParam();
-        weatherParam.setMonitorId(record.getMonitorId());
-        weatherParam.setWeather(record.getWeather());
-        weatherParam.setTemperature(Math.round(record.getTemperature()));
-        weatherParam.setHumidity(Math.round(record.getHumidity()));
-        weatherService.addWeather(weatherParam);
         return record.getId();
     }
 
@@ -65,7 +44,12 @@ public class EnvironmentDataServiceImpl extends ServiceImpl<EnvironmentRecordDao
                         .orderByDesc(EnvironmentRecord::getCreateTime)
                         .last("limit 1")
         );
-        return record == null ? null : new EnvironmentRealtimeRes(record);
+        if (record == null) {
+            return null;
+        }
+        EnvironmentRealtimeRes res = new EnvironmentRealtimeRes(record);
+        res.setAqi(pm25ToAqi(record.getPm25()));
+        return res;
     }
 
     @Override
@@ -94,9 +78,10 @@ public class EnvironmentDataServiceImpl extends ServiceImpl<EnvironmentRecordDao
         for (EnvironmentRecord item : sliced) {
             result.add(new EnvironmentTrendPointRes(
                     format.format(item.getCreateTime()),
-                    safeInt(item.getAqi()),
+                    pm25ToAqi(item.getPm25()),
                     Math.round(defaultFloat(item.getHumidity(), 0F)),
-                    Math.round(defaultFloat(item.getPm25(), 0F))
+                    Math.round(defaultFloat(item.getPm25(), 0F)),
+                    Math.round(defaultFloat(item.getCombustibleGas(), 0F))
             ));
         }
         return result;
@@ -111,22 +96,65 @@ public class EnvironmentDataServiceImpl extends ServiceImpl<EnvironmentRecordDao
             grouped.computeIfAbsent(date, key -> new ArrayList<>()).add(item);
         }
         List<Map.Entry<LocalDate, List<EnvironmentRecord>>> entries = new ArrayList<>(grouped.entrySet());
-        entries.sort(Map.Entry.comparingByKey());
         int keep = "week".equals(range) ? 7 : 8;
         int fromIndex = Math.max(entries.size() - keep, 0);
         List<EnvironmentTrendPointRes> result = new ArrayList<>();
         for (Map.Entry<LocalDate, List<EnvironmentRecord>> entry : entries.subList(fromIndex, entries.size())) {
             List<EnvironmentRecord> dayRecords = entry.getValue();
             int size = Math.max(dayRecords.size(), 1);
-            int avgAqi = Math.round((float) dayRecords.stream().map(EnvironmentRecord::getAqi).filter(v -> v != null).mapToInt(Integer::intValue).sum() / size);
-            int avgHumidity = Math.round((float) dayRecords.stream().map(item -> defaultFloat(item.getHumidity(), 0F)).reduce(0F, Float::sum) / size);
-            int avgPm25 = Math.round((float) dayRecords.stream().map(item -> defaultFloat(item.getPm25(), 0F)).reduce(0F, Float::sum) / size);
+            float avgHumidity = sumHumidity(dayRecords) / size;
+            float avgPm25 = sumPm25(dayRecords) / size;
+            float avgGas = sumGas(dayRecords) / size;
             String label = "week".equals(range)
                     ? entry.getKey().getMonthValue() + "/" + entry.getKey().getDayOfMonth()
                     : entry.getKey().getMonthValue() + "/" + String.format("%02d", entry.getKey().getDayOfMonth());
-            result.add(new EnvironmentTrendPointRes(label, avgAqi, avgHumidity, avgPm25));
+            result.add(new EnvironmentTrendPointRes(
+                    label,
+                    pm25ToAqi(avgPm25),
+                    Math.round(avgHumidity),
+                    Math.round(avgPm25),
+                    Math.round(avgGas)
+            ));
         }
         return result;
+    }
+
+    private float sumHumidity(List<EnvironmentRecord> records) {
+        float sum = 0F;
+        for (EnvironmentRecord item : records) {
+            sum += defaultFloat(item.getHumidity(), 0F);
+        }
+        return sum;
+    }
+
+    private float sumPm25(List<EnvironmentRecord> records) {
+        float sum = 0F;
+        for (EnvironmentRecord item : records) {
+            sum += defaultFloat(item.getPm25(), 0F);
+        }
+        return sum;
+    }
+
+    private float sumGas(List<EnvironmentRecord> records) {
+        float sum = 0F;
+        for (EnvironmentRecord item : records) {
+            sum += defaultFloat(item.getCombustibleGas(), 0F);
+        }
+        return sum;
+    }
+
+    private int pm25ToAqi(Float pm25Raw) {
+        float pm25 = defaultFloat(pm25Raw, 0F);
+        if (pm25 <= 12.0F) return calcAqi(pm25, 0F, 12.0F, 0, 50);
+        if (pm25 <= 35.4F) return calcAqi(pm25, 12.1F, 35.4F, 51, 100);
+        if (pm25 <= 55.4F) return calcAqi(pm25, 35.5F, 55.4F, 101, 150);
+        if (pm25 <= 150.4F) return calcAqi(pm25, 55.5F, 150.4F, 151, 200);
+        if (pm25 <= 250.4F) return calcAqi(pm25, 150.5F, 250.4F, 201, 300);
+        return calcAqi(pm25, 250.5F, 500.4F, 301, 500);
+    }
+
+    private int calcAqi(float value, float cLow, float cHigh, int iLow, int iHigh) {
+        return Math.round((iHigh - iLow) * (value - cLow) / (cHigh - cLow) + iLow);
     }
 
     private long resolveStartMillis(String range) {
@@ -147,15 +175,7 @@ public class EnvironmentDataServiceImpl extends ServiceImpl<EnvironmentRecordDao
         return "day";
     }
 
-    private String defaultWeather(String weather) {
-        return weather == null || weather.isBlank() ? "Sunny" : weather;
-    }
-
     private Float defaultFloat(Float value, Float fallback) {
         return value == null ? fallback : value;
-    }
-
-    private Integer safeInt(Integer value) {
-        return value == null ? 0 : value;
     }
 }

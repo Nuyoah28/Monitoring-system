@@ -417,6 +417,10 @@
                   <span>PM2.5</span>
                   <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.pm25 * 1.2)}%`, background: '#f8cb71' }"></i></div>
                 </div>
+                <div class="comfort-factor">
+                  <span>可燃气体</span>
+                  <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.combustibleGas * 2.5)}%`, background: '#ff8d8d' }"></i></div>
+                </div>
               </div>
             </div>
           </article>
@@ -624,8 +628,9 @@ import ChatPanel from '@/components/chat_panel.vue'
 import dialog1 from '@/components/dialog1.vue'
 import axios from 'axios'
 import flvjs from 'flv.js'
-import { rtmpAddressList } from '@/config/config'
+import { demoAlarmVideoMap, rtmpAddressList, simulateChannelName } from '@/config/config'
 import { useAlarmStore } from '@/stores/alarm'
+import { useAppStore } from '@/stores/app'
 
 type ModuleTab = 'alarm' | 'video' | 'env' | 'agent'
 type AgentStageStatus = 'idle' | 'listening' | 'thinking' | 'speaking'
@@ -667,6 +672,7 @@ interface RecentEventItem {
 
 const router = useRouter()
 const alarmStore = useAlarmStore()
+const appStore = useAppStore()
 
 const tabs: Array<{ key: ModuleTab; label: string }> = [
   { key: 'alarm', label: '报警消息' },
@@ -957,7 +963,7 @@ const useMockData = () => {
       deal: '未处理',
       location: '北门',
       createTime: new Date().toISOString(),
-      video: 'http://localhost:8848/video/电动车进楼.mp4'
+      video: demoAlarmVideoMap.bike
     },
     {
       eventName: '烟雾火灾告警',
@@ -967,7 +973,7 @@ const useMockData = () => {
       deal: '未处理',
       location: '车库',
       createTime: new Date().toISOString(),
-      video: 'http://localhost:8848/video/火灾烟雾.mp4'
+      video: demoAlarmVideoMap.fire
     },
     {
       eventName: '垃圾桶溢出告警',
@@ -977,7 +983,7 @@ const useMockData = () => {
       deal: '未处理',
       location: '东侧',
       createTime: new Date().toISOString(),
-      video: 'http://localhost:8848/video/垃圾桶溢出.mp4'
+      video: demoAlarmVideoMap.garbage
     }
   ]
   alarmStore.setAlarmList(mockAlarms)
@@ -1031,7 +1037,7 @@ const stopRecentEventPolling = (): void => {
 let simChannel: BroadcastChannel | null = null;
 onMounted(() => {
   if (window.BroadcastChannel) {
-    simChannel = new BroadcastChannel('demonstration_channel');
+    simChannel = new BroadcastChannel(simulateChannelName);
     simChannel.onmessage = (event) => {
       if (event.data && event.data.action === 'trigger_alarm') {
         _handleSimulate(event.data.type);
@@ -1064,7 +1070,7 @@ const _handleSimulate = (type: string) => {
       level: 2,
       location: '北门',
       createTime: iso,
-      video: 'http://localhost:8848/video/电动车进楼.mp4',
+      video: demoAlarmVideoMap.bike,
       id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
     };
   } else if (type === 'fire') {
@@ -1075,7 +1081,7 @@ const _handleSimulate = (type: string) => {
       level: 3,
       location: '车库',
       createTime: iso,
-      video: 'http://localhost:8848/video/火灾烟雾.mp4',
+      video: demoAlarmVideoMap.fire,
       id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
     };
   } else if (type === 'garbage') {
@@ -1086,7 +1092,7 @@ const _handleSimulate = (type: string) => {
       level: 1,
       location: '东侧',
       createTime: iso,
-      video: 'http://localhost:8848/video/垃圾桶溢出.mp4',
+      video: demoAlarmVideoMap.garbage,
       id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
     };
   }
@@ -1251,7 +1257,7 @@ const severityText = (level: number) => {
   return '低'
 }
 
-const ENV_PARKING_DATA_MODE: 'mock' | 'api' = 'mock'
+const ENV_PARKING_DATA_MODE: 'mock' | 'api' = 'api'
 const ENV_PARKING_REFRESH_MS = 6000
 const envParkingRefreshSeconds = Math.round(ENV_PARKING_REFRESH_MS / 1000)
 const envParkingDataModeLabel = computed(() => (ENV_PARKING_DATA_MODE === 'mock' ? '模拟数据' : '实时接口'))
@@ -1260,6 +1266,15 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const randDelta = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const toHmLabel = (date: Date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+
+const ensureMonitorId = async (): Promise<number> => {
+  if (appStore.getMonitorId && appStore.getMonitorId !== 0) return appStore.getMonitorId
+  const { data } = await axios.get('/monitor')
+  const list = data?.data || []
+  const monitorId = Number(list[0]?.id || 0)
+  if (monitorId) appStore.setMonitorId(monitorId)
+  return monitorId
+}
 
 interface ParkingZone {
   name: string
@@ -1279,6 +1294,7 @@ const envTrendMetrics = [
   { key: 'aqi', label: 'AQI', unit: '指数', color: '#63b8ff', areaColor: 'rgba(99,184,255,0.22)' },
   { key: 'humidity', label: '湿度', unit: '%', color: '#53d5a5', areaColor: 'rgba(83,213,165,0.20)' },
   { key: 'pm25', label: 'PM2.5', unit: 'ug/m3', color: '#f8cb71', areaColor: 'rgba(248,203,113,0.18)' },
+  { key: 'combustibleGas', label: '可燃气体', unit: 'ppm', color: '#ff8d8d', areaColor: 'rgba(255,141,141,0.18)' },
 ] as const
 
 type EnvMetricKey = typeof envTrendMetrics[number]['key']
@@ -1288,35 +1304,58 @@ interface EnvPoint {
   aqi: number
   humidity: number
   pm25: number
+  combustibleGas: number
+}
+
+interface EnvRealtimeApi {
+  aqi: number
+  humidity: number
+  pm25: number
+  combustibleGas: number
+  createTime?: string
+}
+
+interface ParkingRealtimeApi {
+  zones?: Array<{
+    areaName: string
+    totalSpaces: number
+    occupiedSpaces: number
+  }>
+}
+
+interface ParkingTrendApiPoint {
+  label: string
+  occupancy: number
+  used: number
 }
 
 const envTrendDataState = ref<Record<'day' | 'week' | 'month', EnvPoint[]>>({
   day: [
-    { label: '00:00', aqi: 72, humidity: 63, pm25: 42 },
-    { label: '04:00', aqi: 76, humidity: 64, pm25: 46 },
-    { label: '08:00', aqi: 79, humidity: 58, pm25: 48 },
-    { label: '12:00', aqi: 84, humidity: 54, pm25: 55 },
-    { label: '16:00', aqi: 87, humidity: 52, pm25: 59 },
-    { label: '20:00', aqi: 80, humidity: 57, pm25: 50 },
-    { label: '24:00', aqi: 75, humidity: 61, pm25: 45 },
+    { label: '00:00', aqi: 72, humidity: 63, pm25: 42, combustibleGas: 11 },
+    { label: '04:00', aqi: 76, humidity: 64, pm25: 46, combustibleGas: 10 },
+    { label: '08:00', aqi: 79, humidity: 58, pm25: 48, combustibleGas: 14 },
+    { label: '12:00', aqi: 84, humidity: 54, pm25: 55, combustibleGas: 16 },
+    { label: '16:00', aqi: 87, humidity: 52, pm25: 59, combustibleGas: 13 },
+    { label: '20:00', aqi: 80, humidity: 57, pm25: 50, combustibleGas: 12 },
+    { label: '24:00', aqi: 75, humidity: 61, pm25: 45, combustibleGas: 9 },
   ],
   week: [
-    { label: '周一', aqi: 76, humidity: 62, pm25: 47 },
-    { label: '周二', aqi: 82, humidity: 59, pm25: 52 },
-    { label: '周三', aqi: 78, humidity: 57, pm25: 49 },
-    { label: '周四', aqi: 86, humidity: 55, pm25: 56 },
-    { label: '周五', aqi: 81, humidity: 58, pm25: 51 },
-    { label: '周六', aqi: 74, humidity: 63, pm25: 45 },
-    { label: '周日', aqi: 72, humidity: 64, pm25: 43 },
+    { label: '周一', aqi: 76, humidity: 62, pm25: 47, combustibleGas: 12 },
+    { label: '周二', aqi: 82, humidity: 59, pm25: 52, combustibleGas: 14 },
+    { label: '周三', aqi: 78, humidity: 57, pm25: 49, combustibleGas: 13 },
+    { label: '周四', aqi: 86, humidity: 55, pm25: 56, combustibleGas: 17 },
+    { label: '周五', aqi: 81, humidity: 58, pm25: 51, combustibleGas: 15 },
+    { label: '周六', aqi: 74, humidity: 63, pm25: 45, combustibleGas: 11 },
+    { label: '周日', aqi: 72, humidity: 64, pm25: 43, combustibleGas: 10 },
   ],
   month: [
-    { label: '4/01', aqi: 79, humidity: 60, pm25: 51 },
-    { label: '4/05', aqi: 75, humidity: 62, pm25: 47 },
-    { label: '4/10', aqi: 83, humidity: 58, pm25: 55 },
-    { label: '4/15', aqi: 88, humidity: 54, pm25: 60 },
-    { label: '4/20', aqi: 80, humidity: 57, pm25: 52 },
-    { label: '4/25', aqi: 73, humidity: 63, pm25: 44 },
-    { label: '4/30', aqi: 77, humidity: 61, pm25: 48 },
+    { label: '4/01', aqi: 79, humidity: 60, pm25: 51, combustibleGas: 14 },
+    { label: '4/05', aqi: 75, humidity: 62, pm25: 47, combustibleGas: 12 },
+    { label: '4/10', aqi: 83, humidity: 58, pm25: 55, combustibleGas: 16 },
+    { label: '4/15', aqi: 88, humidity: 54, pm25: 60, combustibleGas: 18 },
+    { label: '4/20', aqi: 80, humidity: 57, pm25: 52, combustibleGas: 15 },
+    { label: '4/25', aqi: 73, humidity: 63, pm25: 44, combustibleGas: 11 },
+    { label: '4/30', aqi: 77, humidity: 61, pm25: 48, combustibleGas: 13 },
   ],
 })
 
@@ -1380,6 +1419,7 @@ const envTrendCharts = computed<Record<EnvMetricKey, TrendRenderData>>(() => ({
   aqi: buildTrendRender('aqi'),
   humidity: buildTrendRender('humidity'),
   pm25: buildTrendRender('pm25'),
+  combustibleGas: buildTrendRender('combustibleGas'),
 }))
 
 const parkingZoneState = ref<ParkingZone[]>([
@@ -1443,12 +1483,49 @@ const syncEnvParkingFromApi = async (): Promise<boolean> => {
   if (ENV_PARKING_DATA_MODE !== 'api') return false
   try {
     // 预留后端接口位：接入后将返回值写入 envTrendDataState / parkingZoneState / parkingDayTrend
-    await Promise.all([
-      axios.get('/env/realtime'),
-      axios.get('/env/trend', { params: { range: envTrendRange.value } }),
-      axios.get('/parking/realtime'),
-      axios.get('/parking/trend', { params: { range: 'day' } }),
-    ])
+    const monitorId = await ensureMonitorId()
+    if (!monitorId) return false
+
+    const envRealtimeRes = await axios.get('/env/realtime', { params: { monitorId } })
+    const envDayRes = await axios.get('/env/trend', { params: { monitorId, range: 'day' } })
+    const parkingRealtimeRes = await axios.get('/parking/realtime', { params: { monitorId } })
+    const parkingTrendRes = await axios.get('/parking/trend', { params: { monitorId, range: 'day' } })
+    const envScopedRes = envTrendRange.value === 'day'
+      ? envDayRes
+      : await axios.get('/env/trend', { params: { monitorId, range: envTrendRange.value } })
+
+    const envRealtime = envRealtimeRes?.data?.data as EnvRealtimeApi | null
+    const envDay = Array.isArray(envDayRes?.data?.data) ? envDayRes.data.data as EnvPoint[] : []
+    const envScoped = Array.isArray(envScopedRes?.data?.data) ? envScopedRes.data.data as EnvPoint[] : []
+    const parkingRealtime = parkingRealtimeRes?.data?.data as ParkingRealtimeApi | null
+    const parkingTrend = Array.isArray(parkingTrendRes?.data?.data) ? parkingTrendRes.data.data as ParkingTrendApiPoint[] : []
+
+    if (!envRealtime || !envDay.length || !parkingRealtime?.zones?.length || !parkingTrend.length) return false
+
+    envTrendDataState.value.day = envDay.map(item => ({
+      label: item.label,
+      aqi: Number(item.aqi || 0),
+      humidity: Number(item.humidity || 0),
+      pm25: Number(item.pm25 || 0),
+      combustibleGas: Number(item.combustibleGas || 0),
+    }))
+    envTrendDataState.value[envTrendRange.value] = envScoped.map(item => ({
+      label: item.label,
+      aqi: Number(item.aqi || 0),
+      humidity: Number(item.humidity || 0),
+      pm25: Number(item.pm25 || 0),
+      combustibleGas: Number(item.combustibleGas || 0),
+    }))
+    parkingZoneState.value = parkingRealtime.zones.map(zone => ({
+      name: zone.areaName,
+      capacity: Number(zone.totalSpaces || 0),
+      used: Number(zone.occupiedSpaces || 0),
+    }))
+    parkingDayTrend.value = parkingTrend.map(item => ({
+      label: item.label,
+      occupancy: Number(item.occupancy || 0),
+      used: Number(item.used || 0),
+    }))
     return true
   } catch (error) {
     void error
@@ -1459,12 +1536,13 @@ const syncEnvParkingFromApi = async (): Promise<boolean> => {
 const stepMockEnvParking = () => {
   const now = new Date()
   const daySeries = envTrendDataState.value.day
-  const last = daySeries[daySeries.length - 1] || { label: '00:00', aqi: 72, humidity: 62, pm25: 44 }
+  const last = daySeries[daySeries.length - 1] || { label: '00:00', aqi: 72, humidity: 62, pm25: 44, combustibleGas: 10 }
   const nextPoint: EnvPoint = {
     label: toHmLabel(now),
     aqi: clamp(last.aqi + randDelta(-4, 5), 45, 135),
     humidity: clamp(last.humidity + randDelta(-3, 3), 35, 82),
     pm25: clamp(last.pm25 + randDelta(-4, 4), 18, 96),
+    combustibleGas: clamp(last.combustibleGas + randDelta(-2, 3), 4, 40),
   }
   daySeries.push(nextPoint)
   if (daySeries.length > 24) daySeries.shift()
@@ -1479,6 +1557,7 @@ const stepMockEnvParking = () => {
       aqi: clamp(Math.round((prev.aqi * 4 + nextPoint.aqi) / 5 + randDelta(-1, 1)), 45, 135),
       humidity: clamp(Math.round((prev.humidity * 4 + nextPoint.humidity) / 5 + randDelta(-1, 1)), 35, 82),
       pm25: clamp(Math.round((prev.pm25 * 4 + nextPoint.pm25) / 5 + randDelta(-1, 1)), 18, 96),
+      combustibleGas: clamp(Math.round((prev.combustibleGas * 4 + nextPoint.combustibleGas) / 5 + randDelta(-1, 1)), 4, 40),
     }
   })
 
@@ -1596,6 +1675,7 @@ const envCurrentValues = computed(() => {
     aqi: last?.aqi ?? 0,
     humidity: last?.humidity ?? 0,
     pm25: last?.pm25 ?? 0,
+    combustibleGas: last?.combustibleGas ?? 0,
   }
 })
 
@@ -1616,11 +1696,12 @@ const parkingOccupancyColor = computed(() => {
 
 // ====== 环境舒适度评分 ======
 const comfortScore = computed(() => {
-  const { aqi, humidity, pm25 } = envCurrentValues.value
+  const { aqi, humidity, pm25, combustibleGas } = envCurrentValues.value
   const aqiScore = Math.max(0, 100 - aqi)
   const humScore = humidity >= 40 && humidity <= 70 ? 100 : Math.max(0, 100 - Math.abs(humidity - 55) * 2)
   const pmScore = Math.max(0, 100 - pm25)
-  return Math.round(aqiScore * 0.4 + humScore * 0.3 + pmScore * 0.3)
+  const gasScore = Math.max(0, 100 - combustibleGas * 2.5)
+  return Math.round(aqiScore * 0.3 + humScore * 0.25 + pmScore * 0.25 + gasScore * 0.2)
 })
 const comfortColor = computed(() => {
   const s = comfortScore.value
@@ -2195,6 +2276,12 @@ watch(
   },
   { deep: true },
 )
+
+watch(envTrendRange, () => {
+  if (ENV_PARKING_DATA_MODE === 'api') {
+    void refreshEnvParkingData()
+  }
+})
 
 watch(activeTab, (tab) => {
   if (tab === 'alarm') {

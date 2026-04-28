@@ -1,39 +1,50 @@
 /**
- * 全局网络与环境配置中心
- * 
- * 只需要在此处修改 IP 地址，全端（HTTP、WebSocket、AI大模型）将自动同步更新。
+ * 全局网络与演示配置中心。
+ * 修改这里的主机、端口或演示资源地址后，移动端页面会自动复用。
  */
 
 export const NETWORK_CONFIG = {
-    // ==========================================
-    // ⬇️ 每次更换网络环境，只修改这一个 IP 即可 ⬇️
-    // ==========================================
-    // 本地联调后端 IP（改回服务器时在这里切换）
-    // IP: "123.56.248.17",  // 服务器 IP   
-    IP: "172.20.10.2",
-
-    // 你的本地电脑 IP (用于连接本地运行的 AI Agent)
-    LOCAL_IP: "172.20.10.2",
-
-    // Java 核心业务后台端口
-    BACKEND_PORT: "10215",
-
-    // Python AI 助手专属端口
-    AI_AGENT_PORT: "5050"
+    IP: '172.20.10.2',
+    LOCAL_IP: '172.20.10.2',
+    BACKEND_PORT: '10215',
+    AI_AGENT_PORT: '5050',
+    DEMO_VIDEO_HOST: 'localhost',
+    DEMO_VIDEO_PORT: '8848'
 };
 
-// ==========================================
-// 自动拼接好的完整路径，直接暴露供各处引入使用
-// ==========================================
-
-// 1. 基础业务后端请求地址 (API)
 export const API_BASE_URL = `http://${NETWORK_CONFIG.IP}:${NETWORK_CONFIG.BACKEND_PORT}`;
-
-// 2. 基础业务报警推送地址 (WebSocket)
 export const WS_ALARM_URL = `ws://${NETWORK_CONFIG.IP}:${NETWORK_CONFIG.BACKEND_PORT}`;
-
-// 3. AI 助手大模型文字/语音收发地址 (HTTP)
 export const AI_HTTP_URL = `http://${NETWORK_CONFIG.LOCAL_IP}:${NETWORK_CONFIG.AI_AGENT_PORT}`;
-
-// 4. AI 助手大模型流式对话地址 (WebSocket)
 export const AI_WS_URL = `ws://${NETWORK_CONFIG.LOCAL_IP}:${NETWORK_CONFIG.AI_AGENT_PORT}`;
+
+export const DEMO_VIDEO_BASE_URL = `http://${NETWORK_CONFIG.DEMO_VIDEO_HOST}:${NETWORK_CONFIG.DEMO_VIDEO_PORT}/video`;
+
+const buildDemoVideoUrl = (fileName) => `${DEMO_VIDEO_BASE_URL}/${fileName}`;
+
+export const DEMO_ALARM_VIDEO_MAP = {
+    bike: buildDemoVideoUrl('电动车进楼.mp4'),
+    fire: buildDemoVideoUrl('火灾烟雾.mp4'),
+    garbage: buildDemoVideoUrl('垃圾桶溢出.mp4')
+};
+
+const DEMO_ALARM_CLIP_VIDEO_MAP = {
+    SIM_BIKE_DEMO: DEMO_ALARM_VIDEO_MAP.bike,
+    SIM_FIRE_DEMO: DEMO_ALARM_VIDEO_MAP.fire,
+    SIM_GARBAGE_DEMO: DEMO_ALARM_VIDEO_MAP.garbage
+};
+
+export const ALARM_DEFAULT_VIDEO = DEMO_ALARM_VIDEO_MAP.bike;
+
+export const resolveDemoAlarmVideo = (clipIdOrUrl) => {
+    if (!clipIdOrUrl) return ALARM_DEFAULT_VIDEO;
+    const value = String(clipIdOrUrl);
+
+    if (DEMO_ALARM_CLIP_VIDEO_MAP[value]) return DEMO_ALARM_CLIP_VIDEO_MAP[value];
+    if (value.includes('SIM_BIKE_DEMO')) return DEMO_ALARM_VIDEO_MAP.bike;
+    if (value.includes('SIM_FIRE_DEMO')) return DEMO_ALARM_VIDEO_MAP.fire;
+    if (value.includes('SIM_GARBAGE_DEMO')) return DEMO_ALARM_VIDEO_MAP.garbage;
+    if (value === 'bike') return DEMO_ALARM_VIDEO_MAP.bike;
+    if (value === 'fire') return DEMO_ALARM_VIDEO_MAP.fire;
+    if (value === 'garbage') return DEMO_ALARM_VIDEO_MAP.garbage;
+    return value;
+};

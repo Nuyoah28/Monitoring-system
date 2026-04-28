@@ -7,6 +7,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { amapConfig, type FixedMapPoint, type LngLat } from '@/config/config'
 
 interface MapPointItem {
   id?: number | string
@@ -29,13 +30,6 @@ interface AlarmCountItem {
   count: number
 }
 
-interface FixedPointItem {
-  title: string
-  camera: string
-  longitude: number
-  latitude: number
-}
-
 type AMapLike = any
 
 const props = defineProps<{
@@ -47,28 +41,11 @@ const emit = defineEmits<{
   (e: 'point-click', point: MapPointItem): void
 }>()
 
-const AMAP_KEY = 'd8250863b36679ef600aa2c28bb90ab0'
-const DEFAULT_CENTER: [number, number] = [117.01187872107023, 39.1443426861701]
-const FIXED_POINTS: FixedPointItem[] = [
-  {
-    title: '三号楼监测点',
-    camera: '三号楼监测点',
-    longitude: 117.01280287680027,
-    latitude: 39.144625636831215,
-  },
-  {
-    title: '九号楼监测点',
-    camera: '九号楼监测点',
-    longitude: 117.0122804687718,
-    latitude: 39.143983680256035,
-  },
-  {
-    title: '南门监测点',
-    camera: '南门监测点',
-    longitude: 117.01346569650909,
-    latitude: 39.14355698741387,
-  },
-]
+const AMAP_KEY = amapConfig.key
+const DEFAULT_CENTER: LngLat = amapConfig.defaultCenter
+const FIXED_POINTS: FixedMapPoint[] = [...amapConfig.fixedPoints]
+const AMAP_VERSION = amapConfig.version
+
 const mapRef = ref<HTMLDivElement | null>(null)
 const loadError = ref(false)
 const isLoadingAmap = ref(false)
@@ -77,7 +54,6 @@ let markers: AMapLike[] = []
 let detachRuntimeGuards: (() => void) | null = null
 
 const pluginsList = ['AMap.Scale']
-const AMAP_VERSION = '1.4.15'
 
 const parsePercent = (input?: string) => {
   if (!input || !input.endsWith('%')) return null
@@ -211,10 +187,10 @@ const renderMarkers = () => {
   markers = pointsToRender.map((point, index) => {
     const position = normalizeLngLat(point, index)
     const alarmCount = getAlarmCount(point.camera)
-    
+
     const markerContent = document.createElement('div')
     markerContent.className = 'marker-wrapper'
-    
+
     if (alarmCount > 0) {
       markerContent.innerHTML = `
         <div class="marker-dot breathing">
@@ -226,7 +202,7 @@ const renderMarkers = () => {
         <div class="marker-dot normal"></div>
       `
     }
-    
+
     const marker = new AMap.Marker({
       position,
       title: point.title,
@@ -236,7 +212,7 @@ const renderMarkers = () => {
     marker.setLabel({
       direction: 'right',
       offset: new AMap.Pixel(12, 0),
-      content: `<span style="color:#16a34a;font-size:12px;white-space:nowrap;">${point.camera || point.title || `监测点${index + 1}`}</span>`,
+      content: `<span style="color:#16a34a;font-size:12px;white-space:nowrap;">${point.camera || point.title || `监测点 ${index + 1}`}</span>`,
     })
     marker.on('click', () => emit('point-click', point))
     return marker

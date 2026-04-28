@@ -10,4 +10,5 @@ public class EnvironmentTrendPointRes {
     private Integer aqi;
     private Integer humidity;
     private Integer pm25;
+    private Integer combustibleGas;
 }

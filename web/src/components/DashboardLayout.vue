@@ -6,18 +6,18 @@
           <span></span>
         </div>
         <div>
-          <h1>社区智眼</h1>
-          <p>AI 驱动的智慧社区安防态势感知平台</p>
+          <h1>Community Vision</h1>
+          <p>AI-driven community safety dashboard</p>
         </div>
       </div>
-      <div class="pill pill-weather">当前天气：多云 26C / 湿度58% / AQI 72</div>
-      <div class="pill pill-duty">值班状态：<span class="status-online">在线</span></div>
+      <div class="pill pill-weather">{{ weatherPillText }}</div>
+      <div class="pill pill-duty">Duty: <span class="status-online">Online</span></div>
       <div class="pill pill-time">{{ nowTime }}</div>
       <button class="top-user user-entry" type="button" @click="$emit('open-profile')">
-        <div class="avatar">安防</div>
+        <div class="avatar">OPS</div>
         <div class="meta">
-          <strong>张三</strong>
-          <span>社区安防值班员</span>
+          <strong>Operator</strong>
+          <span>Security Console</span>
         </div>
       </button>
     </header>
@@ -29,16 +29,23 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import axios from 'axios'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useAppStore } from '@/stores/app'
 
-const nowTime = ref('系统时间 --')
+const appStore = useAppStore()
+const nowTime = ref('System Time --')
+const weatherSummary = ref('Weather: loading...')
 const timer = ref<number | null>(null)
+const weatherTimer = ref<number | null>(null)
 const pad = (n: number) => String(n).padStart(2, '0')
+
+const weatherPillText = computed(() => weatherSummary.value)
 
 const clock = () => {
   const d = new Date()
   nowTime.value =
-    '系统时间 ' +
+    'System Time ' +
     d.getFullYear() +
     '-' +
     pad(d.getMonth() + 1) +
@@ -52,16 +59,68 @@ const clock = () => {
     pad(d.getSeconds())
 }
 
+const ensureMonitorId = async () => {
+  if (appStore.getMonitorId && appStore.getMonitorId !== 0) return appStore.getMonitorId
+  const { data } = await axios.get('/monitor')
+  const list = data?.data || []
+  const monitorId = Number(list[0]?.id || 0)
+  if (monitorId) {
+    appStore.setMonitorId(monitorId)
+  }
+  return monitorId
+}
+
+const fetchWeatherSummary = async () => {
+  try {
+    const monitorId = await ensureMonitorId()
+    if (!monitorId) {
+      weatherSummary.value = 'Weather: no monitor selected'
+      return
+    }
+
+    const response = await axios.get(`/weather/newest/${monitorId}`)
+    const payload = response?.data?.code === '00000' ? response.data.data : null
+    if (!payload) {
+      weatherSummary.value = 'Weather: no data'
+      return
+    }
+
+    const regionName = payload.regionName ? `${payload.regionName} / ` : ''
+    const weather = payload.weather || '--'
+    const temperature = Number(payload.temperature ?? 0).toFixed(1)
+    const humidity = Math.round(Number(payload.humidity ?? 0))
+    weatherSummary.value = `Weather: ${regionName}${weather} ${temperature}C / RH ${humidity}%`
+  } catch {
+    weatherSummary.value = 'Weather: load failed'
+  }
+}
+
 onMounted(() => {
   clock()
   timer.value = window.setInterval(clock, 1000)
+  void fetchWeatherSummary()
+  weatherTimer.value = window.setInterval(() => {
+    void fetchWeatherSummary()
+  }, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {
   if (timer.value) {
     clearInterval(timer.value)
   }
+  if (weatherTimer.value) {
+    clearInterval(weatherTimer.value)
+  }
 })
+
+watch(
+  () => appStore.getMonitorId,
+  (monitorId, prevMonitorId) => {
+    if (monitorId && monitorId !== prevMonitorId) {
+      void fetchWeatherSummary()
+    }
+  }
+)
 </script>
 
 <style scoped>

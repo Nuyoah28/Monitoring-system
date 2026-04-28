@@ -6,9 +6,8 @@ import lombok.Data;
 public class ReportEnvironmentParam {
     private Integer monitorId;
     private String deviceCode;
-    private String weather;
     private Float temperature;
     private Float humidity;
     private Float pm25;
-    private Integer aqi;
+    private Float combustibleGas;
 }

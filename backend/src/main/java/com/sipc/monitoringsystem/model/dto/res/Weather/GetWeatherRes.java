@@ -1,6 +1,6 @@
 package com.sipc.monitoringsystem.model.dto.res.Weather;
 
-import com.huaweicloud.sdk.thirdparty.com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.sipc.monitoringsystem.model.po.Weather.Weather;
 import lombok.Data;
 
@@ -15,17 +15,27 @@ public class GetWeatherRes {
     public GetWeatherRes(Weather weather) {
         this.id = weather.getId();
         this.monitorId = weather.getMonitorId();
+        this.regionName = weather.getRegionName();
         this.temperature = weather.getTemperature();
         this.humidity = weather.getHumidity();
         this.weather = weather.getWeather();
+        this.weatherCode = weather.getWeatherCode();
+        this.windSpeed = weather.getWindSpeed();
+        this.latitude = weather.getLatitude();
+        this.longitude = weather.getLongitude();
         this.createTime = weather.getCreateTime();
     }
 
     private Integer id;
     private Integer monitorId;
+    private String regionName;
     private float temperature;
     private float humidity;
     private String weather;
+    private Integer weatherCode;
+    private float windSpeed;
+    private Double latitude;
+    private Double longitude;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Timestamp createTime;
 }

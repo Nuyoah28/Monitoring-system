@@ -37,9 +37,9 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
-import { baseUrl } from '@/config/config'
+import { baseUrl, simulateChannelName } from '@/config/config'
 
-const channel = new BroadcastChannel('demonstration_channel')
+const channel = new BroadcastChannel(simulateChannelName)
 
 const sendAlarm = async (type: string) => {
   channel.postMessage({

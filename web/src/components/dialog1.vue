@@ -31,6 +31,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import flvjs from 'flv.js';
 import { useUserStore } from '@/stores/user';
 import axios from 'axios';
+import { resolveDemoAlarmVideo } from '@/config/config';
 
 // 定义props类型
 interface TableItem {
@@ -191,13 +192,7 @@ const getVideoData = (): void => {
     // --- 模拟演示视频重定向逻辑 ---
     // 当后端收到 SIM_ 开头的 clipId 时，前端将其重定向到本地 8848 端口的演示视频
     if (video && typeof video === 'string') {
-      if (video.includes('SIM_BIKE_DEMO')) {
-        video = 'http://localhost:8848/video/电动车进楼.mp4';
-      } else if (video.includes('SIM_FIRE_DEMO')) {
-        video = 'http://localhost:8848/video/火灾烟雾.mp4';
-      } else if (video.includes('SIM_GARBAGE_DEMO')) {
-        video = 'http://localhost:8848/video/垃圾桶溢出.mp4';
-      }
+      video = resolveDemoAlarmVideo(video);
     }
 
     const playUrl = withNoCache(video || '');

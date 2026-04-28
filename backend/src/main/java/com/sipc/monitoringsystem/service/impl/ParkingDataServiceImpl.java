@@ -47,16 +47,17 @@ public class ParkingDataServiceImpl implements ParkingDataService {
         String batchNo = UUID.randomUUID().toString().replace("-", "");
         int count = 0;
         for (ReportParkingParam.ZoneReport zone : param.getZones()) {
+            String areaCode = defaultAreaCode(zone);
             ParkingAreaStatus status = parkingAreaStatusDao.selectOne(
                     new LambdaQueryWrapper<ParkingAreaStatus>()
                             .eq(ParkingAreaStatus::getMonitorId, param.getMonitorId())
-                            .eq(ParkingAreaStatus::getAreaCode, zone.getAreaCode())
+                            .eq(ParkingAreaStatus::getAreaCode, areaCode)
                             .last("limit 1")
             );
             if (status == null) {
                 status = new ParkingAreaStatus();
                 status.setMonitorId(param.getMonitorId());
-                status.setAreaCode(defaultAreaCode(zone));
+                status.setAreaCode(areaCode);
                 status.setCreateTime(now);
             }
             status.setDeviceCode(param.getDeviceCode());
