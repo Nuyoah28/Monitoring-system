@@ -13,10 +13,10 @@ class Config:
 
 
 class DevConfig(Config):
-    BACKEND_URL = "http://localhost:10215"
-    STREAM_URL = "rtmp://123.56.248.17:1935"
-    STREAM_RAW_URL = "rtmp://123.56.248.17:1935/live/raw"
-    STREAM_PROCESSED_URL = "rtmp://123.56.248.17:1935/live/ai"
+    BACKEND_URL = "http://host.docker.internal:10215"
+    STREAM_URL = "rtmp://host.docker.internal:1935"
+    STREAM_RAW_URL = "rtmp://host.docker.internal:1935/live/raw"
+    STREAM_PROCESSED_URL = "rtmp://host.docker.internal:1935/live/ai"
     TOKEN = None
     
     # 腾讯云机器翻译 (TMT) 密钥配置

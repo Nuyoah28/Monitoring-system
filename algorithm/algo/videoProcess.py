@@ -16,10 +16,14 @@ from Yolov8.Yolov8_Pose import LoadPoseEngine
 # 将原来固定类别的 LoadEngineModel 替换为 Mamba-YOLO 开放词汇检测器
 # from Yolov8.main import LoadEngineModel  # [已废弃] 原 TensorRT 烟火检测器
 from Yolov8.mamba_yolo import MambaYOLODetector
-from Yolov8.stgcn_action import ActionRecognizer
 from service import AlarmService
 from common import monitor as monitorCommon
 import copy
+
+if monitorCommon.ACTION_MODEL_BACKEND == "ctrgcn":
+    from Yolov8.ctrgcn_action import ActionRecognizer
+else:
+    from Yolov8.stgcn_action import ActionRecognizer
 
 # Mamba-YOLO 自定义检测目标（在"火"和"烟"之外动态扩展）
 # 列表定义和更改标志位已移至 common.monitor 中，
@@ -128,15 +132,29 @@ def stream_video():
     )
     # ST-GCN++ 动作识别器 (替换 Yolov8_Pose.py 中的手写 if-else 规则)
     # 权重来源: PYSKL 官方 ST-GCN++ NTU-60 预训练权重
-    action_recognizer = ActionRecognizer(
-        checkpoint_path='algo/stgcnpp_ntu60.pth',
-        buffer_size=30,
-        confidence_threshold=0.5,
-        max_tracks=8,
-        top_k_tracks=4,
-        infer_interval=2,
-        max_missing=10,
-    )
+    if monitorCommon.ACTION_MODEL_BACKEND == "ctrgcn":
+        action_recognizer = ActionRecognizer(
+            checkpoint_path=monitorCommon.ACTION_CTR_GCN_WEIGHTS,
+            ctrgcn_root=monitorCommon.ACTION_CTR_GCN_ROOT,
+            label_order=monitorCommon.ACTION_LABEL_ORDER,
+            buffer_size=monitorCommon.ACTION_WINDOW_SIZE,
+            min_frames=monitorCommon.ACTION_MIN_FRAMES,
+            smooth=monitorCommon.ACTION_SMOOTH,
+            max_tracks=monitorCommon.ACTION_MAX_TRACKS,
+            top_k_tracks=monitorCommon.ACTION_TOP_K_TRACKS,
+            infer_interval=monitorCommon.ACTION_INFER_INTERVAL,
+            max_missing=monitorCommon.ACTION_MAX_MISSING,
+        )
+    else:
+        action_recognizer = ActionRecognizer(
+            checkpoint_path='algo/stgcnpp_ntu60.pth',
+            buffer_size=30,
+            confidence_threshold=0.5,
+            max_tracks=8,
+            top_k_tracks=4,
+            infer_interval=2,
+            max_missing=10,
+        )
     print('模型加载成功！')
     
     #设置时间

@@ -1,3 +1,4 @@
+import os
 from queue import Queue
 from config import DevConfig as Config
 
@@ -58,4 +59,36 @@ CUSTOM_DETECTION_PROMPTS = [
 
 # 标志位：提示词是否发生更改
 PROMPTS_CHANGED = False
+
+# Action-model runtime config. The defaults are tuned for the
+# current CTR-GCN action weights (window=90, label order fixed).
+ACTION_MODEL_BACKEND = os.environ.get("ACTION_MODEL_BACKEND", "ctrgcn").lower()
+ACTION_CTR_GCN_ROOT = os.environ.get("ACTION_CTR_GCN_ROOT", "")
+ACTION_CTR_GCN_WEIGHTS = os.environ.get("ACTION_CTR_GCN_WEIGHTS", "algo/ctrgcn_action4.pt")
+ACTION_LABEL_ORDER = ("normal", "fall", "punch", "wave")
+ACTION_WINDOW_SIZE = int(os.environ.get("ACTION_WINDOW_SIZE", "90"))
+ACTION_MIN_FRAMES = int(os.environ.get("ACTION_MIN_FRAMES", "8"))
+ACTION_SMOOTH = int(os.environ.get("ACTION_SMOOTH", "4"))
+ACTION_MAX_TRACKS = int(os.environ.get("ACTION_MAX_TRACKS", "8"))
+ACTION_TOP_K_TRACKS = int(os.environ.get("ACTION_TOP_K_TRACKS", "4"))
+ACTION_INFER_INTERVAL = int(os.environ.get("ACTION_INFER_INTERVAL", "1"))
+ACTION_MAX_MISSING = int(os.environ.get("ACTION_MAX_MISSING", "10"))
+
+ACTION_FALL_ON_THR = float(os.environ.get("ACTION_FALL_ON_THR", "0.35"))
+ACTION_FALL_OFF_THR = float(os.environ.get("ACTION_FALL_OFF_THR", "0.15"))
+ACTION_FALL_HOLD_FRAMES = int(os.environ.get("ACTION_FALL_HOLD_FRAMES", "75"))
+ACTION_FALL_RELEASE_FRAMES = int(os.environ.get("ACTION_FALL_RELEASE_FRAMES", "30"))
+
+ACTION_WAVE_ON_THR = float(os.environ.get("ACTION_WAVE_ON_THR", "0.40"))
+ACTION_WAVE_OFF_THR = float(os.environ.get("ACTION_WAVE_OFF_THR", "0.20"))
+ACTION_WAVE_CONFIRM_FRAMES = int(os.environ.get("ACTION_WAVE_CONFIRM_FRAMES", "3"))
+ACTION_WAVE_RELEASE_FRAMES = int(os.environ.get("ACTION_WAVE_RELEASE_FRAMES", "8"))
+
+ACTION_PUNCH_ON_THR = float(os.environ.get("ACTION_PUNCH_ON_THR", "0.45"))
+ACTION_PUNCH_OFF_THR = float(os.environ.get("ACTION_PUNCH_OFF_THR", "0.20"))
+ACTION_PUNCH_CONFIRM_FRAMES = int(os.environ.get("ACTION_PUNCH_CONFIRM_FRAMES", "3"))
+ACTION_PUNCH_RELEASE_FRAMES = int(os.environ.get("ACTION_PUNCH_RELEASE_FRAMES", "8"))
+ACTION_FIGHT_DISTANCE_RATIO = float(os.environ.get("ACTION_FIGHT_DISTANCE_RATIO", "1.40"))
+ACTION_FIGHT_CONFIRM_FRAMES = int(os.environ.get("ACTION_FIGHT_CONFIRM_FRAMES", "4"))
+ACTION_FIGHT_RELEASE_FRAMES = int(os.environ.get("ACTION_FIGHT_RELEASE_FRAMES", "12"))
 
