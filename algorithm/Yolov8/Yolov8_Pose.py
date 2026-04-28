@@ -189,7 +189,12 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
 
             # --- ST-GCN++ action recognition 
             if TYPE_LIST[3] or TYPE_LIST[6] or TYPE_LIST[11]:
-                action_result = action_recognizer.predict(points, bboxes)
+                try:
+                    action_result = action_recognizer.predict(
+                        points, bboxes, frame_shape=np_img.shape[:2]
+                    )
+                except TypeError:
+                    action_result = action_recognizer.predict(points, bboxes)
                 if TYPE_LIST[3]:
                     list3 = action_result.get('fall', False)
                 if TYPE_LIST[6]:
