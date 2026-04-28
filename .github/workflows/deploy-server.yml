@@ -11,9 +11,20 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ secrets.SERVER_HOST != '' && secrets.SERVER_USER != '' && secrets.SERVER_SSH_KEY != '' && secrets.SERVER_PROJECT_DIR != '' }}
 
     steps:
+      - name: Validate required secrets
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_PROJECT_DIR: ${{ secrets.SERVER_PROJECT_DIR }}
+        run: |
+          test -n "$SERVER_HOST" || (echo "Missing secret: SERVER_HOST" && exit 1)
+          test -n "$SERVER_USER" || (echo "Missing secret: SERVER_USER" && exit 1)
+          test -n "$SERVER_SSH_KEY" || (echo "Missing secret: SERVER_SSH_KEY" && exit 1)
+          test -n "$SERVER_PROJECT_DIR" || (echo "Missing secret: SERVER_PROJECT_DIR" && exit 1)
+
       - name: Deploy to server by SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
