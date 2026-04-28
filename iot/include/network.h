@@ -3,6 +3,7 @@
 
 void triggerAlarm();
 void sendWeatherData(int temperature, int humidity);
+void sendParkingData();
 void startWeatherMonitoring(int initial_temperature, int initial_humidity);
 void stopWeatherMonitoring();
 

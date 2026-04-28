@@ -6,6 +6,7 @@ import com.sipc.monitoringsystem.dao.WeatherDao;
 import com.sipc.monitoringsystem.model.dto.param.weather.CreateWeatherParam;
 import com.sipc.monitoringsystem.model.po.Weather.Weather;
 import com.sipc.monitoringsystem.service.WeatherService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -41,6 +42,7 @@ public class WeatherServiceImpl extends ServiceImpl<WeatherDao, Weather> impleme
         }
 
         @Override
+        @CacheEvict(value = "cache", allEntries = true)
         public Integer addWeather(CreateWeatherParam param) {
                 Weather weather = new Weather();
                 weather.setMonitorId(param.getMonitorId());

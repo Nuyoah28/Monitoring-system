@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <ctime>
+#include <vector>
 
 // 全局变量用于控制天气监测线程
 static std::atomic<bool> weather_monitoring_active(false);
@@ -28,6 +29,20 @@ static const int kRtmpPort = [](){
     return port ? std::atoi(port) : 1935;
 }();
 
+struct ParkingZoneState {
+    std::string area_code;
+    std::string area_name;
+    int total_spaces;
+    int occupied_spaces;
+};
+
+static std::vector<ParkingZoneState> parking_zones = {
+    {"garage_a", "Garage-A", 62, 36},
+    {"garage_b", "Garage-B", 44, 24},
+    {"east_ground", "East-Ground", 30, 15},
+    {"west_ground", "West-Ground", 24, 10},
+};
+
 // helper to build full URL
 static std::string makeUrl(const std::string &path) {
     std::ostringstream oss;
@@ -41,6 +56,21 @@ static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::stri
     size_t totalSize = size * nmemb;
     userp->append((char*)contents, totalSize);
     return totalSize;
+}
+
+static std::string randomWeather() {
+    static const std::vector<std::string> weather_list = {
+        "Sunny", "Cloudy", "Light Rain", "Overcast"
+    };
+    return weather_list[static_cast<size_t>(rand()) % weather_list.size()];
+}
+
+static int getPm25() {
+    return rand() % 50 + 18;
+}
+
+static int getAqi() {
+    return rand() % 65 + 55;
 }
 
 void triggerAlarm() {
