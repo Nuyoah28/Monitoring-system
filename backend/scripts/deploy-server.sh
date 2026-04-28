@@ -7,9 +7,9 @@ REPO_URL="${3:-https://github.com/Nuyoah28/Monitoring-system.git}"
 BACKEND_DIR="$PROJECT_DIR/backend"
 
 if [ ! -d "$PROJECT_DIR/.git" ]; then
-  echo "[deploy] repository not found, cloning..."
-  mkdir -p "$(dirname "$PROJECT_DIR")"
-  git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
+  echo "[deploy] git repository not found under $PROJECT_DIR"
+  echo "[deploy] please prepare the project on the server first"
+  exit 1
 fi
 
 cd "$PROJECT_DIR"

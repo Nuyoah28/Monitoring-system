@@ -38,9 +38,9 @@ jobs:
             REPO_URL="https://github.com/Nuyoah28/Monitoring-system.git"
 
             if [ ! -d "$PROJECT_DIR/.git" ]; then
-              echo "[bootstrap] repository not found, cloning to $PROJECT_DIR"
-              mkdir -p "$(dirname "$PROJECT_DIR")"
-              git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
+              echo "git repository not found under $PROJECT_DIR"
+              echo "please prepare the project on the server first"
+              exit 1
             fi
 
             if [ -f "$PROJECT_DIR/backend/scripts/deploy-server.sh" ]; then
