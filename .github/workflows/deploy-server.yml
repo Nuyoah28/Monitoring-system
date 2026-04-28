@@ -33,4 +33,21 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
-            sh "${{ secrets.SERVER_PROJECT_DIR }}/scripts/deploy-server.sh" "${{ secrets.SERVER_PROJECT_DIR }}" "main" "https://github.com/Nuyoah28/Monitoring-system.git"
+            PROJECT_DIR="${{ secrets.SERVER_PROJECT_DIR }}"
+            BRANCH="${{ github.ref_name }}"
+            REPO_URL="https://github.com/Nuyoah28/Monitoring-system.git"
+
+            if [ ! -d "$PROJECT_DIR/.git" ]; then
+              echo "[bootstrap] repository not found, cloning to $PROJECT_DIR"
+              mkdir -p "$(dirname "$PROJECT_DIR")"
+              git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
+            fi
+
+            if [ -f "$PROJECT_DIR/backend/scripts/deploy-server.sh" ]; then
+              sh "$PROJECT_DIR/backend/scripts/deploy-server.sh" "$PROJECT_DIR" "$BRANCH" "$REPO_URL"
+            elif [ -f "$PROJECT_DIR/scripts/deploy-server.sh" ]; then
+              sh "$PROJECT_DIR/scripts/deploy-server.sh" "$PROJECT_DIR" "$BRANCH" "$REPO_URL"
+            else
+              echo "deploy-server.sh not found under $PROJECT_DIR"
+              exit 1
+            fi

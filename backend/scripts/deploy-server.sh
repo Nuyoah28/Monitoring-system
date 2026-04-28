@@ -1,29 +1,39 @@
 #!/bin/sh
 set -eu
 
-PROJECT_DIR="${1:-/opt/monitoring-system/backend}"
+PROJECT_DIR="${1:-/opt/monitoring-system}"
 BRANCH="${2:-main}"
 REPO_URL="${3:-https://github.com/Nuyoah28/Monitoring-system.git}"
+BACKEND_DIR="$PROJECT_DIR/backend"
 
 if [ ! -d "$PROJECT_DIR/.git" ]; then
-  echo "[deploy] 项目目录不存在，开始初始化仓库..."
+  echo "[deploy] repository not found, cloning..."
   mkdir -p "$(dirname "$PROJECT_DIR")"
   git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
 fi
 
 cd "$PROJECT_DIR"
 
-echo "[deploy] 当前目录: $PROJECT_DIR"
-echo "[deploy] 更新分支: $BRANCH"
-echo "[deploy] 仓库地址: $REPO_URL"
+echo "[deploy] project dir: $PROJECT_DIR"
+echo "[deploy] backend dir: $BACKEND_DIR"
+echo "[deploy] branch: $BRANCH"
+echo "[deploy] repo: $REPO_URL"
 
 git fetch origin "$BRANCH"
+git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH"
 
-echo "[deploy] 使用 Jib 构建最新 Docker 镜像..."
+if [ ! -f "$BACKEND_DIR/pom.xml" ]; then
+  echo "[deploy] backend/pom.xml not found, check SERVER_PROJECT_DIR"
+  exit 1
+fi
+
+cd "$BACKEND_DIR"
+
+echo "[deploy] building latest docker image with Jib..."
 mvn -q -DskipTests compile jib:dockerBuild
 
-echo "[deploy] 重建后端容器..."
+echo "[deploy] recreating backend container..."
 docker compose -f docker-compose.server.yml up -d --force-recreate backend
 
-echo "[deploy] 部署完成"
+echo "[deploy] deployment finished"
