@@ -50,14 +50,16 @@ echo "[deploy] using build command: $MVN_CMD"
 
 if [ "$DEPLOY_MODE" = "docker" ]; then
   echo "[deploy] building latest docker image with Jib..."
-  $MVN_CMD -q -DskipTests compile jib:dockerBuild
+  echo "[deploy] Maven output is enabled. The first build may take a while because dependencies are downloaded on the server."
+  $MVN_CMD -B -ntp -DskipTests compile jib:dockerBuild
 
   echo "[deploy] recreating backend container..."
   docker compose -f docker-compose.server.yml up -d --force-recreate backend
 elif [ "$DEPLOY_MODE" = "process" ]; then
   LOG_FILE="$LOG_DIR/backend-$(date +%Y%m%d-%H%M%S).log"
   echo "[deploy] packaging Spring Boot jar..."
-  $MVN_CMD -q -DskipTests clean package
+  echo "[deploy] Maven output is enabled. The first build may take a while because dependencies are downloaded on the server."
+  $MVN_CMD -B -ntp -DskipTests clean package
 
   APP_JAR="$(find "$BACKEND_DIR/target" -maxdepth 1 -type f -name "*.jar" ! -name "*original*.jar" | head -n 1)"
   if [ -z "$APP_JAR" ]; then
