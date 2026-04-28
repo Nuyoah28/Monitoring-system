@@ -22,10 +22,6 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
           SERVER_PROJECT_DIR: ${{ env.SERVER_PROJECT_DIR }}
-          SERVER_HTTP_PROXY: ${{ secrets.SERVER_HTTP_PROXY }}
-          SERVER_HTTPS_PROXY: ${{ secrets.SERVER_HTTPS_PROXY }}
-          SERVER_ALL_PROXY: ${{ secrets.SERVER_ALL_PROXY }}
-          SERVER_NO_PROXY: ${{ secrets.SERVER_NO_PROXY }}
         run: |
           test -n "$SERVER_HOST" || (echo "Missing secret: SERVER_HOST" && exit 1)
           test -n "$SERVER_USER" || (echo "Missing secret: SERVER_USER" && exit 1)
@@ -43,39 +39,12 @@ jobs:
             PROJECT_DIR="${{ env.SERVER_PROJECT_DIR }}"
             BRANCH="${{ github.ref_name }}"
             REPO_URL="https://github.com/Nuyoah28/Monitoring-system.git"
-            HTTP_PROXY_VALUE="${{ secrets.SERVER_HTTP_PROXY }}"
-            HTTPS_PROXY_VALUE="${{ secrets.SERVER_HTTPS_PROXY }}"
-            ALL_PROXY_VALUE="${{ secrets.SERVER_ALL_PROXY }}"
-            NO_PROXY_VALUE="${{ secrets.SERVER_NO_PROXY }}"
-
-            if [ -n "$HTTP_PROXY_VALUE" ]; then
-              export HTTP_PROXY="$HTTP_PROXY_VALUE"
-              export http_proxy="$HTTP_PROXY_VALUE"
-            fi
-
-            if [ -n "$HTTPS_PROXY_VALUE" ]; then
-              export HTTPS_PROXY="$HTTPS_PROXY_VALUE"
-              export https_proxy="$HTTPS_PROXY_VALUE"
-            fi
-
-            if [ -n "$ALL_PROXY_VALUE" ]; then
-              export ALL_PROXY="$ALL_PROXY_VALUE"
-              export all_proxy="$ALL_PROXY_VALUE"
-            fi
-
-            if [ -n "$NO_PROXY_VALUE" ]; then
-              export NO_PROXY="$NO_PROXY_VALUE"
-              export no_proxy="$NO_PROXY_VALUE"
-            fi
 
             echo "[debug] host: $(hostname)"
             echo "[debug] user: $(whoami)"
             echo "[debug] home: $HOME"
             echo "[debug] pwd: $(pwd)"
             echo "[debug] project dir: $PROJECT_DIR"
-            echo "[debug] http proxy set: $([ -n "${HTTP_PROXY:-}" ] && echo yes || echo no)"
-            echo "[debug] https proxy set: $([ -n "${HTTPS_PROXY:-}" ] && echo yes || echo no)"
-            echo "[debug] all proxy set: $([ -n "${ALL_PROXY:-}" ] && echo yes || echo no)"
             ls -ld /opt || true
             ls -ld "$PROJECT_DIR" || true
             ls -ld "$PROJECT_DIR/.git" || true
@@ -87,10 +56,26 @@ jobs:
             fi
 
             if [ -f "$PROJECT_DIR/backend/scripts/deploy-server.sh" ]; then
-              sh "$PROJECT_DIR/backend/scripts/deploy-server.sh" "$PROJECT_DIR" "$BRANCH" "$REPO_URL"
+              DEPLOY_SCRIPT="$PROJECT_DIR/backend/scripts/deploy-server.sh"
             elif [ -f "$PROJECT_DIR/scripts/deploy-server.sh" ]; then
-              sh "$PROJECT_DIR/scripts/deploy-server.sh" "$PROJECT_DIR" "$BRANCH" "$REPO_URL"
+              DEPLOY_SCRIPT="$PROJECT_DIR/scripts/deploy-server.sh"
             else
               echo "deploy-server.sh not found under $PROJECT_DIR"
               exit 1
+            fi
+
+            if command -v bash >/dev/null 2>&1; then
+              bash -lc "
+                source ~/.bashrc >/dev/null 2>&1 || true
+                if command -v clashon >/dev/null 2>&1; then
+                  echo '[debug] enabling proxy via clashon'
+                  clashon
+                else
+                  echo '[debug] clashon not found in bash environment'
+                fi
+                sh \"$DEPLOY_SCRIPT\" \"$PROJECT_DIR\" \"$BRANCH\" \"$REPO_URL\"
+              "
+            else
+              echo "[debug] bash not found, running deploy without clashon bootstrap"
+              sh "$DEPLOY_SCRIPT" "$PROJECT_DIR" "$BRANCH" "$REPO_URL"
             fi
