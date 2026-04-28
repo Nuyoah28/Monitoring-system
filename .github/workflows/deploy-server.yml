@@ -8,6 +8,9 @@ on:
     paths:
       - 'backend/**'
 
+env:
+  SERVER_PROJECT_DIR: /opt/Monitoring-system
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,12 +21,12 @@ jobs:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-          SERVER_PROJECT_DIR: ${{ secrets.SERVER_PROJECT_DIR }}
+          SERVER_PROJECT_DIR: ${{ env.SERVER_PROJECT_DIR }}
         run: |
           test -n "$SERVER_HOST" || (echo "Missing secret: SERVER_HOST" && exit 1)
           test -n "$SERVER_USER" || (echo "Missing secret: SERVER_USER" && exit 1)
           test -n "$SERVER_SSH_KEY" || (echo "Missing secret: SERVER_SSH_KEY" && exit 1)
-          test -n "$SERVER_PROJECT_DIR" || (echo "Missing secret: SERVER_PROJECT_DIR" && exit 1)
+          test -n "$SERVER_PROJECT_DIR" || (echo "Missing workflow env: SERVER_PROJECT_DIR" && exit 1)
 
       - name: Deploy to server by SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -33,7 +36,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
-            PROJECT_DIR="${{ secrets.SERVER_PROJECT_DIR }}"
+            PROJECT_DIR="${{ env.SERVER_PROJECT_DIR }}"
             BRANCH="${{ github.ref_name }}"
             REPO_URL="https://github.com/Nuyoah28/Monitoring-system.git"
 
