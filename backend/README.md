@@ -118,34 +118,32 @@ SOURCE sql/migrate_nearby_push.sql;
 - 已有环境表，需要继续接入天气能力
 - 老库升级到“环境 + 天气”新流程
 
-## 推荐执行顺序
+## 服务器部署补充
 
-### 方案 A：新库快速启动
+当前仓库支持两种后端部署模式：
 
-如果你只是想最快跑起来，推荐：
+- `docker`
+  通过 `jib:dockerBuild` 构建镜像，再用 `docker compose` 重建 `backend` 容器
+- `process`
+  直接在服务器上执行 `mvn clean package`，再用 `nohup java -jar` 启动 Spring Boot
 
-1. 执行 `quick_create.sql`
-2. 执行 `iot_env_parking.sql`
-3. 执行 `env_weather_flow.sql`
-4. 如果需要附近居民推送，再执行 `migrate_nearby_push.sql`
+GitHub Actions 目前默认使用 `process` 模式，配置位置在 [.github/workflows/deploy-server.yml](../.github/workflows/deploy-server.yml) 里的 `DEPLOY_MODE`。
 
-### 方案 B：手动初始化
+### `process` 模式日志位置
 
-如果你想更可控地搭库，推荐：
+如果使用服务器直跑模式：
 
-1. 执行 `table.sql`
-2. 按需执行 `insert_data.sql`
-3. 执行 `iot_env_parking.sql`
-4. 执行 `env_weather_flow.sql`
-5. 如果需要附近居民推送，再执行 `migrate_nearby_push.sql`
+- 进程 PID 文件：`backend/run/backend.pid`
+- 历史日志目录：`backend/logs/`
+- 当前最新日志软链接：`backend/logs/current.log`
 
-## 执行建议
+常用排查命令：
 
-- 在执行带 `DROP TABLE`、`DELETE` 的脚本前先备份数据库
-- 生产环境优先走“增量迁移脚本”，不要直接跑 `quick_create.sql`
-- 如果数据库已经存在历史数据，先看清脚本里是否有：
-  - `DROP TABLE`
-  - `DELETE FROM`
-  - 批量 `INSERT`
+```bash
+cd /opt/Monitoring-system/backend
+cat run/backend.pid
+tail -f logs/current.log
+ps -fp "$(cat run/backend.pid)"
+```
 
 
