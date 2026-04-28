@@ -40,6 +40,15 @@ jobs:
             BRANCH="${{ github.ref_name }}"
             REPO_URL="https://github.com/Nuyoah28/Monitoring-system.git"
 
+            echo "[debug] host: $(hostname)"
+            echo "[debug] user: $(whoami)"
+            echo "[debug] home: $HOME"
+            echo "[debug] pwd: $(pwd)"
+            echo "[debug] project dir: $PROJECT_DIR"
+            ls -ld /opt || true
+            ls -ld "$PROJECT_DIR" || true
+            ls -ld "$PROJECT_DIR/.git" || true
+
             if [ ! -d "$PROJECT_DIR/.git" ]; then
               echo "git repository not found under $PROJECT_DIR"
               echo "please prepare the project on the server first"
