@@ -1,0 +1,16 @@
+services:
+  backend:
+    image: maven:3.9.9-eclipse-temurin-17
+    working_dir: /workspace
+    ports:
+      - "10215:10215"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: docker-dev
+    volumes:
+      - ./:/workspace
+      - maven-repo:/root/.m2
+    command: ["sh", "/workspace/scripts/docker-dev-entrypoint.sh"]
+
+volumes:
+  maven-repo:

@@ -1,0 +1,9 @@
+services:
+  backend:
+    image: monitoring-system-backend:0.0.1-SNAPSHOT
+    container_name: monitoring-system-backend
+    restart: always
+    network_mode: host
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: prod
