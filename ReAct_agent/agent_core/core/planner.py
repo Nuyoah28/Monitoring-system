@@ -54,7 +54,7 @@ class ToolPlanner:
             if skip_primary_ai:
                 return [], True
             try:
-                tool_calls = self._llm_tool_calls(question)
+                tool_calls = self._llm_tool_calls(question, request_context)
             except Exception as exc:
                 print(f"Tool planning failed, fallback to direct answer: {exc}")
                 skip_primary_ai = is_non_retryable_spark_error(exc)
@@ -255,8 +255,12 @@ class ToolPlanner:
 
         return tool_calls
 
-    def _llm_tool_calls(self, question: str) -> list[tuple[str, dict]]:
-        prompt = build_tool_selection_prompt(self.tool_catalog.describe(), question)
+    def _llm_tool_calls(self, question: str, request_context: Any) -> list[tuple[str, dict]]:
+        prompt = build_tool_selection_prompt(
+            self.tool_catalog.describe(),
+            question,
+            request_context.current_time.strftime("%Y-%m-%d %H:%M:%S"),
+        )
         response = self.ai_client.chat(prompt, context=[], max_tokens=512)
         return self._parse_tool_calls(response)
 

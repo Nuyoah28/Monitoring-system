@@ -130,10 +130,13 @@ def _recognize(recognizer, audio, language: str) -> Tuple[bool, str]:
         return True, (text or "").strip()
     except Exception as e:
         err = str(e).lower()
-        if "connection" in err or "network" in err:
+        err_type = e.__class__.__name__
+        if err_type == "UnknownValueError":
+            return False, "未识别到有效语音，请靠近麦克风再说一遍"
+        if err_type == "RequestError" or "connection" in err or "network" in err:
             return False, "网络不可用，请检查后重试"
         if "not understand" in err or "recognition" in err:
-            return False, "未识别到有效语音"
+            return False, "未识别到有效语音，请靠近麦克风再说一遍"
         return False, f"识别失败: {e}"
 
 
@@ -209,6 +212,7 @@ def tts_to_bytes(text: str, voice: str = DEFAULT_TTS_VOICE) -> Tuple[bool, Optio
         import edge_tts
         import asyncio
         import io
+        import time
     except ImportError:
         return False, None, "请安装: pip install edge-tts"
 
@@ -220,11 +224,18 @@ def tts_to_bytes(text: str, voice: str = DEFAULT_TTS_VOICE) -> Tuple[bool, Optio
                 buf.write(chunk["data"])
         return buf.getvalue()
 
-    try:
-        data = asyncio.run(_run())
-        return True, data, ""
-    except Exception as e:
-        return False, None, str(e)
+    last_error = ""
+    for attempt in range(3):
+        try:
+            data = asyncio.run(_run())
+            if data:
+                return True, data, ""
+            last_error = "TTS 未返回音频"
+        except Exception as e:
+            last_error = str(e)
+        if attempt < 2:
+            time.sleep(0.4 * (attempt + 1))
+    return False, None, last_error or "TTS 合成失败"
 
 
 def tts_play(text: str, voice: str = DEFAULT_TTS_VOICE) -> Tuple[bool, str]:

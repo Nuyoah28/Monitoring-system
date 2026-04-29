@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -168,15 +169,18 @@ class ReactIntelligentAgent:
         user_token: Optional[str] = None,
         conversation_key: Optional[str] = None,
         stream_mode: str = "default",
+        current_time: Optional[datetime] = None,
     ) -> str:
         question = (question or "").strip()
         if not question:
             return "问题不能为空。"
 
         conversation_key = conversation_key or self._default_conversation_key(user_token)
+        current_time = current_time or datetime.now()
         request_context = RequestContext(
             user_token=user_token,
             conversation_key=conversation_key,
+            current_time=current_time,
         )
 
         if on_event:
@@ -217,7 +221,11 @@ class ReactIntelligentAgent:
                 on_event("planning", "no tool selected, answer directly")
         observations = self._execute_tool_calls(tool_calls, request_context, on_event=on_event)
         data_summary = "\n\n".join(observations)
-        final_prompt = build_final_answer_prompt(question, data_summary)
+        final_prompt = build_final_answer_prompt(
+            question,
+            data_summary,
+            current_time.strftime("%Y-%m-%d %H:%M:%S"),
+        )
         history = self.memory_store.get_history(
             conversation_key,
             query=question,

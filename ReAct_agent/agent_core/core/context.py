@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Optional
 
 
@@ -8,6 +9,7 @@ from typing import Any, Optional
 class RequestContext:
     user_token: Optional[str]
     conversation_key: str
+    current_time: datetime
     monitor_list_cache: Optional[list[dict[str, Any]]] = None
 
     def get_monitor_list(self, tools: Any) -> list[dict[str, Any]]:

@@ -134,7 +134,7 @@ class SkillSupport:
         time_text = str(params.get("time_text") or "").strip()
         if not time_text:
             return None, None
-        return extract_time_range(time_text)
+        return extract_time_range(time_text, now=request_context.current_time)
 
     def _normalize_int_list(self, value: Any) -> list[int]:
         if value is None:

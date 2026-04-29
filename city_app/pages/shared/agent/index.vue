@@ -1,5 +1,5 @@
 <template>
-	<view class="main" :class="{ 'drawer-open': showSessionList, 'owner-app': isOwnerApp }" :style="{ minHeight: safeHeight + 'px', height: safeHeight + 'px', paddingTop: statusBarHeight + 'px', '--status-bar-height': statusBarHeight + 'px' }">
+	<view class="main" :class="{ 'owner-app': isOwnerApp }" :style="{ minHeight: safeHeight + 'px', height: safeHeight + 'px', paddingTop: statusBarHeight + 'px', '--status-bar-height': statusBarHeight + 'px' }">
 		<view class="header" id="ai-header">
 			<view class="topNav">
 				<view class="back-btn" @tap="goBack">
@@ -32,43 +32,67 @@
 						@longpress.stop="onSessionLongPress(item.id)"
 						@longtap.stop="onSessionLongPress(item.id)"
 					>
-						<view class="session-name">{{ getSessionTitle(item) }}</view>
-						<view class="session-time">{{ formatSessionTime(item.updatedAt) }}</view>
+						<view class="session-content">
+							<view class="session-name">{{ getSessionTitle(item) }}</view>
+							<view class="session-time">{{ formatSessionTime(item.updatedAt) }}</view>
+						</view>
+						<view class="session-delete" @tap.stop="onSessionLongPress(item.id)">删除</view>
 					</view>
 				</scroll-view>
 			</view>
 			<view class="session-peek" @tap="showSessionList = false"></view>
 		</view>
-		<view class="body" id="ai-body" :style="bodyStyle">
-			<scroll-view :scroll-top="scrollTop" class="scroll" scroll-y @scroll="recordHeight" :style="{ height: scrollHeight + 'px' }">
-				<view class="chat">
-					<view id="msgbar" v-for="(item, index) in textList" :key="index" :class="getMessageRole(item, index) === 'assistant' ? 'left' : 'right'">
-						<view class="avatar">
-							<image :src="getMessageRole(item, index) === 'assistant' ? '/static/ai.png' : '/static/AIuser.png' "></image>
-						</view>
-						<view class="msg">
-							<rich-text v-if="getMessageRole(item, index) === 'assistant'" class="msg-rich" :nodes="mdToHtml(getMessageText(item))"></rich-text>
-							<view v-else>{{ getMessageText(item) }}</view>
-						</view>
-					</view>
-					<view class="loading" v-show="isLoading">
-					<view class="loadText">
-						<text>智能生成中...</text>
-					</view>
-						<view class="spinner">
-							<view></view>
-							<view></view>
-							<view></view>
-							<view></view>
-							<view></view>
-							<view></view>
-						</view>
-					</view>
+		<view class="body" id="ai-body" :class="{ 'chat-open': showChatPanel }" :style="bodyStyle">
+			<virtual-agent-card :state="agentState" :status-text="agentStatusText" :subtitle="agentStatusSubText" @tap="handleAgentTap" />
+
+			<view class="floating-dialog" v-if="latestUserText || latestAssistantText">
+				<view class="floating-bubble user-bubble" v-if="latestUserText">
+					<text>{{ latestUserText }}</text>
 				</view>
-			</scroll-view>
+				<view class="floating-bubble assistant-bubble" v-if="latestAssistantText">
+					<text>{{ latestAssistantText }}</text>
+				</view>
+			</view>
+
+			<view class="chat-toggle" @tap="toggleChatPanel">
+				<text>{{ showChatPanel ? '收起对话' : '对话记录' }}</text>
+			</view>
+			<view class="chat-mask" v-if="showChatPanel" @tap="showChatPanel = false"></view>
+			<view class="chat-panel" :class="{ open: showChatPanel }" @tap.stop>
+				<view class="chat-panel-head">
+					<text class="chat-panel-title">对话记录</text>
+					<text class="chat-panel-close" @tap="showChatPanel = false">收起</text>
+				</view>
+				<scroll-view :scroll-top="scrollTop" class="scroll chat-scroll" scroll-y @scroll="recordHeight" :style="{ height: scrollHeight + 'px' }">
+					<view class="chat">
+						<view id="msgbar" v-for="(item, index) in textList" :key="index" :class="getMessageRole(item, index) === 'assistant' ? 'left' : 'right'">
+							<view class="avatar">
+								<image :src="getMessageRole(item, index) === 'assistant' ? '/static/ai.png' : '/static/AIuser.png' "></image>
+							</view>
+							<view class="msg">
+								<rich-text v-if="getMessageRole(item, index) === 'assistant'" class="msg-rich" :nodes="mdToHtml(getMessageText(item))"></rich-text>
+								<view v-else>{{ getMessageText(item) }}</view>
+							</view>
+						</view>
+						<view class="loading" v-show="isLoading">
+							<view class="loadText">
+								<text>智能生成中...</text>
+							</view>
+							<view class="spinner">
+								<view></view>
+								<view></view>
+								<view></view>
+								<view></view>
+								<view></view>
+								<view></view>
+							</view>
+						</view>
+					</view>
+				</scroll-view>
+			</view>
 			<view class="down" id="ai-down">
 				<view class="input-wrap">
-					<input class="input-inner" type="text" v-model="text" placeholder="输入或点击麦克风说话" :disabled="isLoading" />
+					<input class="input-inner" type="text" v-model="text" placeholder="输入问题，或点击麦克风对话" :disabled="isLoading" />
 					<view class="btn-voice" :class="{ recording: isRecording }" @click="voiceClickHandler" :style="{ opacity: isLoading ? 0.6 : 1 }">
 						<text class="btn-voice-text">{{ isRecording ? '停止' : '🎤' }}</text>
 					</view>
@@ -76,9 +100,9 @@
 						<text class="btn-send-text">发送</text>
 					</view>
 				</view>
-				<view class="voice-tip" v-if="isRecording">正在录音，再次点击停止并发送</view>
+				<view class="voice-tip" v-if="isRecording || isVoiceProcessing">{{ isVoiceProcessing ? '语音已发送，正在识别，请稍等' : '正在聆听，再次点击即可发送' }}</view>
 				<view class="tts-bar" v-if="isTtsPlaying">
-					<text class="tts-bar-text">语音播放中</text>
+					<text class="tts-bar-text">正在为你播报</text>
 					<view class="btn-stop-tts" @click.stop="stopTtsPlayback">停止播放</view>
 				</view>
 			</view>
@@ -92,12 +116,14 @@ import wsRequest from '@/api/websocket.js'
 import { AI_HTTP_URL, AI_WS_URL } from '@/common/config.js'
 import Vue from 'vue';
 	import OwnerTabbar from '@/components/navigation/owner-tabbar.vue';
+	import VirtualAgentCard from '@/components/VirtualAgentCard.vue';
 
 	const AI_WELCOME_MESSAGE = '你好，我是社区智眼 AI 助手。你可以问我报警处置、监控巡检、环境数据、车位引导相关的问题，我会尽量用简单清楚的方式帮你分析。';
 
 	export default {
 		components: {
 			OwnerTabbar,
+			VirtualAgentCard,
 		},
 		data() {
 			return {
@@ -117,10 +143,15 @@ import Vue from 'vue';
 				// 语音
 				agentBaseUrl: AI_HTTP_URL,
 				isRecording: false,
+				isVoiceProcessing: false,
 				isTtsPlaying: false,
+				voiceRecordStartAt: 0,
 				recorderManager: null,
 				innerAudioContext: null,
+				ttsDownloadTask: null,
+				ttsPlaybackToken: 0,
 				showSessionList: false,
+				showChatPanel: false,
 				sessions: [],
 				currentSessionId: '',
 				sessionLongPressLock: false,
@@ -133,13 +164,7 @@ import Vue from 'vue';
 				: (info.windowHeight || info.screenHeight || 0);
 			this.safeHeight = safeAreaHeight;
 			this.statusBarHeight = (info && info.statusBarHeight) || 20;
-				this.scrollHeight = Math.max(220, safeAreaHeight - 230);
-				console.log('[AIPage] onShow init', {
-					safeAreaHeight,
-					statusBarHeight: this.statusBarHeight,
-					scrollHeight: this.scrollHeight,
-					windowHeight: info && info.windowHeight,
-				});
+				this.scrollHeight = Math.max(260, safeAreaHeight - this.statusBarHeight - (this.isOwnerApp ? 210 : 150) - 140);
 				this.$nextTick(() => {
 					this.refreshScrollViewport(true);
 				});
@@ -159,11 +184,6 @@ import Vue from 'vue';
 		onReady() {
 			this.$nextTick(() => {
 				this.refreshScrollViewport(true);
-				console.log('[AIPage] ready state', {
-					safeHeight: this.safeHeight,
-					scrollHeight: this.scrollHeight,
-					textListLen: this.textList.length,
-				});
 			});
 		},
 		onHide() {
@@ -193,10 +213,51 @@ import Vue from 'vue';
 			sortedSessions() {
 				return [...this.sessions].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 			},
+			latestUserText() {
+				if (this.isRecording) return '正在聆听...';
+				if (this.isVoiceProcessing) return '语音已收到，正在整理...';
+				for (let i = this.textList.length - 1; i >= 0; i -= 1) {
+					const item = this.textList[i];
+					if (this.getMessageRole(item, i) === 'user') {
+						const text = this.getMessageText(item).replace(/\s+/g, ' ').trim();
+						if (text) return this.trimFloatingText(text, 42);
+					}
+				}
+				return '';
+			},
+			latestAssistantText() {
+				const text = this.getLatestAssistantContent();
+				if (text) return this.trimFloatingText(text, 62);
+				if (this.isVoiceProcessing) return '请稍等，我正在识别语音';
+				if (this.isLoading || this.isDisabled) return '正在思考，请稍等';
+				return '';
+			},
 			bodyStyle() {
-				return {
-					transform: this.showSessionList ? 'translateX(80%)' : 'translateX(0)',
+				return {};
+			},
+			agentState() {
+				if (this.isTtsPlaying) return 'speaking';
+				if (this.isRecording) return 'listening';
+				if (this.isLoading || this.isDisabled) return 'thinking';
+				return 'idle';
+			},
+			agentStatusText() {
+				const map = {
+					idle: '随时待命',
+					listening: '我在听',
+					thinking: '正在思考',
+					speaking: '为你播报',
 				};
+				return map[this.agentState] || map.idle;
+			},
+			agentStatusSubText() {
+				const map = {
+					idle: '可以询问报警、巡检、环境与车位信息',
+					listening: '说完后再次点击麦克风即可发送',
+					thinking: '正在整理社区数据与建议',
+					speaking: '正在用语音为你说明结果',
+				};
+				return map[this.agentState] || map.idle;
 			},
 		},
 		methods:{
@@ -235,6 +296,29 @@ import Vue from 'vue';
 			},
 			toggleSessionList() {
 				this.showSessionList = !this.showSessionList;
+				if (this.showSessionList) this.showChatPanel = false;
+			},
+			toggleChatPanel() {
+				this.showChatPanel = !this.showChatPanel;
+				if (this.showChatPanel) {
+					this.showSessionList = false;
+					this.refreshScrollViewport(true);
+				}
+			},
+			handleAgentTap() {
+				if (this.isRecording) {
+					uni.showToast({ title: '我在听，请继续说', icon: 'none' });
+					return;
+				}
+				if (this.isLoading) {
+					uni.showToast({ title: '正在思考，请稍等', icon: 'none' });
+					return;
+				}
+				if (this.isTtsPlaying) {
+					uni.showToast({ title: '正在为你播报', icon: 'none' });
+					return;
+				}
+				uni.showToast({ title: '有什么可以帮你？', icon: 'none' });
 			},
 			startNewSession() {
 				const id = String(Date.now());
@@ -338,6 +422,19 @@ import Vue from 'vue';
 				if (item && typeof item === 'object' && item.role) return item.role;
 				return index % 2 === 1 ? 'assistant' : 'user';
 			},
+			trimFloatingText(text, limit) {
+				return text.length > limit ? text.slice(0, limit) + '...' : text;
+			},
+			getLatestAssistantContent() {
+				for (let i = this.textList.length - 1; i >= 0; i -= 1) {
+					const item = this.textList[i];
+					if (this.getMessageRole(item, i) === 'assistant' && item.type !== 'welcome') {
+						const text = this.getMessageText(item).replace(/\s+/g, ' ').trim();
+						if (text) return text;
+					}
+				}
+				return '';
+			},
 			// 将 Markdown 转为富文本可用的 HTML，去掉符号并保留排版
 			mdToHtml(str) {
 				if (str == null || typeof str !== 'string') return ''
@@ -423,6 +520,7 @@ import Vue from 'vue';
 				}
 				this.websocket = null;
 				this.isLoading = false;
+				this.isVoiceProcessing = false;
 				this.isDisabled = false;
 			},
 			refreshScrollViewport(scrollToBottom = false) {
@@ -439,15 +537,10 @@ import Vue from 'vue';
 						const body = res[0];
 						const down = res[1];
 						if (body && down) {
-							this.scrollHeight = Math.max(220, Math.floor((body.height || 0) - (down.height || 0)));
+							this.scrollHeight = Math.max(260, Math.floor((body.height || 0) - (down.height || 0) - 140));
 						} else {
-							this.scrollHeight = Math.max(220, this.safeHeight - 230);
+							this.scrollHeight = Math.max(260, this.safeHeight - this.statusBarHeight - (this.isOwnerApp ? 210 : 150) - 140);
 						}
-						console.log('[AIPage] setSafeArea rect', {
-							body,
-							down,
-							scrollHeight: this.scrollHeight,
-						});
 						if (scrollToBottom) {
 							this.$nextTick(() => this.toBottom());
 						}
@@ -474,7 +567,7 @@ import Vue from 'vue';
 				}
 				else if (!this.websocket || !this.websocket.is_open_socket) {
 					uni.showToast({
-						title: 'AI连接未就绪，请稍后再试',
+						title: '助手正在准备，请稍后再试',
 						icon: 'none',
 						duration: 1500
 					})
@@ -490,7 +583,7 @@ import Vue from 'vue';
 					if (!sent) {
 						this.textList.pop();
 						uni.showToast({
-							title: 'AI连接未就绪，请稍后再试',
+							title: '助手正在准备，请稍后再试',
 							icon: 'none',
 							duration: 1500
 						});
@@ -503,6 +596,11 @@ import Vue from 'vue';
 					this.refreshCurrentSession();
 				}	
 			},
+			getClientTime() {
+				const now = new Date();
+				const pad = (num) => String(num).padStart(2, '0');
+				return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+			},
 			getAnswer(ask){
 				if (!this.websocket || typeof this.websocket.send !== 'function' || !this.websocket.is_open_socket) {
 					this.isLoading = false;
@@ -510,7 +608,7 @@ import Vue from 'vue';
 				}
 				// this.isLeft = 1;
 				this.answerText = ""
-				const sent = this.websocket.send(JSON.stringify(ask));
+				const sent = this.websocket.send(JSON.stringify({ question: ask, client_time: this.getClientTime() }));
 				if (!sent) {
 					this.isLoading = false;
 					return false;
@@ -593,10 +691,19 @@ import Vue from 'vue';
 						return;
 					}
 					this.recorderManager = rm;
-					if (typeof rm.onStart === 'function') rm.onStart(() => { this.isRecording = true; });
+					if (typeof rm.onStart === 'function') rm.onStart(() => {
+						this.voiceRecordStartAt = Date.now();
+						this.isRecording = true;
+					});
 					if (typeof rm.onStop === 'function') {
 						rm.onStop((res) => {
 							this.isRecording = false;
+							const duration = this.voiceRecordStartAt ? Date.now() - this.voiceRecordStartAt : 0;
+							this.voiceRecordStartAt = 0;
+							if (duration && duration < 800) {
+								uni.showToast({ title: '说话时间太短，请重新录音', icon: 'none' });
+								return;
+							}
 							if (res && res.tempFilePath) this.sendVoiceToAgent(res.tempFilePath);
 							else uni.showToast({ title: '录音失败', icon: 'none' });
 						});
@@ -604,6 +711,7 @@ import Vue from 'vue';
 					if (typeof rm.onError === 'function') {
 						rm.onError((err) => {
 							this.isRecording = false;
+							this.voiceRecordStartAt = 0;
 							const msg = (err && err.errMsg) ? err.errMsg : '录音错误';
 							if (msg.indexOf('auth') !== -1 || msg.indexOf('权限') !== -1) {
 								uni.showModal({
@@ -636,12 +744,13 @@ import Vue from 'vue';
 			sendVoiceToAgent(tempFilePath) {
 				const token = uni.getStorageSync('token') || '';
 				this.isLoading = true;
+				this.isVoiceProcessing = true;
 				uni.uploadFile({
 					url: this.agentBaseUrl + '/chat/voice',
 					filePath: tempFilePath,
 					name: 'audio',
 					header: token ? { Authorization: 'Bearer ' + token } : {},
-					formData: { return_tts: 'true' },
+					formData: { return_tts: 'true', client_time: this.getClientTime() },
 					success: (res) => {
 						try {
 							if (res.statusCode && res.statusCode !== 200) {
@@ -653,6 +762,7 @@ import Vue from 'vue';
 								} catch (e) {}
 								uni.showToast({ title: msg, icon: 'none' });
 								this.isLoading = false;
+								this.isVoiceProcessing = false;
 								return;
 							}
 							// 部分平台 res.data 已是对象，部分为字符串
@@ -660,12 +770,14 @@ import Vue from 'vue';
 							if (raw === undefined || raw === null || raw === '') {
 								uni.showToast({ title: '无返回数据', icon: 'none' });
 								this.isLoading = false;
+								this.isVoiceProcessing = false;
 								return;
 							}
 							const data = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
 							if (data.code !== '00000' || !data.data) {
 								uni.showToast({ title: data.message || '请求失败', icon: 'none' });
 								this.isLoading = false;
+								this.isVoiceProcessing = false;
 								return;
 							}
 							const { question: recognized, answer } = data.data;
@@ -675,13 +787,15 @@ import Vue from 'vue';
 							this.refreshScrollViewport(true);
 							if (answer && answer.trim()) this.requestTtsAndPlay(answer.trim());
 						} catch (e) {
-							uni.showToast({ title: '解析失败，请确认 Agent 已启动', icon: 'none' });
+							uni.showToast({ title: '语音结果暂时不可用，请稍后再试', icon: 'none' });
 						}
 						this.isLoading = false;
+						this.isVoiceProcessing = false;
 					},
 					fail: () => {
 						uni.showToast({ title: '网络异常', icon: 'none' });
 						this.isLoading = false;
+						this.isVoiceProcessing = false;
 					}
 				});
 			},
@@ -693,26 +807,60 @@ import Vue from 'vue';
 					uni.showToast({ title: '当前环境不支持语音播放', icon: 'none' });
 					return;
 				}
-				const ctx = uni.createInnerAudioContext();
-				this.innerAudioContext = ctx;
-				ctx.obeysMuteSwitch = false;
-				ctx.src = playUrl;
-				ctx.onPlay(() => {
-					this.isTtsPlaying = true;
-					this.refreshScrollViewport(true);
+				const playbackToken = this.ttsPlaybackToken + 1;
+				this.ttsPlaybackToken = playbackToken;
+				this.isTtsPlaying = true;
+				this.refreshScrollViewport(true);
+				const startPlayback = (src) => {
+					if (playbackToken !== this.ttsPlaybackToken || !src) return;
+					const ctx = uni.createInnerAudioContext();
+					this.innerAudioContext = ctx;
+					ctx.obeysMuteSwitch = false;
+					ctx.src = src;
+					ctx.onPlay(() => {
+						this.isTtsPlaying = true;
+						this.refreshScrollViewport(true);
+					});
+					ctx.onEnded(() => {
+						if (this.innerAudioContext === ctx) this.innerAudioContext = null;
+						if (typeof ctx.destroy === 'function') ctx.destroy();
+						if (playbackToken === this.ttsPlaybackToken) this.isTtsPlaying = false;
+						this.refreshScrollViewport(true);
+					});
+					ctx.onError(() => {
+						if (this.innerAudioContext === ctx) this.innerAudioContext = null;
+						if (typeof ctx.destroy === 'function') ctx.destroy();
+						if (playbackToken === this.ttsPlaybackToken) this.isTtsPlaying = false;
+						this.refreshScrollViewport(true);
+						uni.showToast({ title: '语音播放失败', icon: 'none' });
+					});
+					ctx.play();
+				};
+				if (typeof uni.downloadFile !== 'function') {
+					startPlayback(playUrl);
+					return;
+				}
+				this.ttsDownloadTask = uni.downloadFile({
+					url: playUrl,
+					success: (res) => {
+						this.ttsDownloadTask = null;
+						if (playbackToken !== this.ttsPlaybackToken) return;
+						if (res.statusCode === 200 && res.tempFilePath) {
+							startPlayback(res.tempFilePath);
+						} else {
+							this.isTtsPlaying = false;
+							this.refreshScrollViewport(true);
+							uni.showToast({ title: '语音播放暂时不可用', icon: 'none' });
+						}
+					},
+					fail: () => {
+						this.ttsDownloadTask = null;
+						if (playbackToken !== this.ttsPlaybackToken) return;
+						this.isTtsPlaying = false;
+						this.refreshScrollViewport(true);
+						uni.showToast({ title: '语音下载失败', icon: 'none' });
+					},
 				});
-				ctx.onEnded(() => {
-					this.isTtsPlaying = false;
-					this.innerAudioContext = null;
-					this.refreshScrollViewport(true);
-				});
-				ctx.onError(() => {
-					this.isTtsPlaying = false;
-					this.innerAudioContext = null;
-					this.refreshScrollViewport(true);
-					uni.showToast({ title: '语音播放失败', icon: 'none' });
-				});
-				ctx.play();
 			},
 			// 请求 TTS 并播放：POST 提交全文，用返回的短 URL 播放，避免 GET 长度限制导致念不完
 			requestTtsAndPlay(text) {
@@ -730,7 +878,7 @@ import Vue from 'vue';
 						if (res.statusCode === 200 && res.data && res.data.code === '00000' && res.data.data && res.data.data.play_url) {
 							this.playTtsByPlayUrl(res.data.data.play_url);
 						} else {
-							uni.showToast({ title: res.data && res.data.message ? res.data.message : 'TTS 请求失败', icon: 'none' });
+							uni.showToast({ title: res.data && res.data.message ? res.data.message : '语音播放暂时不可用', icon: 'none' });
 						}
 					},
 					fail: () => {
@@ -739,6 +887,11 @@ import Vue from 'vue';
 				});
 			},
 			stopTtsPlayback() {
+				this.ttsPlaybackToken += 1;
+				if (this.ttsDownloadTask && typeof this.ttsDownloadTask.abort === 'function') {
+					try { this.ttsDownloadTask.abort(); } catch (e) {}
+				}
+				this.ttsDownloadTask = null;
 				if (this.innerAudioContext) {
 					try {
 						if (typeof this.innerAudioContext.stop === 'function') this.innerAudioContext.stop();
@@ -758,6 +911,9 @@ import Vue from 'vue';
 				},
 			},
 			isRecording() {
+				this.refreshScrollViewport(true);
+			},
+			isVoiceProcessing() {
 				this.refreshScrollViewport(true);
 			},
 			isTtsPlaying() {
@@ -789,77 +945,78 @@ import Vue from 'vue';
 		// 	flex-direction: column;
 		//  justify-content: space-around;
 			.header {
-				position: relative;
-				z-index: 20;
-				width: 100%;
+				position: fixed;
+				left: 24rpx;
+				right: 24rpx;
+				top: calc(var(--status-bar-height, 0px) + 16rpx);
+				z-index: 1200;
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
-				padding: 0 40rpx;
-				box-sizing: border-box;
-				height: 100rpx;
-				margin-bottom: 8rpx;
+				pointer-events: none;
 
 				.topNav {
 					display: flex;
 					align-items: center;
-					gap: 16rpx;
-					.back-btn {
-						background: rgba(255, 255, 255, 0.7);
-						border: 1px solid rgba(0, 122, 255, 0.15);
+					gap: 14rpx;
+					pointer-events: auto;
+					.back-btn,
+					.choosen {
 						width: 66rpx;
 						height: 66rpx;
-						border-radius: 18rpx;
-						box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.08);
+						border-radius: 22rpx;
+						background: rgba(255, 255, 255, 0.72);
+						border: 1px solid rgba(126, 187, 255, 0.28);
+						box-shadow: 0 12rpx 30rpx rgba(8, 31, 75, 0.14);
 						display: flex;
 						align-items: center;
 						justify-content: center;
+						backdrop-filter: blur(8px);
+						box-sizing: border-box;
 					}
 					.choosen {
-						position: relative;
-						z-index: 1200;
-						background: rgba(255, 255, 255, 0.7);
-						border: 1px solid rgba(0, 122, 255, 0.15);
 						padding: 10rpx;
-						border-radius: 18rpx;
-						box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.08);
-						display: flex;
-						align-items: center;
-						justify-content: center;
 						.session-tag {
-							width: 44rpx;
-							height: 44rpx;
+							width: 42rpx;
+							height: 42rpx;
 							object-fit: contain;
 						}
 					}
 				}
 				.header-title {
+					position: absolute;
+					left: 50%;
+					transform: translateX(-50%);
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					margin-top: 2rpx;
+					padding: 10rpx 22rpx;
+					border-radius: 999rpx;
+					background: rgba(7, 27, 54, 0.34);
+					border: 1px solid rgba(139, 219, 255, 0.16);
+					backdrop-filter: blur(8px);
 					text {
-						color: #51678f;
-						font-size: 40rpx;
+						color: rgba(232, 245, 255, 0.92);
+						font-size: 26rpx;
 						font-weight: 700;
-						font-family: "Novecento wide", "半展开", "粗体";
-						letter-spacing: 4rpx;
-						transform: translateY(-2rpx);
+						letter-spacing: 2rpx;
 					}
 				}
 				.setting-btn {
-					width: 60rpx;
-					height: 60rpx;
-					background: transparent;
-					border: none;
-					border-radius: 50%;
+					width: 66rpx;
+					height: 66rpx;
+					border-radius: 22rpx;
+					background: rgba(255, 255, 255, 0.72);
+					border: 1px solid rgba(126, 187, 255, 0.28);
+					box-shadow: 0 12rpx 30rpx rgba(8, 31, 75, 0.14);
 					display: flex;
 					justify-content: center;
 					align-items: center;
-					box-shadow: none;
+					backdrop-filter: blur(8px);
+					pointer-events: auto;
 					.setting-tag {
-						width: 48rpx;
-						height: 48rpx;
+						width: 42rpx;
+						height: 42rpx;
 						object-fit: contain;
 					}
 				}
@@ -867,10 +1024,10 @@ import Vue from 'vue';
 			.session-drawer {
 				position: fixed;
 				left: 0;
-				top: calc(100rpx + var(--status-bar-height, 0px));
+				top: 0;
 				width: 100%;
-				height: calc(100% - 100rpx - var(--status-bar-height, 0px));
-				z-index: 1100;
+				height: 100%;
+				z-index: 1150;
 				display: flex;
 				pointer-events: none;
 			}
@@ -878,25 +1035,28 @@ import Vue from 'vue';
 				pointer-events: auto;
 			}
 			.session-panel {
-				width: 80%;
+				width: 78%;
+				max-width: 620rpx;
 				height: 100%;
-				background: rgba(245, 250, 255, 0.98);
+				padding-top: calc(var(--status-bar-height, 0px) + 96rpx);
+				background: rgba(245, 250, 255, 0.96);
 				border-right: 1px solid rgba(38, 108, 232, 0.18);
-				box-shadow: 12rpx 0 30rpx rgba(16, 60, 130, 0.16);
+				box-shadow: 18rpx 0 46rpx rgba(6, 24, 60, 0.22);
 				display: flex;
 				flex-direction: column;
 				transform: translateX(-100%);
 				transition: transform 260ms ease;
 				overflow: hidden;
+				box-sizing: border-box;
+				backdrop-filter: blur(12px);
 			}
 			.session-drawer.open .session-panel {
 				transform: translateX(0);
 			}
 			.session-peek {
-				width: 20%;
+				flex: 1;
 				height: 100%;
-				background: linear-gradient(90deg, rgba(233, 242, 255, 0.06) 0%, rgba(233, 242, 255, 0.28) 45%, rgba(233, 242, 255, 0.56) 100%);
-				backdrop-filter: blur(2px);
+				background: rgba(3, 13, 30, 0.26);
 				opacity: 0;
 				transition: opacity 260ms ease;
 			}
@@ -934,8 +1094,9 @@ import Vue from 'vue';
 			.session-item {
 				padding: 18rpx 24rpx;
 				display: flex;
-				flex-direction: column;
-				gap: 8rpx;
+				align-items: center;
+				justify-content: space-between;
+				gap: 18rpx;
 				border-bottom: 1px solid rgba(0, 122, 255, 0.08);
 				transition: background 0.2s ease;
 			}
@@ -944,6 +1105,10 @@ import Vue from 'vue';
 			}
 			.session-item.active {
 				background: linear-gradient(90deg, rgba(88, 147, 255, 0.16) 0%, rgba(88, 147, 255, 0.06) 100%);
+			}
+			.session-content {
+				flex: 1;
+				min-width: 0;
 			}
 			.session-name {
 				font-size: 28rpx;
@@ -954,16 +1119,28 @@ import Vue from 'vue';
 				text-overflow: ellipsis;
 			}
 			.session-time {
+				margin-top: 8rpx;
 				font-size: 22rpx;
 				color: #7990b3;
 			}
+			.session-delete {
+				flex-shrink: 0;
+				padding: 8rpx 18rpx;
+				border-radius: 999rpx;
+				font-size: 22rpx;
+				font-weight: 700;
+				color: #d84d4d;
+				background: rgba(216, 77, 77, 0.1);
+				border: 1px solid rgba(216, 77, 77, 0.16);
+			}
 			.body {
-				position: relative;
+				position: absolute;
+				left: 0;
+				right: 0;
+				top: 0;
+				bottom: 0;
 				z-index: 10;
-				flex: 1;
-				min-height: 0;
 				width: 100%;
-				height: auto;
 				overflow: hidden;
 				background: transparent;
 				border-radius: 0;
@@ -972,7 +1149,6 @@ import Vue from 'vue';
 				align-items: center;
 				justify-content: flex-start;
 				box-shadow: none;
-				transition: transform 260ms ease;
 				.scroll {
 					flex: 1;
 					min-height: 0;
@@ -1293,5 +1469,147 @@ import Vue from 'vue';
 			}
 			}
 
+	}
+	.floating-dialog {
+		position: absolute;
+		left: 24rpx;
+		right: 24rpx;
+		bottom: 244rpx;
+		z-index: 28;
+		pointer-events: none;
+	}
+	.floating-bubble {
+		max-width: 58%;
+		padding: 18rpx 22rpx;
+		border-radius: 28rpx;
+		box-shadow: 0 14rpx 36rpx rgba(8, 31, 75, 0.16);
+	}
+	.floating-bubble text {
+		font-size: 25rpx;
+		line-height: 1.42;
+	}
+	.user-bubble {
+		margin-left: auto;
+		margin-bottom: 18rpx;
+		border-bottom-right-radius: 8rpx;
+		background: linear-gradient(135deg, rgba(64, 123, 255, 0.94) 0%, rgba(91, 156, 255, 0.94) 100%);
+	}
+	.user-bubble text {
+		color: #fff;
+	}
+	.assistant-bubble {
+		margin-right: auto;
+		border-bottom-left-radius: 8rpx;
+		background: rgba(255, 255, 255, 0.9);
+		border: 1px solid rgba(126, 187, 255, 0.28);
+	}
+	.assistant-bubble text {
+		color: #1f3760;
+	}
+	.chat-toggle {
+		position: absolute;
+		right: 32rpx;
+		bottom: 396rpx;
+		z-index: 35;
+		height: 64rpx;
+		line-height: 64rpx;
+		padding: 0 24rpx;
+		border-radius: 999rpx;
+		background: rgba(255, 255, 255, 0.88);
+		border: 1px solid rgba(126, 187, 255, 0.3);
+		box-shadow: 0 12rpx 30rpx rgba(8, 31, 75, 0.14);
+	}
+	.chat-toggle text {
+		color: #245cbd;
+		font-size: 24rpx;
+		font-weight: 700;
+	}
+	.chat-mask {
+		position: absolute;
+		inset: 0;
+		z-index: 38;
+		background: rgba(3, 13, 30, 0.28);
+	}
+	.chat-panel {
+		position: absolute;
+		left: 22rpx;
+		right: 22rpx;
+		bottom: 144rpx;
+		z-index: 42;
+		border-radius: 34rpx 34rpx 0 0;
+		overflow: hidden;
+		background: rgba(243, 248, 255, 0.96);
+		border: 1px solid rgba(126, 187, 255, 0.28);
+		box-shadow: 0 -18rpx 46rpx rgba(5, 25, 70, 0.22);
+		transform: translateY(calc(100% + 170rpx));
+		transition: transform 260ms ease;
+	}
+	.chat-panel.open {
+		transform: translateY(0);
+	}
+	.chat-panel-head {
+		height: 82rpx;
+		padding: 0 26rpx;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		border-bottom: 1px solid rgba(0, 122, 255, 0.1);
+	}
+	.chat-panel-title {
+		color: #1f3760;
+		font-size: 30rpx;
+		font-weight: 800;
+	}
+	.chat-panel-close {
+		color: #3572d8;
+		font-size: 25rpx;
+		font-weight: 700;
+	}
+	.chat-scroll .chat {
+		padding: 18rpx 0 24rpx;
+	}
+	.chat-panel .loading {
+		position: relative;
+		bottom: auto;
+		margin-top: 8rpx;
+	}
+	.main .body .down {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 50;
+		width: 100%;
+		padding: 18rpx 24rpx 26rpx;
+		background: linear-gradient(180deg, rgba(7, 21, 45, 0) 0%, rgba(7, 21, 45, 0.72) 28%, rgba(6, 19, 40, 0.92) 100%);
+		border-top: 0;
+	}
+	.main .body .input-wrap {
+		max-width: 700rpx;
+		height: 92rpx;
+		background-color: rgba(255, 255, 255, 0.96);
+		border-radius: 46rpx;
+		border: 1px solid rgba(126, 187, 255, 0.24);
+		box-shadow: 0 16rpx 42rpx rgba(0, 12, 42, 0.2);
+	}
+	.main .body .voice-tip,
+	.main .body .tts-bar {
+		margin-top: 12rpx;
+		color: rgba(232, 245, 255, 0.9);
+		font-size: 24rpx;
+	}
+	.main .body .tts-bar {
+		background: transparent;
+		padding: 0;
+	}
+	.main .body .tts-bar-text {
+		color: rgba(232, 245, 255, 0.9);
+	}
+	.main .body .btn-stop-tts {
+		padding: 8rpx 22rpx;
+		border-radius: 999rpx;
+		color: #fff;
+		font-size: 24rpx;
+		background: rgba(255, 152, 0, 0.86);
 	}
 </style>

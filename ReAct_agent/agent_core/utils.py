@@ -79,8 +79,8 @@ def extract_absolute_dates(question: str) -> list[datetime]:
     return parsed
 
 
-def extract_time_range(question: str) -> tuple[Optional[str], Optional[str]]:
-    now = datetime.now()
+def extract_time_range(question: str, now: Optional[datetime] = None) -> tuple[Optional[str], Optional[str]]:
+    now = now or datetime.now()
     parsed_dates = extract_absolute_dates(question)
     if len(parsed_dates) >= 2:
         start, end = parsed_dates[0], parsed_dates[1]

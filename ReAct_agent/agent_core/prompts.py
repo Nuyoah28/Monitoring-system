@@ -11,7 +11,8 @@ ANSWER_SYSTEM_PROMPT = """你是“社区智眼”监控系统里的智能助手
 2. 如果执行了更新类操作，要明确告诉用户做了什么。
 3. 如果数据不足以回答，就直接说明缺什么，不要假装查到了。
 4. 回答用中文，风格专业、清晰、简洁，尽量先给结论，再给建议。
-5. 如果用户在问系统能力，可以结合监控、告警、天气、检测目标下发等模块来回答。"""
+5. 如果用户在问系统能力，可以结合监控、告警、天气、检测目标下发等模块来回答。
+6. 涉及“今天、昨天、本周、本月、当前时间”等时间问题时，以本次请求上下文里的当前时间为准，不要使用模型训练时间。"""
 
 WEB_FAILURE_HINT = """
 如果工具结果中出现“联网访问失败”“403”“反爬”“Jina 代理”等描述，
@@ -20,6 +21,8 @@ WEB_FAILURE_HINT = """
 """
 
 TOOL_SELECTION_TEMPLATE = """你是监控系统的工具规划助手。请根据用户问题，只输出 JSON，不要输出其他解释。
+
+当前时间：{current_time}
 
 输出规则：
 1. 只需要一个工具时：{{"tool":"工具名","params":{{...}}}}
@@ -44,21 +47,27 @@ TOOL_SELECTION_TEMPLATE = """你是监控系统的工具规划助手。请根据
 JSON："""
 
 
-def build_tool_selection_prompt(skills_desc: str, question: str) -> str:
-    return TOOL_SELECTION_TEMPLATE.format(skills_desc=skills_desc, question=question)
+def build_tool_selection_prompt(skills_desc: str, question: str, current_time: str) -> str:
+    return TOOL_SELECTION_TEMPLATE.format(
+        skills_desc=skills_desc,
+        question=question,
+        current_time=current_time,
+    )
 
 
-def build_final_answer_prompt(question: str, data_summary: str) -> str:
+def build_final_answer_prompt(question: str, data_summary: str, current_time: str) -> str:
     if data_summary:
         return (
             f"{ANSWER_SYSTEM_PROMPT}\n\n"
             f"{WEB_FAILURE_HINT}\n\n"
+            f"当前时间：{current_time}\n\n"
             f"用户问题：{question}\n\n"
             f"系统数据：\n{data_summary}\n\n"
             "请基于这些系统数据回答用户，并在必要时给出简短处置建议。"
         )
     return (
         f"{ANSWER_SYSTEM_PROMPT}\n\n"
+        f"当前时间：{current_time}\n\n"
         f"用户问题：{question}\n\n"
         "如果这是知识类问题，请直接回答；"
         "如果这是需要系统数据的问题但当前没有查到数据，请明确说明。"

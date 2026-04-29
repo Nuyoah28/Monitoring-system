@@ -4,7 +4,7 @@ Agent API 服务 - 提供HTTP接口供前端或其他服务调用
 """
 
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from datetime import datetime
 
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
@@ -23,12 +23,11 @@ from queue import SimpleQueue
 
 AGENT_IMPL_NAME = "react"
 app = Flask(__name__)
-# 长文本 TTS 音频缓存：id -> {audio, created_at}。
-# 移动端播放器可能会对同一 play_url 发起多次 GET，如果首个请求后立即删除缓存，
-# 后续重试就会得到 404，因此这里保留一个短 TTL 供重复拉取。
+# 长文本 TTS 音频缓存：POST 生成后通过短 URL 播放，避免 GET 长度限制。
+# App 播放器可能会重复拉取同一个 URL，所以缓存不能在第一次读取后立即删除。
 _tts_audio_cache = {}
+_TTS_AUDIO_CACHE_TTL_SECONDS = 600
 _tts_cache_lock = threading.Lock()
-_TTS_AUDIO_CACHE_TTL_SECONDS = 10 * 60
 sock = Sock(app)
 # 允许跨域请求
 CORS(app)
@@ -44,17 +43,14 @@ app.register_blueprint(create_qq_gateway_blueprint(lambda: agent, agent_executor
 PUBLIC_AGENT_ERROR_MESSAGE = "抱歉，智能助手暂时不可用，请稍后重试。"
 PUBLIC_VOICE_ERROR_MESSAGE = "抱歉，语音服务暂时不可用，请稍后重试。"
 
-
-def _prune_tts_audio_cache(now_ts: Optional[float] = None):
-    now_ts = now_ts or time.time()
-    expired_keys = []
-    for sid, payload in list(_tts_audio_cache.items()):
-        if isinstance(payload, dict):
-            created_at = float(payload.get("created_at") or 0)
-        else:
-            created_at = 0
-        if created_at and now_ts - created_at > _TTS_AUDIO_CACHE_TTL_SECONDS:
-            expired_keys.append(sid)
+def _prune_tts_audio_cache(now=None):
+    """清理过期 TTS 音频，避免长时间运行后缓存堆积。"""
+    current = now if now is not None else time.time()
+    expired_keys = [
+        sid
+        for sid, item in _tts_audio_cache.items()
+        if current - item.get("created_at", current) > _TTS_AUDIO_CACHE_TTL_SECONDS
+    ]
     for sid in expired_keys:
         _tts_audio_cache.pop(sid, None)
 
@@ -80,6 +76,27 @@ def _build_conversation_key(req, user_token: str = None):
     user_agent = headers.get('User-Agent', 'unknown')
     digest = hashlib.sha1(f"{remote_addr}|{user_agent}".encode('utf-8')).hexdigest()[:12]
     return f"anon:{digest}"
+
+
+def _parse_client_time(value):
+    """解析 App 传来的当前时间，失败时回退到服务端当前时间。"""
+    if value is None:
+        return datetime.now()
+    text = str(value).strip()
+    if not text:
+        return datetime.now()
+    if text.endswith('Z'):
+        text = text[:-1] + '+00:00'
+    try:
+        return datetime.fromisoformat(text).replace(tzinfo=None)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return datetime.now()
 
 def init_agent():
     """初始化Agent"""
@@ -161,12 +178,14 @@ def chat():
         # 从Header或Body获取用户token（前端用户JWT）
         user_token = _get_user_token(request, data)
         conversation_key = _build_conversation_key(request, user_token)
+        current_time = _parse_client_time(data.get('client_time') or data.get('current_time'))
 
         response = agent_executor.submit(
             agent.process_question,
             question,
             user_token=user_token,
             conversation_key=conversation_key,
+            current_time=current_time,
         ).result()
         
         elapsed = time.time() - start_time
@@ -220,6 +239,7 @@ def chat_stream():
 
             user_token = _get_user_token(request, data)
             conversation_key = _build_conversation_key(request, user_token)
+            current_time = _parse_client_time(data.get('client_time') or data.get('current_time'))
 
             # 发送开始信号
             yield f"data: {json.dumps({'type': 'start', 'question': question})}\n\n"
@@ -237,6 +257,7 @@ def chat_stream():
                         user_token=user_token,
                         conversation_key=conversation_key,
                         stream_mode='sse',
+                        current_time=current_time,
                     )
                 except Exception as e:
                     q.put({'type': 'error', 'message': PUBLIC_AGENT_ERROR_MESSAGE})
@@ -298,6 +319,7 @@ def chat_voice():
             return jsonify({"code": "A1000", "message": "请上传 audio 文件", "data": None}), 400
         audio_bytes = f.read()
         return_tts = request.form.get('return_tts', 'false').lower() == 'true'
+        current_time = _parse_client_time(request.form.get('client_time') or request.form.get('current_time'))
     elif request.json:
         data = request.json
         b64 = data.get('audio_base64')
@@ -309,6 +331,7 @@ def chat_voice():
             return jsonify({"code": "A1000", "message": f"base64 解码失败: {e}", "data": None}), 400
         return_tts = data.get('return_tts', False)
         user_token = _get_user_token(request, data)
+        current_time = _parse_client_time(data.get('client_time') or data.get('current_time'))
     else:
         return jsonify({"code": "A1000", "message": "请使用 multipart 或 JSON 提交音频", "data": None}), 400
 
@@ -330,6 +353,7 @@ def chat_voice():
             question.strip(),
             user_token=user_token,
             conversation_key=conversation_key,
+            current_time=current_time,
         ).result()
     except Exception as e:
         print(f"Voice chat failed: {e}")
@@ -407,11 +431,12 @@ def tts_audio():
     if request.method == 'POST':
         # 长文本：存入缓存，返回短 URL，避免 GET 长度限制导致念不完
         sid = str(uuid.uuid4())
+        now = time.time()
         with _tts_cache_lock:
-            _prune_tts_audio_cache()
+            _prune_tts_audio_cache(now)
             _tts_audio_cache[sid] = {
                 "audio": mp3_bytes,
-                "created_at": time.time(),
+                "created_at": now,
             }
         base_url = request.host_url.rstrip('/')
         play_url = f"{base_url}/tts/audio/stream/{sid}"
@@ -421,25 +446,26 @@ def tts_audio():
             "data": {"play_url": play_url}
         })
 
-    from flask import Response
-    return Response(mp3_bytes, mimetype="audio/mpeg", headers={"Content-Disposition": "inline; filename=tts.mp3"})
+    return Response(
+        mp3_bytes,
+        mimetype="audio/mpeg",
+        headers={
+            "Content-Disposition": "inline; filename=tts.mp3",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+    )
 
 
 @app.route('/tts/audio/stream/<sid>', methods=['GET'])
 def tts_audio_stream(sid):
     """根据 POST /tts/audio 返回的 play_url 拉取音频流。"""
+    now = time.time()
     with _tts_cache_lock:
-        _prune_tts_audio_cache()
-        payload = _tts_audio_cache.get(sid)
-    if not payload:
-        return jsonify({"code": "A1000", "message": "音频已过期或不存在", "data": None}), 404
-    if isinstance(payload, dict):
-        mp3_bytes = payload.get("audio")
-    else:
-        mp3_bytes = payload
+        _prune_tts_audio_cache(now)
+        cache_item = _tts_audio_cache.get(sid)
+        mp3_bytes = cache_item.get("audio") if cache_item else None
     if not mp3_bytes:
         return jsonify({"code": "A1000", "message": "音频已过期或不存在", "data": None}), 404
-    from flask import Response
     return Response(
         mp3_bytes,
         mimetype="audio/mpeg",
@@ -470,12 +496,16 @@ def gpt_ws(ws, token):
                 # 尝试解析JSON
                 # Uniapp端发送的是 JSON.stringify(ask) -> "\"问题\""
                 data = json.loads(message)
+                current_time = None
                 if isinstance(data, dict):
                     question = data.get('question', '') or data.get('content', '')
+                    current_time = _parse_client_time(data.get('client_time') or data.get('current_time'))
                 else:
                     question = str(data)
+                    current_time = datetime.now()
             except:
                 question = message
+                current_time = datetime.now()
             
             question = question.strip()
             if not question:
@@ -494,6 +524,7 @@ def gpt_ws(ws, token):
                         user_token=token,
                         conversation_key=conversation_key,
                         stream_mode='ws',
+                        current_time=current_time,
                     ).result()
                 else:
                     ws.send("⚠️ Agent未初始化")
