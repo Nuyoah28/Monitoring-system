@@ -4,6 +4,7 @@ Agent API 服务 - 提供HTTP接口供前端或其他服务调用
 """
 
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
 
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
@@ -22,9 +23,12 @@ from queue import SimpleQueue
 
 AGENT_IMPL_NAME = "react"
 app = Flask(__name__)
-# 长文本 TTS 音频缓存：id -> mp3_bytes，POST 生成后通过短 URL 播放，避免 GET 长度限制
+# 长文本 TTS 音频缓存：id -> {audio, created_at}。
+# 移动端播放器可能会对同一 play_url 发起多次 GET，如果首个请求后立即删除缓存，
+# 后续重试就会得到 404，因此这里保留一个短 TTL 供重复拉取。
 _tts_audio_cache = {}
 _tts_cache_lock = threading.Lock()
+_TTS_AUDIO_CACHE_TTL_SECONDS = 10 * 60
 sock = Sock(app)
 # 允许跨域请求
 CORS(app)
@@ -39,6 +43,20 @@ app.register_blueprint(create_qq_gateway_blueprint(lambda: agent, agent_executor
 
 PUBLIC_AGENT_ERROR_MESSAGE = "抱歉，智能助手暂时不可用，请稍后重试。"
 PUBLIC_VOICE_ERROR_MESSAGE = "抱歉，语音服务暂时不可用，请稍后重试。"
+
+
+def _prune_tts_audio_cache(now_ts: Optional[float] = None):
+    now_ts = now_ts or time.time()
+    expired_keys = []
+    for sid, payload in list(_tts_audio_cache.items()):
+        if isinstance(payload, dict):
+            created_at = float(payload.get("created_at") or 0)
+        else:
+            created_at = 0
+        if created_at and now_ts - created_at > _TTS_AUDIO_CACHE_TTL_SECONDS:
+            expired_keys.append(sid)
+    for sid in expired_keys:
+        _tts_audio_cache.pop(sid, None)
 
 def _get_user_token(req, data: dict):
     """从Header或Body获取用户token（前端用户JWT）"""
@@ -390,7 +408,11 @@ def tts_audio():
         # 长文本：存入缓存，返回短 URL，避免 GET 长度限制导致念不完
         sid = str(uuid.uuid4())
         with _tts_cache_lock:
-            _tts_audio_cache[sid] = mp3_bytes
+            _prune_tts_audio_cache()
+            _tts_audio_cache[sid] = {
+                "audio": mp3_bytes,
+                "created_at": time.time(),
+            }
         base_url = request.host_url.rstrip('/')
         play_url = f"{base_url}/tts/audio/stream/{sid}"
         return jsonify({
@@ -405,13 +427,27 @@ def tts_audio():
 
 @app.route('/tts/audio/stream/<sid>', methods=['GET'])
 def tts_audio_stream(sid):
-    """根据 POST /tts/audio 返回的 play_url 拉取音频流，播放后即从缓存删除。"""
+    """根据 POST /tts/audio 返回的 play_url 拉取音频流。"""
     with _tts_cache_lock:
-        mp3_bytes = _tts_audio_cache.pop(sid, None)
+        _prune_tts_audio_cache()
+        payload = _tts_audio_cache.get(sid)
+    if not payload:
+        return jsonify({"code": "A1000", "message": "音频已过期或不存在", "data": None}), 404
+    if isinstance(payload, dict):
+        mp3_bytes = payload.get("audio")
+    else:
+        mp3_bytes = payload
     if not mp3_bytes:
         return jsonify({"code": "A1000", "message": "音频已过期或不存在", "data": None}), 404
     from flask import Response
-    return Response(mp3_bytes, mimetype="audio/mpeg", headers={"Content-Disposition": "inline; filename=tts.mp3"})
+    return Response(
+        mp3_bytes,
+        mimetype="audio/mpeg",
+        headers={
+            "Content-Disposition": "inline; filename=tts.mp3",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+    )
 
 
 @sock.route('/api/v1/gpt/ws/<token>')

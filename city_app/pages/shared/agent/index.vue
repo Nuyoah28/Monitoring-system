@@ -141,8 +141,7 @@ import Vue from 'vue';
 					windowHeight: info && info.windowHeight,
 				});
 				this.$nextTick(() => {
-					this.setSafeArea();
-					this.toBottom();
+					this.refreshScrollViewport(true);
 				});
 			this.loadSessionCache();
 			if (!this.sessions.length) {
@@ -159,7 +158,7 @@ import Vue from 'vue';
 		},
 		onReady() {
 			this.$nextTick(() => {
-				this.setSafeArea();
+				this.refreshScrollViewport(true);
 				console.log('[AIPage] ready state', {
 					safeHeight: this.safeHeight,
 					scrollHeight: this.scrollHeight,
@@ -426,7 +425,7 @@ import Vue from 'vue';
 				this.isLoading = false;
 				this.isDisabled = false;
 			},
-			setSafeArea() {
+			refreshScrollViewport(scrollToBottom = false) {
 				const info = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : uni.getSystemInfoSync();
 				const safeAreaHeight = info && info.safeArea && info.safeArea.height
 					? info.safeArea.height
@@ -435,24 +434,23 @@ import Vue from 'vue';
 				this.$nextTick(() => {
 					const query = uni.createSelectorQuery();
 					query.select('#ai-body').boundingClientRect();
-					query.select('#ai-header').boundingClientRect();
 					query.select('#ai-down').boundingClientRect();
 					query.exec((res) => {
 						const body = res[0];
-						const title = res[1];
-						const down = res[2];
+						const down = res[1];
 						if (body && down) {
-							const titleH = (title && title.height) ? title.height : 100;
-							this.scrollHeight = Math.max(220, (body.height || 0) - titleH - (down.height || 0));
+							this.scrollHeight = Math.max(220, Math.floor((body.height || 0) - (down.height || 0)));
 						} else {
 							this.scrollHeight = Math.max(220, this.safeHeight - 230);
 						}
 						console.log('[AIPage] setSafeArea rect', {
 							body,
-							title,
 							down,
 							scrollHeight: this.scrollHeight,
 						});
+						if (scrollToBottom) {
+							this.$nextTick(() => this.toBottom());
+						}
 					});
 				});
 			},
@@ -674,7 +672,7 @@ import Vue from 'vue';
 							this.textList.push({ role: 'user', content: recognized || '(语音)' });
 							this.textList.push({ role: 'assistant', content: answer || '' });
 							this.refreshCurrentSession();
-							this.toBottom();
+							this.refreshScrollViewport(true);
 							if (answer && answer.trim()) this.requestTtsAndPlay(answer.trim());
 						} catch (e) {
 							uni.showToast({ title: '解析失败，请确认 Agent 已启动', icon: 'none' });
@@ -699,11 +697,19 @@ import Vue from 'vue';
 				this.innerAudioContext = ctx;
 				ctx.obeysMuteSwitch = false;
 				ctx.src = playUrl;
-				ctx.onPlay(() => { this.isTtsPlaying = true; });
-				ctx.onEnded(() => { this.isTtsPlaying = false; this.innerAudioContext = null; });
+				ctx.onPlay(() => {
+					this.isTtsPlaying = true;
+					this.refreshScrollViewport(true);
+				});
+				ctx.onEnded(() => {
+					this.isTtsPlaying = false;
+					this.innerAudioContext = null;
+					this.refreshScrollViewport(true);
+				});
 				ctx.onError(() => {
 					this.isTtsPlaying = false;
 					this.innerAudioContext = null;
+					this.refreshScrollViewport(true);
 					uni.showToast({ title: '语音播放失败', icon: 'none' });
 				});
 				ctx.play();
@@ -741,6 +747,7 @@ import Vue from 'vue';
 					this.innerAudioContext = null;
 				}
 				this.isTtsPlaying = false;
+				this.refreshScrollViewport(true);
 			},
 		},
 		watch:{
@@ -749,6 +756,12 @@ import Vue from 'vue';
 					// console.log("@count_handler");
 					this.scrollTop = this.newTop;
 				},
+			},
+			isRecording() {
+				this.refreshScrollViewport(true);
+			},
+			isTtsPlaying() {
+				this.refreshScrollViewport(true);
 			},
 		}
 	}

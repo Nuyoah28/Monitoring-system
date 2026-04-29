@@ -1,6 +1,6 @@
 <template>
   <view class="main" :style="{ minHeight: safeHeight + 'px', height: safeHeight + 'px', paddingTop: statusBarHeight + 'px' }">
-    <view class="header">
+    <view class="header" id="ai-header">
       <view class="top-nav">
         <view class="back-btn" @tap="goBack">
           <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
@@ -39,8 +39,8 @@
       <view class="session-peek" @tap="showSessionList = false"></view>
     </view>
 
-    <view class="body" :style="bodyStyle">
-      <scroll-view :scroll-top="scrollTop" class="scroll" scroll-y @scroll="recordHeight">
+    <view class="body" id="ai-body" :style="bodyStyle">
+      <scroll-view :scroll-top="scrollTop" class="scroll" scroll-y @scroll="recordHeight" :style="{ height: scrollHeight + 'px' }">
         <view class="chat">
           <view id="msgbar" v-for="(item, index) in textList" :key="index" :class="getMessageRole(item, index) === 'assistant' ? 'left' : 'right'">
             <view class="avatar">
@@ -145,6 +145,14 @@ export default {
     if (!this.sessions.length) this.startNewSession();
     else this.switchSession(this.currentSessionId || this.sessions[0].id, false);
     this.createWs();
+    this.$nextTick(() => {
+      this.refreshScrollViewport(true);
+    });
+  },
+  onReady() {
+    this.$nextTick(() => {
+      this.refreshScrollViewport(true);
+    });
   },
   onHide() {
     this.closeWs();
@@ -158,9 +166,24 @@ export default {
       const safeAreaHeight = info && info.safeArea && info.safeArea.height ? info.safeArea.height : info.windowHeight || info.screenHeight || 720;
       this.safeHeight = safeAreaHeight;
       this.statusBarHeight = (info && info.statusBarHeight) || 20;
-      const header = 108;
-      const input = this.isOwnerApp ? 180 : 128;
-      this.scrollHeight = Math.max(260, safeAreaHeight - this.statusBarHeight - header - input);
+      this.scrollHeight = Math.max(260, safeAreaHeight - this.statusBarHeight - 236);
+    },
+    refreshScrollViewport(scrollToBottom = false) {
+      this.$nextTick(() => {
+        const query = uni.createSelectorQuery().in(this);
+        query.select('#ai-body').boundingClientRect();
+        query.select('#ai-down').boundingClientRect();
+        query.exec((res) => {
+          const body = res && res[0] ? res[0] : null;
+          const down = res && res[1] ? res[1] : null;
+          const baseHeight = body && body.height ? body.height : this.safeHeight - this.statusBarHeight - 108;
+          const downHeight = down && down.height ? down.height : (this.isOwnerApp ? 180 : 128);
+          this.scrollHeight = Math.max(220, Math.floor(baseHeight - downHeight));
+          if (scrollToBottom) {
+            this.$nextTick(() => this.toBottom());
+          }
+        });
+      });
     },
     goBack() {
       if (getCurrentPages().length > 1) {
@@ -509,7 +532,7 @@ export default {
             this.textList.push({ role: 'user', content: recognized || '(语音)' });
             this.textList.push({ role: 'assistant', content: answer || '' });
             this.refreshCurrentSession();
-            this.toBottom();
+            this.refreshScrollViewport(true);
             if (answer && answer.trim()) this.requestTtsAndPlay(answer.trim());
           } catch (e) {
             uni.showToast({ title: '解析失败，请确认 Agent 已启动', icon: 'none' });
@@ -533,14 +556,19 @@ export default {
       this.innerAudioContext = ctx;
       ctx.obeysMuteSwitch = false;
       ctx.src = playUrl;
-      ctx.onPlay(() => (this.isTtsPlaying = true));
+      ctx.onPlay(() => {
+        this.isTtsPlaying = true;
+        this.refreshScrollViewport(true);
+      });
       ctx.onEnded(() => {
         this.isTtsPlaying = false;
         this.innerAudioContext = null;
+        this.refreshScrollViewport(true);
       });
       ctx.onError(() => {
         this.isTtsPlaying = false;
         this.innerAudioContext = null;
+        this.refreshScrollViewport(true);
         uni.showToast({ title: '语音播放失败', icon: 'none' });
       });
       ctx.play();
@@ -572,6 +600,7 @@ export default {
         this.innerAudioContext = null;
       }
       this.isTtsPlaying = false;
+      this.refreshScrollViewport(true);
     },
   },
   watch: {
@@ -579,6 +608,12 @@ export default {
       handler() {
         this.scrollTop = this.newTop;
       },
+    },
+    isRecording() {
+      this.refreshScrollViewport(true);
+    },
+    isTtsPlaying() {
+      this.refreshScrollViewport(true);
     },
   },
 };

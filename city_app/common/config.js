@@ -8,7 +8,7 @@ export const NETWORK_CONFIG = {
     LOCAL_IP: '172.20.10.2',
     BACKEND_PORT: '10215',
     AI_AGENT_PORT: '5050',
-    DEMO_VIDEO_HOST: 'localhost',
+    DEMO_VIDEO_HOST: '172.20.10.2',
     DEMO_VIDEO_PORT: '8848'
 };
 
