@@ -178,6 +178,7 @@ export default {
   data() {
     return {
       selectedDate: "month",
+      currentMonth: new Date().getMonth() + 1,
       monthTotal: { total: 0, todayNew: 0, dayChange: 0 },
       monthCaseList: [],
       dayAlarms: [],
