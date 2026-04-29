@@ -1,56 +1,43 @@
 class Request {
 	constructor(options = {}) {
 		this.baseUrl = options.baseUrl || ''
-		this.url = options.url || ''
-		this.method = "GET"
-		this.data = null
-		this.header = options.header || {}
 		this.beforeRequest = null
 		this.afterRequest = null
 	}
-	get(url, data = {}) {
-		this.method = 'GET',
-			this.url = this.baseUrl + url
-		this.data = data
-		return this._()
+	get(url, data = {}, options = {}) {
+		return this._({ url: this.baseUrl + url, method: 'GET', data, options })
 	}
-	post(url, data = {}) {
-		this.method = "POST"
-		this.url = this.baseUrl + url
-		this.data = data;
-		return this._();
+	post(url, data = {}, options = {}) {
+		return this._({ url: this.baseUrl + url, method: 'POST', data, options })
 	}
-	delete(url, data = {}) {
-		this.method = "DELETE"
-		this.url = this.baseUrl + url
-		this.data = data;
-		return this._();
+	delete(url, data = {}, options = {}) {
+		return this._({ url: this.baseUrl + url, method: 'DELETE', data, options })
 	}
-	put(url, data = {}) {
-		this.method = 'PUT',
-			this.url = this.baseUrl + url
-		this.data = data;
-		return this._();
+	put(url, data = {}, options = {}) {
+		return this._({ url: this.baseUrl + url, method: 'PUT', data, options })
 	}
-	_() {
-		// 清空header对象
-		this.header = {};
-		this.beforeRequest && typeof this.beforeRequest === 'function' && this.beforeRequest(this);
-		// console.log(this.url)
+	_(requestConfig) {
+		const request = {
+			url: requestConfig.url,
+			method: requestConfig.method,
+			data: requestConfig.data,
+			header: {},
+			silent: requestConfig.options && requestConfig.options.silent === true,
+		}
+		this.beforeRequest && typeof this.beforeRequest === 'function' && this.beforeRequest(request);
 		return new Promise((resolve, reject) => {
 			uni.request({
-				url: this.url,
-				method: this.method,
-				data: this.data,
-				header: this.header,
+				url: request.url,
+				method: request.method,
+				data: request.data,
+				header: request.header,
 				sslVerify: false,
 				success: (res) => {
 					resolve(res);
 				},
 				fail: (err) => { reject(err) },
 				complete: (res) => {
-					// console.log(res)
-					this.afterRequest && typeof this.afterRequest === 'function' && this.afterRequest(res);
+					this.afterRequest && typeof this.afterRequest === 'function' && this.afterRequest(res, request);
 				}
 			})
 		})

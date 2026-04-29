@@ -4,17 +4,29 @@
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
       </view>
-      <view class="top-title">车位引导</view>
-      <view class="ghost-btn" @tap="loadSpaces">刷新</view>
+      <view class="title-box">
+        <view class="top-title">车位检测管理</view>
+        <view class="top-subtitle">实时掌握社区车位运行情况</view>
+      </view>
+    </view>
+
+    <view class="status-strip panel">
+      <view class="status-icon" :class="isLoading ? 'syncing' : ''">
+        <view class="status-core"></view>
+      </view>
+      <view class="status-copy">
+        <view class="status-title">{{ statusTitle }}</view>
+        <view class="status-desc">最近更新：{{ formattedUpdateTime }}</view>
+      </view>
     </view>
 
     <view class="overview panel">
       <view class="overview-head">
         <view>
-          <view class="panel-title">车位总览</view>
-          <view class="sub-text">实时占用与空位推荐</view>
+          <view class="panel-title">车位检测总览</view>
+          <view class="sub-text">根据各区域检测结果汇总当前占用情况</view>
         </view>
-        <view class="rate-pill" :class="parkingRate >= 85 ? 'danger' : parkingRate >= 70 ? 'warn' : ''">
+        <view class="rate-pill" :class="rateClass(parkingRate)">
           {{ parkingRate }}%
         </view>
       </view>
@@ -32,34 +44,49 @@
           <text class="stat-value free">{{ parkingSummary.free }}</text>
         </view>
       </view>
-      <view class="recommend-card">
-        <view>
-          <view class="recommend-label">推荐前往</view>
-          <view class="recommend-title">{{ recommendedArea.location }}</view>
-        </view>
-        <view class="recommend-count">空 {{ recommendedArea.free }} 位</view>
+    </view>
+
+    <view class="focus-grid">
+      <view class="focus-card panel">
+        <view class="focus-label">重点关注区域</view>
+        <view class="focus-title">{{ tightestArea.location }}</view>
+        <view class="focus-meta">占用率 {{ tightestArea.rate }}% · {{ tightestArea.statusText }}</view>
+      </view>
+      <view class="focus-card panel soft">
+        <view class="focus-label">空位最多区域</view>
+        <view class="focus-title">{{ freestArea.location }}</view>
+        <view class="focus-meta">剩余 {{ freestArea.free }} 位，可作为调度参考</view>
       </view>
     </view>
 
     <view class="panel map-panel">
-      <view class="panel-title">车位地图</view>
-      <view class="legend-row">
-        <view class="legend"><text class="dot free-dot"></text>空闲</view>
-        <view class="legend"><text class="dot occupied-dot"></text>占用</view>
-        <view class="legend"><text class="dot abnormal-dot"></text>紧张</view>
+      <view class="panel-head">
+        <view>
+          <view class="panel-title">区域检测状态</view>
+          <view class="sub-text">按区域展示占用比例和紧张程度</view>
+        </view>
+        <view class="legend-row">
+          <view class="legend"><text class="dot free-dot"></text>空闲</view>
+          <view class="legend"><text class="dot occupied-dot"></text>占用</view>
+          <view class="legend"><text class="dot tight-dot"></text>紧张</view>
+        </view>
       </view>
-      <view v-if="!parkingAreas.length" class="empty">暂无车位数据。</view>
+
+      <view v-if="!parkingAreas.length" class="empty">暂无车位检测数据。</view>
       <view v-else class="parking-map">
-        <view v-for="area in parkingAreas" :key="area.id || area.location" class="area-block">
+        <view v-for="area in parkingAreas" :key="area.id" class="area-block" :class="rateClass(area.rate)">
           <view class="area-head">
             <view>
               <view class="area-name">{{ area.location }}</view>
-              <view class="area-meta">{{ area.occupied }}/{{ area.total }} 已用</view>
+              <view class="area-meta">
+                已用 {{ area.occupied }}/{{ area.total }} · 空闲 {{ area.free }}
+              </view>
             </view>
-            <view class="area-rate" :class="area.rate >= 85 ? 'danger' : area.rate >= 70 ? 'warn' : ''">
+            <view class="area-rate" :class="rateClass(area.rate)">
               {{ area.rate }}%
             </view>
           </view>
+
           <view class="slot-grid">
             <view
               v-for="slot in area.slots"
@@ -68,44 +95,14 @@
               :class="{ busy: slot.busy, tight: area.rate >= 85 && !slot.busy }"
             ></view>
           </view>
-          <view class="progress">
-            <view class="progress-inner" :style="{ width: area.rate + '%' }"></view>
+
+          <view class="area-footer">
+            <view class="status-tag" :class="rateClass(area.rate)">{{ area.statusText }}</view>
+            <view class="area-code">区域编码：{{ area.areaCode }}</view>
           </view>
-        </view>
-      </view>
-    </view>
-
-    <view class="panel form-panel">
-      <view class="panel-title">新增车位区域</view>
-      <view class="form-item">
-        <view class="label">位置</view>
-        <input v-model="form.location" class="ipt" placeholder="例如：地下A区" />
-      </view>
-      <view class="form-row">
-        <view class="form-item half">
-          <view class="label">总车位数</view>
-          <input v-model="form.totalSpaces" type="number" class="ipt" placeholder="如：120" />
-        </view>
-        <view class="form-item half">
-          <view class="label">占用车辆数</view>
-          <input v-model="form.occupiedVehicle" type="number" class="ipt" placeholder="如：35" />
-        </view>
-      </view>
-      <view class="submit-btn" @tap="submitSpace">保存区域</view>
-    </view>
-
-    <view class="panel list-panel">
-      <view class="panel-title">区域明细</view>
-      <view v-if="!parkingAreas.length" class="empty">暂无车位数据。</view>
-      <view v-for="item in parkingAreas" :key="'record-' + (item.id || item.location)" class="record-card">
-        <view class="record-head">
-          <view class="name">{{ item.location }}</view>
-          <view class="delete" @tap="removeSpace(item.id)">删除</view>
-        </view>
-        <view class="record-row">
-          <view class="meta">空闲 {{ item.free }} 位</view>
-          <view class="meta">占用 {{ item.occupied }} 位</view>
-          <view class="meta">总计 {{ item.total }} 位</view>
+          <view class="progress">
+            <view class="progress-inner" :class="rateClass(area.rate)" :style="{ width: area.rate + '%' }"></view>
+          </view>
         </view>
       </view>
     </view>
@@ -114,45 +111,63 @@
 
 <script>
 const SUCCESS_CODE = '00000';
-
-const FALLBACK_SPACES = [
-  { id: 'mock-a', location: '地库A区', totalSpaces: 56, occupiedVehicle: '38' },
-  { id: 'mock-b', location: '地库B区', totalSpaces: 48, occupiedVehicle: '29' },
-  { id: 'mock-c', location: '地面东侧', totalSpaces: 32, occupiedVehicle: '18' },
-  { id: 'mock-d', location: '地面西侧', totalSpaces: 28, occupiedVehicle: '23' },
-];
+const PARKING_DATA_SOURCE = 'mock';
+const DEFAULT_MONITOR_ID = 1;
+const AUTO_REFRESH_MS = 12000;
 
 export default {
   data() {
     return {
-      form: {
-        location: '',
-        totalSpaces: '',
-        occupiedVehicle: '',
-      },
-      spaces: [],
-      usingMock: false,
+      monitorId: DEFAULT_MONITOR_ID,
+      dataSource: PARKING_DATA_SOURCE,
+      realtimeData: null,
+      updateTime: '',
+      isLoading: false,
+      refreshTimer: null,
+      hasLoaded: false,
+      requestLock: false,
+      silentFailCount: 0,
     };
   },
   computed: {
+    statusTitle() {
+      if (this.isLoading && !this.hasLoaded) return '正在获取车位状态';
+      if (this.silentFailCount > 0) return '车位状态待更新';
+      return '车位检测运行中';
+    },
+    formattedUpdateTime() {
+      return this.updateTime || '--';
+    },
     parkingAreas() {
-      return this.spaces.map((item, index) => {
-        const total = Math.max(0, Number(item.totalSpaces || item.total || 0));
-        const occupied = Math.min(total, this.parseOccupiedCount(item.occupiedVehicle));
+      const zones = (this.realtimeData && Array.isArray(this.realtimeData.zones))
+        ? this.realtimeData.zones
+        : [];
+      return zones.map((item, index) => {
+        const total = Math.max(0, Number(item.totalSpaces || 0));
+        const occupied = Math.min(total, Math.max(0, Number(item.occupiedSpaces || 0)));
         const free = Math.max(0, total - occupied);
         const rate = total ? Math.round((occupied / total) * 100) : 0;
         return {
-          id: item.id || `area-${index}`,
-          location: item.location || item.area || `车位区域${index + 1}`,
+          id: item.areaCode || `area-${index}`,
+          areaCode: item.areaCode || `AREA-${index + 1}`,
+          location: item.areaName || `车位区域${index + 1}`,
           total,
           occupied,
           free,
           rate,
+          statusText: this.rateText(rate),
           slots: this.buildSlots(total, occupied),
         };
       });
     },
     parkingSummary() {
+      if (this.realtimeData && Number(this.realtimeData.totalSpaces) > 0) {
+        return {
+          total: Number(this.realtimeData.totalSpaces || 0),
+          occupied: Number(this.realtimeData.occupiedSpaces || 0),
+          free: Number(this.realtimeData.freeSpaces || 0),
+        };
+      }
       return this.parkingAreas.reduce(
         (sum, item) => ({
           total: sum.total + item.total,
@@ -163,28 +178,72 @@ export default {
       );
     },
     parkingRate() {
+      if (this.realtimeData && this.realtimeData.occupancyRate !== undefined) {
+        return Number(this.realtimeData.occupancyRate || 0);
+      }
       const total = this.parkingSummary.total;
       if (!total) return 0;
       return Math.round((this.parkingSummary.occupied / total) * 100);
     },
-    recommendedArea() {
-      if (!this.parkingAreas.length) return { location: '暂无可推荐区域', free: 0 };
+    tightestArea() {
+      if (!this.parkingAreas.length) return this.emptyArea('暂无重点区域');
+      return [...this.parkingAreas].sort((a, b) => b.rate - a.rate)[0];
+    },
+    freestArea() {
+      if (!this.parkingAreas.length) return this.emptyArea('暂无空闲区域');
       return [...this.parkingAreas].sort((a, b) => b.free - a.free)[0];
     },
   },
   onShow() {
-    this.loadSpaces();
+    this.startAutoRefresh();
+  },
+  onHide() {
+    this.stopAutoRefresh();
+  },
+  onUnload() {
+    this.stopAutoRefresh();
   },
   methods: {
     isSuccess(res) {
       return String(res && res.code) === SUCCESS_CODE;
     },
-    parseOccupiedCount(value) {
-      if (value === null || value === undefined) return 0;
-      const text = `${value}`.trim();
-      if (!text) return 0;
-      if (/^\d+$/.test(text)) return Number(text);
-      return text.split(/[,，\s]+/).filter(Boolean).length;
+    startAutoRefresh() {
+      this.stopAutoRefresh();
+      this.loadRealtimeParking();
+      this.refreshTimer = setInterval(() => {
+        this.loadRealtimeParking(false);
+      }, AUTO_REFRESH_MS);
+    },
+    stopAutoRefresh() {
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer);
+        this.refreshTimer = null;
+      }
+    },
+    emptyArea(location) {
+      return {
+        id: 'empty',
+        areaCode: '--',
+        location,
+        total: 0,
+        occupied: 0,
+        free: 0,
+        rate: 0,
+        statusText: '暂无数据',
+        slots: [],
+      };
+    },
+    rateClass(rate) {
+      if (rate >= 95) return 'full';
+      if (rate >= 85) return 'danger';
+      if (rate >= 70) return 'warn';
+      return 'normal';
+    },
+    rateText(rate) {
+      if (rate >= 95) return '接近满载';
+      if (rate >= 85) return '车位紧张';
+      if (rate >= 70) return '较为繁忙';
+      return '运行正常';
     },
     buildSlots(total, occupied) {
       const count = Math.min(24, Math.max(8, total || 8));
@@ -194,6 +253,14 @@ export default {
         busy: index < busyCount,
       }));
     },
+    normalizeUpdateTime(value) {
+      if (!value) return this.formatDate(new Date());
+      return String(value).replace('T', ' ').slice(0, 19);
+    },
+    formatDate(date) {
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    },
     goBack() {
       if (getCurrentPages().length > 1) {
         uni.navigateBack();
@@ -201,72 +268,31 @@ export default {
       }
       uni.switchTab({ url: '/pages/manage/controls/controls' });
     },
-    async loadSpaces() {
+    async loadRealtimeParking(showLoading = true) {
+      if (this.requestLock) return;
+      this.requestLock = true;
+      if (showLoading && !this.hasLoaded) this.isLoading = true;
       try {
-        const { data: res } = await uni.$http.get('/api/v1/parking-space/list');
+        const { data: res } = await uni.$http.get('/api/v1/parking/realtime', {
+          monitorId: this.monitorId,
+          source: this.dataSource,
+        }, { silent: !showLoading || this.hasLoaded });
         if (!this.isSuccess(res)) {
-          this.spaces = FALLBACK_SPACES;
-          this.usingMock = true;
+          if (!this.hasLoaded) uni.$showMsg(res.message || '加载车位检测数据失败');
+          this.silentFailCount += 1;
           return;
         }
-        const list = Array.isArray(res.data) ? res.data : [];
-        this.spaces = list.length ? list : FALLBACK_SPACES;
-        this.usingMock = !list.length;
+        this.realtimeData = res.data || null;
+        this.dataSource = (this.realtimeData && this.realtimeData.source) || this.dataSource;
+        this.updateTime = this.normalizeUpdateTime(this.realtimeData && this.realtimeData.updateTime);
+        this.hasLoaded = true;
+        this.silentFailCount = 0;
       } catch (e) {
-        this.spaces = FALLBACK_SPACES;
-        this.usingMock = true;
-      }
-    },
-    async submitSpace() {
-      if (!this.form.location.trim()) {
-        uni.$showMsg('请填写位置');
-        return;
-      }
-      const total = Number(this.form.totalSpaces);
-      if (!total || total <= 0) {
-        uni.$showMsg('请填写正确的总车位数');
-        return;
-      }
-      const occupiedCount = Number(this.form.occupiedVehicle);
-      if (Number.isNaN(occupiedCount) || occupiedCount < 0 || occupiedCount > total) {
-        uni.$showMsg('请填写正确的占用车辆数');
-        return;
-      }
-      const payload = {
-        location: this.form.location.trim(),
-        totalSpaces: total,
-        occupiedVehicle: String(occupiedCount),
-      };
-      try {
-        const { data: res } = await uni.$http.post('/api/v1/parking-space/create', payload);
-        if (!this.isSuccess(res)) {
-          uni.$showMsg(res.message || '保存失败');
-          return;
-        }
-        uni.showToast({ title: '保存成功', icon: 'success' });
-        this.form.location = '';
-        this.form.totalSpaces = '';
-        this.form.occupiedVehicle = '';
-        this.loadSpaces();
-      } catch (e) {
-        uni.$showMsg('网络异常，请稍后重试');
-      }
-    },
-    async removeSpace(id) {
-      if (!id || `${id}`.startsWith('mock-')) {
-        uni.$showMsg('模拟区域不可删除');
-        return;
-      }
-      try {
-        const { data: res } = await uni.$http.delete(`/api/v1/parking-space/${id}`);
-        if (!this.isSuccess(res)) {
-          uni.$showMsg(res.message || '删除失败');
-          return;
-        }
-        uni.showToast({ title: '已删除', icon: 'success' });
-        this.loadSpaces();
-      } catch (e) {
-        uni.$showMsg('网络异常，请稍后重试');
+        if (!this.hasLoaded) uni.$showMsg('网络异常，车位检测数据加载失败');
+        this.silentFailCount += 1;
+      } finally {
+        this.isLoading = false;
+        this.requestLock = false;
       }
     },
   },
@@ -297,29 +323,30 @@ export default {
   align-items: center;
   justify-content: center;
   box-shadow: 0 8rpx 20rpx rgba(32, 74, 126, 0.1);
+  flex-shrink: 0;
+}
+
+.title-box {
+  flex: 1;
+  min-width: 0;
+  margin: 0 16rpx;
 }
 
 .top-title {
   font-size: 34rpx;
-  font-weight: 800;
+  font-weight: 900;
   color: #18304b;
 }
 
-.ghost-btn {
-  padding: 0 20rpx;
-  height: 56rpx;
-  border-radius: 28rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.82);
-  color: #2b5b99;
-  font-size: 24rpx;
+.top-subtitle {
+  margin-top: 4rpx;
+  color: #66809b;
+  font-size: 22rpx;
 }
 
 .panel {
   border-radius: 26rpx;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.95);
   box-shadow: 0 10rpx 28rpx rgba(40, 92, 150, 0.08);
   padding: 24rpx;
@@ -327,15 +354,84 @@ export default {
   box-sizing: border-box;
 }
 
+.status-strip {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(239, 248, 255, 0.96), rgba(255, 255, 255, 0.94));
+}
+
+.status-icon {
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 50%;
+  background: rgba(70, 201, 147, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.status-icon::after {
+  content: '';
+  position: absolute;
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 50%;
+  background: rgba(70, 201, 147, 0.16);
+  transform: scale(1);
+  opacity: 0;
+}
+
+.status-icon.syncing::after {
+  animation: soft-pulse 1.6s ease-out infinite;
+}
+
+.status-core {
+  width: 22rpx;
+  height: 22rpx;
+  border-radius: 50%;
+  background: #30bd80;
+  box-shadow: 0 0 0 8rpx rgba(48, 189, 128, 0.12);
+}
+
+@keyframes soft-pulse {
+  0% {
+    transform: scale(0.82);
+    opacity: 0.72;
+  }
+
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+.status-copy {
+  margin-left: 18rpx;
+  min-width: 0;
+}
+
+.status-title {
+  color: #1d2f44;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.status-desc {
+  margin-top: 4rpx;
+  color: #66809b;
+  font-size: 22rpx;
+}
+
 .overview {
-  background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(232,246,255,0.9));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(232, 246, 255, 0.92));
 }
 
 .overview-head,
 .area-head,
-.record-head,
-.recommend-card,
-.record-row {
+.panel-head,
+.area-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -344,14 +440,14 @@ export default {
 .panel-title {
   font-size: 30rpx;
   color: #1d2f44;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .sub-text,
-.recommend-label,
-.label,
 .area-meta,
-.meta {
+.focus-label,
+.focus-meta,
+.area-code {
   font-size: 23rpx;
   color: #58708e;
 }
@@ -361,23 +457,33 @@ export default {
   min-width: 92rpx;
   height: 54rpx;
   border-radius: 27rpx;
-  background: rgba(56, 196, 139, 0.15);
-  color: #1b9d67;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 26rpx;
-  font-weight: 800;
+  font-weight: 900;
+}
+
+.rate-pill.normal,
+.area-rate.normal,
+.status-tag.normal {
+  background: rgba(56, 196, 139, 0.15);
+  color: #1b9d67;
 }
 
 .rate-pill.warn,
-.area-rate.warn {
+.area-rate.warn,
+.status-tag.warn {
   background: rgba(255, 176, 58, 0.18);
   color: #d58a00;
 }
 
 .rate-pill.danger,
-.area-rate.danger {
+.area-rate.danger,
+.status-tag.danger,
+.rate-pill.full,
+.area-rate.full,
+.status-tag.full {
   background: rgba(255, 87, 104, 0.16);
   color: #e34a5d;
 }
@@ -407,6 +513,7 @@ export default {
   color: #19334f;
   font-size: 38rpx;
   font-weight: 900;
+  transition: color 0.25s ease, transform 0.25s ease;
 }
 
 .stat-value.occupied {
@@ -417,31 +524,42 @@ export default {
   color: #15aa72;
 }
 
-.recommend-card {
-  margin-top: 18rpx;
-  padding: 18rpx;
-  border-radius: 18rpx;
-  background: #edf7ff;
-  border: 1px solid #d8ebff;
+.focus-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14rpx;
 }
 
-.recommend-title {
-  margin-top: 4rpx;
-  font-size: 30rpx;
-  font-weight: 800;
+.focus-card {
+  min-height: 140rpx;
+  background: linear-gradient(135deg, rgba(255, 248, 248, 0.96), rgba(255, 255, 255, 0.92));
+}
+
+.focus-card.soft {
+  background: linear-gradient(135deg, rgba(238, 250, 255, 0.98), rgba(255, 255, 255, 0.94));
+}
+
+.focus-title {
+  margin-top: 10rpx;
   color: #17314c;
+  font-size: 32rpx;
+  font-weight: 900;
 }
 
-.recommend-count {
-  color: #1377c8;
-  font-size: 28rpx;
-  font-weight: 800;
+.focus-meta {
+  margin-top: 8rpx;
+}
+
+.panel-head {
+  align-items: flex-start;
 }
 
 .legend-row {
   display: flex;
-  gap: 18rpx;
-  margin: 14rpx 0 16rpx;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12rpx;
+  max-width: 260rpx;
 }
 
 .legend {
@@ -466,8 +584,12 @@ export default {
   background: #ff6672;
 }
 
-.abnormal-dot {
+.tight-dot {
   background: #ffc857;
+}
+
+.parking-map {
+  margin-top: 18rpx;
 }
 
 .area-block {
@@ -476,13 +598,24 @@ export default {
   border-radius: 20rpx;
   background: #f8fcff;
   border: 1px solid #dceafa;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-.area-name,
-.name {
+.area-block.danger,
+.area-block.full {
+  border-color: rgba(255, 87, 104, 0.24);
+  background: #fff8f9;
+}
+
+.area-block.warn {
+  border-color: rgba(255, 176, 58, 0.28);
+  background: #fffaf0;
+}
+
+.area-name {
   font-size: 28rpx;
   color: #17314c;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .slot-grid {
@@ -496,7 +629,8 @@ export default {
   height: 34rpx;
   border-radius: 8rpx;
   background: linear-gradient(180deg, #75deb1, #46c993);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.52);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.52);
+  transition: background 0.35s ease;
 }
 
 .slot.busy {
@@ -505,6 +639,17 @@ export default {
 
 .slot.tight {
   background: linear-gradient(180deg, #ffd56c, #f1ad2c);
+}
+
+.area-footer {
+  margin-top: 14rpx;
+}
+
+.status-tag {
+  padding: 5rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 800;
 }
 
 .progress {
@@ -519,47 +664,20 @@ export default {
   height: 100%;
   border-radius: 8rpx;
   background: linear-gradient(90deg, #65b8ff, #5ed8a5);
+  transition: width 0.45s ease, background 0.3s ease;
 }
 
-.form-item {
-  margin-bottom: 14rpx;
+.progress-inner.warn {
+  background: linear-gradient(90deg, #ffcf6a, #ffad42);
 }
 
-.form-row {
-  display: flex;
-  justify-content: space-between;
-}
-
-.half {
-  width: 48%;
-}
-
-.ipt {
-  width: 100%;
-  height: 76rpx;
-  border-radius: 16rpx;
-  background: #f4f9ff;
-  border: 1px solid #d9e9fb;
-  padding: 0 18rpx;
-  box-sizing: border-box;
-  font-size: 26rpx;
-  color: #1d2f44;
-}
-
-.submit-btn {
-  margin-top: 10rpx;
-  height: 82rpx;
-  border-radius: 41rpx;
-  background: linear-gradient(90deg, #007aff 0%, #05b5ff 100%);
-  color: #fff;
-  font-size: 28rpx;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.progress-inner.danger,
+.progress-inner.full {
+  background: linear-gradient(90deg, #ff8791, #ef5967);
 }
 
 .empty {
+  margin-top: 18rpx;
   border-radius: 16rpx;
   background: rgba(236, 246, 255, 0.8);
   color: #58708e;
@@ -567,16 +685,4 @@ export default {
   padding: 18rpx;
 }
 
-.record-card {
-  padding: 18rpx;
-  border-radius: 18rpx;
-  background: #f7fbff;
-  border: 1px solid #dceafa;
-  margin-bottom: 12rpx;
-}
-
-.delete {
-  font-size: 22rpx;
-  color: #e45e5e;
-}
 </style>

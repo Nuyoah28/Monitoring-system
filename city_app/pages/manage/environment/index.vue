@@ -4,7 +4,7 @@
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
       </view>
-      <text class="title">环境质量检测</text>
+      <text class="title">环境质量监测</text>
       <view class="refresh-btn" @tap="refreshAll">刷新</view>
     </view>
 
@@ -25,18 +25,18 @@
       </view>
       <view class="quality-right">
         <text class="aqi-value">{{ realtime.aqi || '-' }}</text>
-        <text class="aqi-label">AQI指数</text>
+        <text class="aqi-label">空气质量指数</text>
       </view>
     </view>
 
     <view class="score-panel">
-      <view>
+      <view class="score-summary">
         <view class="score-label">综合舒适度</view>
         <view class="score-main">{{ comfortScore }}<text>/100</text></view>
       </view>
       <view class="score-bars">
         <view class="score-row">
-          <text>AQI</text>
+          <text>空气</text>
           <view class="bar"><view class="bar-inner blue" :style="{ width: aqiScore + '%' }"></view></view>
         </view>
         <view class="score-row">
@@ -51,40 +51,44 @@
     </view>
 
     <view class="grid">
-      <view class="metric-card">
-        <view class="metric-icon">
-          <u-icon name="sun" color="#ff9c28" size="36rpx"></u-icon>
+      <view class="metric-card" :class="'metric-card--' + temperatureState.type">
+        <view class="metric-icon metric-icon--temperature">温</view>
+        <view class="metric-title-row">
+          <text class="metric-name">温度</text>
+          <text class="metric-status">{{ temperatureState.text }}</text>
         </view>
-        <text class="metric-name">温度</text>
         <text class="metric-value">{{ realtime.temperature }}°C</text>
         <text class="metric-desc">较昨日 {{ realtime.temperatureDelta >= 0 ? '+' : '' }}{{ realtime.temperatureDelta }}°C</text>
       </view>
 
-      <view class="metric-card">
-        <view class="metric-icon">
-          <u-icon name="water" color="#409df8" size="36rpx"></u-icon>
+      <view class="metric-card" :class="'metric-card--' + humidityState.type">
+        <view class="metric-icon metric-icon--humidity">湿</view>
+        <view class="metric-title-row">
+          <text class="metric-name">湿度</text>
+          <text class="metric-status">{{ humidityState.text }}</text>
         </view>
-        <text class="metric-name">湿度</text>
         <text class="metric-value">{{ realtime.humidity }}%</text>
         <text class="metric-desc">动态区间 {{ humidityRange }}</text>
       </view>
 
-      <view class="metric-card">
-        <view class="metric-icon">
-          <u-icon name="dashboard" color="#5f8df7" size="36rpx"></u-icon>
+      <view class="metric-card" :class="'metric-card--' + aqiState.type">
+        <view class="metric-icon metric-icon--aqi">空</view>
+        <view class="metric-title-row">
+          <text class="metric-name">空气指数</text>
+          <text class="metric-status">{{ aqiState.text }}</text>
         </view>
-        <text class="metric-name">AQI</text>
         <text class="metric-value">{{ realtime.aqi }}</text>
         <text class="metric-desc">{{ aqiText }}</text>
       </view>
 
-      <view class="metric-card">
-        <view class="metric-icon">
-          <u-icon name="wind" color="#56c999" size="36rpx"></u-icon>
+      <view class="metric-card" :class="'metric-card--' + pm25State.type">
+        <view class="metric-icon metric-icon--pm25">PM</view>
+        <view class="metric-title-row">
+          <text class="metric-name">PM2.5</text>
+          <text class="metric-status">{{ pm25State.text }}</text>
         </view>
-        <text class="metric-name">PM2.5</text>
         <text class="metric-value">{{ realtime.pm25 }}</text>
-        <text class="metric-desc">μg/m³</text>
+        <text class="metric-desc">微克/立方米</text>
       </view>
     </view>
 
@@ -196,6 +200,30 @@ export default {
       if (!values.length) return '--';
       return `${Math.min(...values)}-${Math.max(...values)}%`;
     },
+    temperatureState() {
+      const value = Number(this.realtime.temperature);
+      if (value >= 35 || value <= 5) return { type: 'bad', text: '异常' };
+      if (value >= 30 || value <= 12) return { type: 'warn', text: '关注' };
+      return { type: 'good', text: '正常' };
+    },
+    humidityState() {
+      const value = Number(this.realtime.humidity);
+      if (value >= 75 || value <= 25) return { type: 'bad', text: '异常' };
+      if (value >= 65 || value <= 35) return { type: 'warn', text: '关注' };
+      return { type: 'good', text: '正常' };
+    },
+    aqiState() {
+      const value = Number(this.realtime.aqi);
+      if (value > 150) return { type: 'bad', text: '异常' };
+      if (value > 100) return { type: 'warn', text: '关注' };
+      return { type: 'good', text: '正常' };
+    },
+    pm25State() {
+      const value = Number(this.realtime.pm25);
+      if (value > 75) return { type: 'bad', text: '异常' };
+      if (value > 35) return { type: 'warn', text: '关注' };
+      return { type: 'good', text: '正常' };
+    },
     aqiText() {
       if (this.realtime.aqi >= 120) return '空气偏差';
       if (this.realtime.aqi >= 80) return '轻度波动';
@@ -233,17 +261,19 @@ export default {
     analysisList() {
       const list = [];
       list.push(`当前${this.currentMonitor ? this.currentMonitor.name : '监测点'}舒适度为 ${this.comfortScore} 分。`);
-      if (this.realtime.pm25 > 55) list.push('PM2.5 偏高，建议加强通风并关注烟雾类报警。');
-      else list.push('PM2.5 处于可控范围，空气质量整体稳定。');
-      if (this.realtime.humidity > 65) list.push('湿度偏高，地下或楼道区域建议开启除湿/排风。');
+      if (this.pm25State.type === 'bad') list.push('PM2.5已达到异常水平，建议及时排查扬尘、烟雾或通风情况。');
+      else if (this.pm25State.type === 'warn') list.push('PM2.5偏高，建议加强通风并关注烟雾类报警。');
+      else list.push('PM2.5处于可控范围，空气质量整体稳定。');
+      if (this.humidityState.type === 'bad') list.push('湿度已明显偏离舒适区间，建议检查通风、除湿或补湿设备。');
+      else if (this.realtime.humidity > 65) list.push('湿度偏高，地下或楼道区域建议开启除湿/排风。');
       else if (this.realtime.humidity < 40) list.push('湿度偏低，室外扬尘风险略有上升。');
       else list.push('湿度处于舒适区间，环境波动较小。');
       return list;
     },
     abnormalList() {
       const events = [];
-      if (this.realtime.pm25 > 55) events.push({ time: '近10分钟', text: 'PM2.5 短时抬升' });
-      if (this.realtime.aqi > 95) events.push({ time: '今日', text: 'AQI 达到关注阈值' });
+      if (this.realtime.pm25 > 55) events.push({ time: '近10分钟', text: 'PM2.5短时抬升' });
+      if (this.realtime.aqi > 95) events.push({ time: '今日', text: '空气质量达到关注阈值' });
       if (!events.length) events.push({ time: '今日', text: '暂无明显环境异常' });
       return events;
     },
@@ -545,15 +575,20 @@ export default {
 }
 
 .score-panel {
-  margin-top: 18rpx;
-  padding: 24rpx;
+  margin-top: 24rpx;
+  padding: 28rpx 30rpx;
   display: flex;
-  gap: 22rpx;
+  gap: 34rpx;
   align-items: center;
 }
 
+.score-summary {
+  width: 214rpx;
+  flex-shrink: 0;
+}
+
 .score-main {
-  margin-top: 8rpx;
+  margin-top: 12rpx;
   color: #1178cc;
   font-size: 64rpx;
   font-weight: 900;
@@ -568,13 +603,15 @@ export default {
 
 .score-bars {
   flex: 1;
+  min-width: 0;
+  padding-left: 8rpx;
 }
 
 .score-row {
   display: grid;
-  grid-template-columns: 84rpx 1fr;
+  grid-template-columns: 92rpx 1fr;
   align-items: center;
-  margin: 10rpx 0;
+  margin: 14rpx 0;
   font-size: 22rpx;
   color: #58708e;
 }
@@ -607,7 +644,7 @@ export default {
 }
 
 .grid {
-  margin-top: 18rpx;
+  margin-top: 24rpx;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16rpx;
@@ -615,10 +652,80 @@ export default {
 
 .metric-card {
   padding: 20rpx;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.metric-card--good {
+  border-color: rgba(94, 205, 145, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.metric-card--warn {
+  border-color: rgba(255, 184, 66, 0.42);
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.96), rgba(255, 255, 255, 0.92));
+}
+
+.metric-card--bad {
+  border-color: rgba(255, 91, 105, 0.46);
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.98), rgba(255, 255, 255, 0.92));
 }
 
 .metric-icon {
-  margin-bottom: 6rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  margin-bottom: 8rpx;
+  border-radius: 18rpx;
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 900;
+}
+
+.metric-icon--temperature {
+  background: linear-gradient(135deg, #ffb44f, #ff8a3d);
+}
+
+.metric-icon--humidity {
+  background: linear-gradient(135deg, #5ab7ff, #3f8ff3);
+}
+
+.metric-icon--aqi {
+  background: linear-gradient(135deg, #7398ff, #536ee8);
+}
+
+.metric-icon--pm25 {
+  background: linear-gradient(135deg, #5bd59d, #38b987);
+}
+
+.metric-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.metric-status {
+  padding: 4rpx 10rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+}
+
+.metric-card--good .metric-status {
+  color: #16a36f;
+  background: rgba(62, 202, 143, 0.14);
+}
+
+.metric-card--warn .metric-status {
+  color: #d48d08;
+  background: rgba(255, 184, 66, 0.2);
+}
+
+.metric-card--bad .metric-status {
+  color: #e04d60;
+  background: rgba(255, 91, 105, 0.15);
 }
 
 .metric-value {
@@ -627,6 +734,14 @@ export default {
   color: #1f2d3c;
   font-size: 42rpx;
   font-weight: 900;
+}
+
+.metric-card--warn .metric-value {
+  color: #d48d08;
+}
+
+.metric-card--bad .metric-value {
+  color: #e04d60;
 }
 
 .metric-desc {

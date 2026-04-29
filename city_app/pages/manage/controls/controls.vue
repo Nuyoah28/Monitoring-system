@@ -34,7 +34,7 @@
         <view class="quick-icon quick-icon--blue">
           <image class="quick-icon-image" src="/static/locate-blue.png" mode="aspectFit"></image>
         </view>
-        <text>车位引导</text>
+        <text>车位检测</text>
       </view>
       <view class="quick-item" @tap="goPage('/pages/manage/environment/index')">
         <view class="quick-icon quick-icon--green">
@@ -157,6 +157,7 @@ export default {
       alarmRefreshTimer: null,
       monitorRefreshTimer: null,
       mapPulseTimer: null,
+      pendingRefreshTimer: null,
     };
   },
   computed: {
@@ -184,6 +185,7 @@ export default {
   onLoad() {
     const info = uni.getWindowInfo();
     this.statusBarHeight = info.statusBarHeight || 20;
+    uni.$on('newAlarm', this.handleNewAlarm);
   },
   onShow() {
     this.startRealtimeMap();
@@ -192,6 +194,7 @@ export default {
     this.stopRealtimeMap();
   },
   onUnload() {
+    uni.$off('newAlarm', this.handleNewAlarm);
     this.stopRealtimeMap();
   },
   methods: {
@@ -201,11 +204,11 @@ export default {
       this.getPendingAlerts();
 
       this.alarmRefreshTimer = setInterval(() => {
-        this.getPendingAlerts();
+        this.getPendingAlerts(true);
       }, 10000);
 
       this.monitorRefreshTimer = setInterval(() => {
-        this.getMonitor();
+        this.getMonitor(true);
       }, 30000);
 
       this.mapPulseTimer = setInterval(() => {
@@ -225,6 +228,46 @@ export default {
         clearInterval(this.mapPulseTimer);
         this.mapPulseTimer = null;
       }
+      if (this.pendingRefreshTimer) {
+        clearTimeout(this.pendingRefreshTimer);
+        this.pendingRefreshTimer = null;
+      }
+    },
+    handleNewAlarm(payload) {
+      const alarm = payload && payload.data ? payload.data : payload;
+      if (alarm && alarm.caseType !== 13) {
+        this.prependRealtimeAlarm(alarm);
+      }
+      this.schedulePendingAlertRefresh(260);
+    },
+    schedulePendingAlertRefresh(delay = 0) {
+      if (this.pendingRefreshTimer) {
+        clearTimeout(this.pendingRefreshTimer);
+      }
+      this.pendingRefreshTimer = setTimeout(() => {
+        this.pendingRefreshTimer = null;
+        this.getPendingAlerts(true);
+      }, delay);
+    },
+    prependRealtimeAlarm(alarm) {
+      if (!alarm || typeof alarm !== 'object') return;
+      const alarmId = alarm.id || alarm.alarmId || alarm.warningId || `${alarm.name || alarm.monitorName || 'alarm'}-${Date.now()}`;
+      const exists = this.alarms.some((item) => String(item.id || item.alarmId || item.warningId) === String(alarmId));
+      if (exists) return;
+      const normalized = {
+        ...alarm,
+        id: alarmId,
+        level: alarm.level || alarm.warningLevel || 1,
+        eventName: alarm.eventName || alarm.caseTypeName || alarm.message || '新的警情',
+        date: alarm.date || this.formatNowTime(),
+        status: alarm.status === undefined ? 0 : alarm.status,
+      };
+      this.alarms = [normalized, ...this.alarms].filter((item) => item.caseType !== 13).slice(0, 50);
+    },
+    formatNowTime() {
+      const now = new Date();
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
     },
     mergeMonitorPosition(monitorList, monitorPosList) {
       const monitors = Array.isArray(monitorList) ? monitorList : [];
@@ -258,14 +301,14 @@ export default {
         endTime: `${y}-${m}-${d} 23:59:59`,
       };
     },
-    async getMonitor() {
+    async getMonitor(silent = false) {
       try {
-        const { data: monitorRes } = await uni.$http.get("/api/v1/monitor");
+        const { data: monitorRes } = await uni.$http.get("/api/v1/monitor", {}, { silent });
         const monitorList = (monitorRes && monitorRes.data) || [];
 
         let monitorPosList = [];
         try {
-          const { data: mapRes } = await uni.$http.get("/api/v1/monitor/map");
+          const { data: mapRes } = await uni.$http.get("/api/v1/monitor/map", {}, { silent });
           const mapData = (mapRes && mapRes.data) || {};
           monitorPosList = Array.isArray(mapData) ? mapData : mapData.monitorPosList || [];
         } catch (mapError) {
@@ -277,7 +320,7 @@ export default {
         console.warn("[controls] 获取监控地图信息失败：", error);
       }
     },
-    async getPendingAlerts() {
+    async getPendingAlerts(silent = false) {
       try {
         const range = this.buildTodayRange();
         const query = {
@@ -287,7 +330,7 @@ export default {
           startTime: range.startTime,
           endTime: range.endTime,
         };
-        const { data } = await uni.$http.get("/api/v1/alarm/query", query);
+        const { data } = await uni.$http.get("/api/v1/alarm/query", query, { silent });
         const list = (data && data.data && data.data.alarmList) || [];
         this.alarms = list.filter((item) => item.caseType !== 13);
       } catch (error) {

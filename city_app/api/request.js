@@ -21,7 +21,6 @@ let requestCount = 0;
 
 $http.beforeRequest = function (options) {
     let token = uni.getStorageSync('token')
-    // console.log("token!!!!1",token);
     let header = {};
     if (token) {
         header = {
@@ -29,6 +28,7 @@ $http.beforeRequest = function (options) {
         }
     }
     options.header = header
+    if (options.silent) return;
     if (requestCount === 0) {
         uni.showLoading({
             title: '加载中',
@@ -37,7 +37,8 @@ $http.beforeRequest = function (options) {
     }
     requestCount++;
 }
-$http.afterRequest = function () {
+$http.afterRequest = function (res, options = {}) {
+    if (options.silent) return;
     requestCount--;
     if (requestCount <= 0) {
         requestCount = 0;

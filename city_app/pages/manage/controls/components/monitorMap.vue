@@ -24,7 +24,7 @@
         </view>
         <view class="fallback-pin">
           <view v-if="point.hasAlert" class="fallback-pulse"></view>
-          <image src="/static/locate-blue.png" mode="aspectFit"></image>
+          <image :src="point.hasAlert ? '/static/locate-red.png' : '/static/locate-blue.png'" mode="aspectFit"></image>
           <text v-if="point.hasAlert" class="fallback-badge">{{ point.alarmCount > 99 ? "99+" : point.alarmCount }}</text>
         </view>
       </view>
@@ -172,11 +172,37 @@ const inferPseudoLngLat = (camera, department, index) => {
   return [lng + jitterLng, lat + jitterLat];
 };
 
+const APP_SAFE_MARKER_ICON = "/static/locate-blue.png";
+const APP_ALERT_MARKER_ICON = "/static/locate-red.png";
+const APP_ALERT_BADGE_ICONS = {
+  1: "/static/locate-red-badge-1.png",
+  2: "/static/locate-red-badge-2.png",
+  3: "/static/locate-red-badge-3.png",
+  4: "/static/locate-red-badge-4.png",
+  5: "/static/locate-red-badge-5.png",
+  6: "/static/locate-red-badge-6.png",
+  7: "/static/locate-red-badge-7.png",
+  8: "/static/locate-red-badge-8.png",
+  9: "/static/locate-red-badge-9.png",
+  plus: "/static/locate-red-badge-plus.png",
+};
+
 const pickAlarmCameraName = (item) =>
-  String(item?.camera || item?.monitorName || item?.monitor || item?.deviceName || "").trim();
+  String(item?.camera || item?.monitorName || item?.monitor || item?.deviceName || item?.name || "").trim();
 
 const pickAlarmAreaName = (item) =>
   String(item?.department || item?.location || item?.area || "").trim();
+
+const pickAlarmTitle = (item) =>
+  String(item?.eventName || item?.caseTypeName || item?.message || item?.alarmName || item?.typeName || "待处理警情").trim();
+
+const addAlarmInfo = (target, key, item) => {
+  if (!key) return;
+  if (!target[key]) {
+    target[key] = { count: 0, latest: item };
+  }
+  target[key].count += 1;
+};
 
 export default {
   name: "MonitorMap",
@@ -204,6 +230,7 @@ export default {
       h5MarkerOverlays: [],
       h5Error: "",
       h5PulseStyleInjected: false,
+      lastPointFitSignature: "",
     };
   },
   computed: {
@@ -218,15 +245,14 @@ export default {
         if (!this.isPendingAlarm(item)) return;
         const monitorId = item?.monitorId || item?.cameraId || item?.deviceId || item?.monitor_id;
         if (monitorId !== undefined && monitorId !== null && `${monitorId}` !== "") {
-          const idKey = String(monitorId);
-          idCounts[idKey] = (idCounts[idKey] || 0) + 1;
+          addAlarmInfo(idCounts, String(monitorId), item);
           return;
         }
 
         const cameraName = pickAlarmCameraName(item);
         const cameraKey = normalizeName(cameraName);
         if (cameraKey) {
-          cameraCounts[cameraKey] = (cameraCounts[cameraKey] || 0) + 1;
+          addAlarmInfo(cameraCounts, cameraKey, item);
           return;
         }
 
@@ -245,11 +271,11 @@ export default {
 
         const matchedName = normalizeName(matched?.name || matched?.camera);
         if (matchedName) {
-          cameraCounts[matchedName] = (cameraCounts[matchedName] || 0) + 1;
+          addAlarmInfo(cameraCounts, matchedName, item);
           return;
         }
 
-        areaCounts[areaKey] = (areaCounts[areaKey] || 0) + 1;
+        addAlarmInfo(areaCounts, areaKey, item);
       });
 
       return { idCounts, cameraCounts, areaCounts };
@@ -274,7 +300,7 @@ export default {
         const [fallbackLng, fallbackLat] = inferPseudoLngLat(camera, department, index);
 
         const sourceId = monitor?.id || monitor?.monitorId || index + 1;
-        const alarmCount = this.getAlarmCount(sourceId, camera, department);
+        const alarmInfo = this.getAlarmInfo(sourceId, camera, department);
 
         return {
           markerId: index + 1,
@@ -284,8 +310,9 @@ export default {
           department,
           longitude: hasGeo ? lon : fallbackLng,
           latitude: hasGeo ? lat : fallbackLat,
-          alarmCount,
-          hasAlert: alarmCount > 0,
+          alarmCount: alarmInfo.count,
+          latestAlarm: alarmInfo.latest,
+          hasAlert: alarmInfo.count > 0,
         };
       });
 
@@ -350,44 +377,27 @@ export default {
       });
     },
     mapMarkers() {
-      const pulseExpand = this.getPulseExpand();
       return this.points.map((item) => {
-        const markerSize = item.hasAlert ? 34 + pulseExpand : 30;
-        const label = this.getNativeLabelText(item);
-        const labelColor = item.hasAlert ? "#b91c1c" : "#0f4c81";
-        const borderColor = item.hasAlert ? "#fca5a5" : "#93c5fd";
-        const bgColor = item.hasAlert ? "#fff1f2" : "#eff6ff";
-        const labelText = item.hasAlert ? label : "";
-
+        const labelText = this.getNativeLabelText(item);
         return {
           id: item.markerId,
           longitude: item.longitude,
           latitude: item.latitude,
-          iconPath: "/static/locate-blue.png",
-          width: markerSize,
-          height: markerSize,
-          callout: {
-            content: labelText,
-            color: labelColor,
-            fontSize: 11.5,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor,
-            bgColor,
-            padding: 6,
-            display: item.hasAlert ? "ALWAYS" : "BYCLICK",
-          },
+          iconPath: this.getNativeMarkerIcon(item),
+          width: item.hasAlert ? 38 : 30,
+          height: item.hasAlert ? 38 : 30,
+          zIndex: item.hasAlert ? 999 : 100,
           label: {
             content: labelText,
-            color: labelColor,
-            fontSize: 11.5,
+            color: item.hasAlert ? "#b91c1c" : "#0f4c81",
+            fontSize: 11,
             borderRadius: 10,
             borderWidth: 1,
-            borderColor,
-            bgColor,
+            borderColor: item.hasAlert ? "#fca5a5" : "#bfdbfe",
+            bgColor: item.hasAlert ? "#fff1f2" : "#eff6ff",
             padding: 6,
-            anchorX: 18,
-            anchorY: -30,
+            anchorX: item.hasAlert ? 22 : 18,
+            anchorY: item.hasAlert ? -34 : -30,
           },
         };
       });
@@ -397,16 +407,17 @@ export default {
     points: {
       deep: true,
       handler() {
+        const shouldFit = this.shouldRefitPoints();
         // #ifdef H5
-        this.renderH5Markers(true);
+        this.renderH5Markers(shouldFit);
         // #endif
         // #ifndef H5
-        this.fitToPoints();
+        if (shouldFit) this.fitToPoints();
         // #endif
       },
     },
     pulseTick() {
-      // H5 端使用 CSS 连续动画，不再通过定时重绘 marker 模拟呼吸
+      // App 真机端保持 marker 稳定，避免频繁重绘导致闪烁
     },
   },
   mounted() {
@@ -430,6 +441,14 @@ export default {
     // #endif
   },
   methods: {
+    shouldRefitPoints() {
+      const signature = this.points
+        .map((item) => `${item.sourceId}:${Number(item.longitude).toFixed(6)},${Number(item.latitude).toFixed(6)}`)
+        .join('|');
+      if (signature === this.lastPointFitSignature) return false;
+      this.lastPointFitSignature = signature;
+      return true;
+    },
     isPendingAlarm(item) {
       if (!item || typeof item !== "object") return false;
       if (item.status === 1 || item.status === true || String(item.status) === "1") return false;
@@ -437,26 +456,22 @@ export default {
       if (dealText.includes("已处理")) return false;
       return true;
     },
-    getAlarmCount(sourceId, camera, department) {
+    getAlarmInfo(sourceId, camera, department) {
       if (sourceId !== undefined && sourceId !== null) {
-        const idCount = this.alarmCountMap.idCounts[String(sourceId)] || 0;
-        if (idCount > 0) return idCount;
+        const idInfo = this.alarmCountMap.idCounts[String(sourceId)];
+        if (idInfo && idInfo.count > 0) return idInfo;
       }
       const cameraKey = normalizeName(camera);
       const departmentKey = normalizeName(department);
-      const cameraCount = this.alarmCountMap.cameraCounts[cameraKey] || 0;
-      if (cameraCount > 0) return cameraCount;
-      // 仅在没有摄像头名且区域可唯一匹配时，才做区域兜底，避免“全图都变红”
-      if (!departmentKey) return 0;
+      const cameraInfo = this.alarmCountMap.cameraCounts[cameraKey];
+      if (cameraInfo && cameraInfo.count > 0) return cameraInfo;
+      if (!departmentKey) return { count: 0, latest: null };
       const deptMonitors = (Array.isArray(this.monitorList) ? this.monitorList : []).filter((item) => {
         const dept = normalizeName(item?.department || item?.area || item?.location);
         return dept && dept === departmentKey;
       });
-      if (deptMonitors.length !== 1) return 0;
-      return this.alarmCountMap.areaCounts[departmentKey] || 0;
-    },
-    getPulseExpand() {
-      return this.pulseTick % 2 === 0 ? 0 : 8;
+      if (deptMonitors.length !== 1) return { count: 0, latest: null };
+      return this.alarmCountMap.areaCounts[departmentKey] || { count: 0, latest: null };
     },
     getMarkerLabelText(point) {
       if (!point) return "监测点";
@@ -464,12 +479,22 @@ export default {
         ? `${point.camera || point.name}（${point.alarmCount}）`
         : point.camera || point.name || "监测点";
     },
+    getNativeMarkerIcon(point) {
+      if (!point || !point.hasAlert) return APP_SAFE_MARKER_ICON;
+      const count = Number(point.alarmCount || 0);
+      if (count >= 10) return APP_ALERT_BADGE_ICONS.plus;
+      return APP_ALERT_BADGE_ICONS[count] || APP_ALERT_MARKER_ICON;
+    },
     getNativeLabelText(point) {
       if (!point) return "监测点";
       const name = this.getShortText(point.camera || point.name || "监测点", 12);
       if (!point.hasAlert) return name;
-      const count = Number(point.alarmCount) > 99 ? "99+" : point.alarmCount;
-      return `${name}  告警 ${count}`;
+      const count = this.getAlarmCountText(point.alarmCount);
+      const title = this.getShortText(pickAlarmTitle(point.latestAlarm), 8);
+      return `${name}｜${count}条告警｜${title}`;
+    },
+    getAlarmCountText(count) {
+      return Number(count) > 9 ? "9+" : String(count || 0);
     },
     getH5LabelText(point) {
       if (!point) return "监测点";
@@ -510,7 +535,7 @@ export default {
           </span>`
         : "";
       return `<div class="${markerClass}">
-        <img class="monitor-map-pin" src="/static/locate-blue.png" alt="pin" />
+        <img class="monitor-map-pin" src="${point.hasAlert ? APP_ALERT_MARKER_ICON : APP_SAFE_MARKER_ICON}" alt="pin" />
         ${badgeHtml}
       </div>`;
     },

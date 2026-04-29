@@ -4,11 +4,11 @@
  */
 
 export const NETWORK_CONFIG = {
-    IP: '172.20.10.2',
-    LOCAL_IP: '172.20.10.2',
+    IP: '192.168.68.31',
+    LOCAL_IP: '192.168.68.31',
     BACKEND_PORT: '10215',
     AI_AGENT_PORT: '5050',
-    DEMO_VIDEO_HOST: '172.20.10.2',
+    DEMO_VIDEO_HOST: 'localhost',
     DEMO_VIDEO_PORT: '8848'
 };
 

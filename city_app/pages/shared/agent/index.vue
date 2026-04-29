@@ -432,7 +432,7 @@ import Vue from 'vue';
 					: (info.windowHeight || info.screenHeight || 0);
 				this.safeHeight = safeAreaHeight;
 				this.$nextTick(() => {
-					const query = uni.createSelectorQuery();
+					const query = uni.createSelectorQuery().in(this);
 					query.select('#ai-body').boundingClientRect();
 					query.select('#ai-down').boundingClientRect();
 					query.exec((res) => {
@@ -961,8 +961,10 @@ import Vue from 'vue';
 				position: relative;
 				z-index: 10;
 				flex: 1;
+				min-height: 0;
 				width: 100%;
 				height: auto;
+				overflow: hidden;
 				background: transparent;
 				border-radius: 0;
 				display: flex;

@@ -99,6 +99,7 @@ public class ParkingDataServiceImpl implements ParkingDataService {
         }
         ParkingRealtimeRes res = new ParkingRealtimeRes();
         res.setMonitorId(monitorId);
+        res.setSource("real");
         res.setZones(new ArrayList<>());
         int total = 0;
         int used = 0;

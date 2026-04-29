@@ -9,6 +9,7 @@ import java.util.List;
 @Data
 public class ParkingRealtimeRes {
     private Integer monitorId;
+    private String source;
     private Integer totalSpaces;
     private Integer occupiedSpaces;
     private Integer freeSpaces;

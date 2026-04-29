@@ -1,6 +1,6 @@
 <template>
   <view class="main" :style="{ minHeight: safeHeight + 'px', height: safeHeight + 'px', paddingTop: statusBarHeight + 'px' }">
-    <view class="header" id="ai-header">
+    <view class="header">
       <view class="top-nav">
         <view class="back-btn" @tap="goBack">
           <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
@@ -85,7 +85,7 @@ import { AI_HTTP_URL, AI_WS_URL } from '@/common/config.js';
 import Vue from 'vue';
 import OwnerTabbar from '@/components/navigation/owner-tabbar.vue';
 
-const AI_WELCOME_MESSAGE = '你好，我是社区智眼 AI 助手。你可以问我报警处置、监控巡检、环境数据、车位引导相关的问题，我会尽量用简单清楚的方式帮你分析。';
+const AI_WELCOME_MESSAGE = '你好，我是社区智眼 AI 助手。你可以问我报警处置、监控巡检、环境数据、车位检测相关的问题，我会尽量用简单清楚的方式帮你分析。';
 
 export default {
   components: { OwnerTabbar },
@@ -166,9 +166,15 @@ export default {
       const safeAreaHeight = info && info.safeArea && info.safeArea.height ? info.safeArea.height : info.windowHeight || info.screenHeight || 720;
       this.safeHeight = safeAreaHeight;
       this.statusBarHeight = (info && info.statusBarHeight) || 20;
-      this.scrollHeight = Math.max(260, safeAreaHeight - this.statusBarHeight - 236);
+      const header = 108;
+      const input = this.isOwnerApp ? 180 : 128;
+      this.scrollHeight = Math.max(260, safeAreaHeight - this.statusBarHeight - header - input);
     },
     refreshScrollViewport(scrollToBottom = false) {
+      const info = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : uni.getSystemInfoSync();
+      const safeAreaHeight = info && info.safeArea && info.safeArea.height ? info.safeArea.height : info.windowHeight || info.screenHeight || 720;
+      this.safeHeight = safeAreaHeight;
+      this.statusBarHeight = (info && info.statusBarHeight) || 20;
       this.$nextTick(() => {
         const query = uni.createSelectorQuery().in(this);
         query.select('#ai-body').boundingClientRect();
@@ -790,7 +796,9 @@ export default {
   position: relative;
   z-index: 10;
   flex: 1;
+  min-height: 0;
   width: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
