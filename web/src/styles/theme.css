@@ -40,7 +40,10 @@
 html,
 body,
 #app {
-  min-height: 100%;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 html {
@@ -52,7 +55,9 @@ body {
   color: var(--text);
   font: 14px/1.55 var(--font-ui);
   letter-spacing: 0.01em;
-  min-height: 100vh;
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
   background:
     radial-gradient(circle at 0% 0%, rgba(103, 190, 255, 0.2), transparent 30%),
     radial-gradient(circle at 100% 0%, rgba(126, 232, 255, 0.12), transparent 26%),
@@ -159,29 +164,33 @@ textarea:focus-visible,
   margin: 0 auto;
   padding: 18px;
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 .head {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 26px;
+  border-radius: 20px;
   background:
     linear-gradient(135deg, rgba(12, 32, 54, 0.96), rgba(8, 21, 37, 0.88)),
     rgba(8, 22, 39, 0.88);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    var(--shadow-lg);
+    0 14px 34px rgba(1, 10, 21, 0.3);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  padding: 18px 20px;
+  padding: 10px 16px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto auto;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -197,9 +206,9 @@ textarea:focus-visible,
 .head::after {
   content: '';
   position: absolute;
-  inset: auto 12% -120px auto;
-  width: 260px;
-  height: 260px;
+  inset: auto 12% -90px auto;
+  width: 190px;
+  height: 190px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(103, 190, 255, 0.14), transparent 68%);
   filter: blur(8px);
@@ -207,16 +216,16 @@ textarea:focus-visible,
 
 .head h1 {
   margin: 0;
-  font-size: 32px;
+  font-size: 25px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: #fcffff;
   text-shadow: 0 0 14px rgba(126, 197, 255, 0.24);
 }
 
 .head p {
-  margin: 8px 0 0;
-  font-size: 13px;
+  margin: 3px 0 0;
+  font-size: 12px;
   color: var(--sub);
   letter-spacing: 0.08em;
 }
@@ -225,13 +234,13 @@ textarea:focus-visible,
   position: relative;
   z-index: 1;
   border: 1px solid rgba(126, 197, 255, 0.22);
-  border-radius: 18px;
+  border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(18, 43, 70, 0.88), rgba(11, 28, 46, 0.82));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 10px 20px rgba(1, 8, 17, 0.18);
-  padding: 10px 14px;
+    0 8px 16px rgba(1, 8, 17, 0.16);
+  padding: 7px 12px;
   font-size: 12px;
   color: var(--text-soft);
   white-space: nowrap;
@@ -730,7 +739,7 @@ textarea:hover {
 
 @media (max-width: 1240px) {
   .head {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   }
 
   .status-grid {
@@ -747,7 +756,7 @@ textarea:hover {
   }
 
   .top-user {
-    justify-self: stretch;
+    justify-self: end;
   }
 
   .focus-screen {
@@ -762,17 +771,18 @@ textarea:hover {
   }
 
   .head {
-    padding: 16px;
-    border-radius: 22px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 10px 12px;
+    border-radius: 18px;
   }
 
   .head h1 {
-    font-size: 26px;
+    font-size: 23px;
   }
 
   .top-user {
     min-width: 0;
-    grid-template-columns: 44px 1fr;
+    grid-template-columns: 32px 1fr;
   }
 
   .monitor-grid,

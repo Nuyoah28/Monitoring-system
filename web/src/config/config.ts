@@ -31,7 +31,7 @@ const getEnvList = (name: string, fallback: string[]) => {
 const trimRightSlash = (value: string) => value.replace(/\/+$/, '')
 const toWsBase = (value: string) => trimRightSlash(value).replace(/^http/i, 'ws')
 
-const defaultApiBaseUrl = 'http://172.20.10.2:10215'
+const defaultApiBaseUrl = 'http://localhost:10215'
 const defaultAlgorithmUrl = 'http://localhost:6006'
 const defaultAgentBaseUrl = 'http://localhost:5050'
 const defaultDemoVideoBaseUrl = 'http://localhost:8848/video'

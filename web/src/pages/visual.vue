@@ -14,30 +14,36 @@
             {{ tab.label }}
           </button>
         </div>
-        <div class="nav-current">{{ currentTabLabel }}</div>
+        <div class="nav-current" :class="{ 'video-current': activeTab === 'video' }">
+          <template v-if="activeTab === 'video'">
+            <span class="nav-current-title">监控视频</span>
+            <span class="nav-metric">总点位 <b>{{ monitors.length || cameraTiles.length }}</b></span>
+            <span class="nav-metric ok">在线 <b>{{ monitors.length ? onlineCount : cameraTiles.length }}</b></span>
+            <span class="nav-metric muted">离线 <b>{{ offlineCount }}</b></span>
+            <span class="nav-metric warn">未处理 <b>{{ pendingAlertCount }}</b></span>
+            <button class="mini-action nav-mini-action" type="button" @click="openMonitorModal">全部点位</button>
+          </template>
+          <template v-else>{{ currentTabLabel }}</template>
+        </div>
       </section>
 
       <section class="content-shell">
         <section v-show="activeTab === 'alarm'" class="panel alarm-panel">
           <div class="alarm-left card">
-            <div class="panel-headline small">
-              <h3>最新报警明细</h3>
-              <div class="table-filters">
-                <input v-model.trim="alarmKeyword" placeholder="搜索事件/区域" />
-                <select v-model="alarmDealFilter">
-                  <option value="all">全部</option>
-                  <option value="pending">未处理</option>
-                  <option value="done">已处理</option>
-                </select>
-                <button class="mini-action chart-mini-action" type="button" @click="activeTab = 'video'">
-                  <span class="mini-icon video-icon" aria-hidden="true"></span>
-                  <span>联动视频</span>
-                </button>
-                <button class="mini-action chart-mini-action" type="button" @click="activeTab = 'agent'">
-                  <span class="mini-icon agent-icon" aria-hidden="true"></span>
-                  <span>交给 Agent</span>
-                </button>
+            <div class="alarm-list-head">
+              <div>
+                <h3>报警处置队列</h3>
+                <p>未处理与高等级报警优先</p>
               </div>
+              <span class="queue-count">{{ filteredAlarmRows.length }} 条</span>
+            </div>
+            <div class="table-filters alarm-table-filters">
+              <input v-model.trim="alarmKeyword" placeholder="搜索事件/区域" />
+              <select v-model="alarmDealFilter">
+                <option value="pending">未处理优先</option>
+                <option value="all">全部</option>
+                <option value="done">已处理</option>
+              </select>
             </div>
             <div
               ref="alarmTableWrapRef"
@@ -56,7 +62,12 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(row, idx) in filteredAlarmRows" :key="`${row.eventName}-${idx}`" :class="severityClass(row.level)" @click="openAlarmDetail(row)">
+                  <tr
+                    v-for="(row, idx) in filteredAlarmRows"
+                    :key="alarmRowKey(row, idx)"
+                    :class="[severityClass(row.level), { selected: isSelectedAlarm(row), pending: !row.deal.includes('已') }]"
+                    @click="selectAlarmRow(row)"
+                  >
                     <td>{{ row.eventName }}</td>
                     <td>{{ row.department }}</td>
                     <td>{{ row.date }}</td>
@@ -78,59 +89,99 @@
           </div>
 
           <div class="alarm-right">
-            <article class="card chart-card">
-              <div class="panel-headline small">
-                <h3>告警统计</h3>
-                <span>处理率 {{ alarmCompletionRate }}%</span>
-              </div>
-              <div class="kpi-grid">
-                <div class="kpi" v-for="k in kpis" :key="k.name">
-                  <div class="name">{{ k.name }}</div>
-                  <div class="num" :style="{ color: k.color || 'inherit' }">{{ k.value }}</div>
+            <article class="card alarm-overview-card" :class="alarmSituationTone">
+              <div class="panel-headline small overview-head">
+                <div>
+                  <h3>当前风险态势</h3>
+                  <p>未处理、高等级和重点类型汇总</p>
                 </div>
+                <span class="alarm-situation-pill">{{ alarmSituationStatus }}</span>
               </div>
-              <div class="severity-list">
-                <div class="severity-row" v-for="item in alarmSeverityStats" :key="item.label">
-                  <span>{{ item.label }}</span>
-                  <div class="trend-bar"><i :style="{ width: `${item.percent}%` }"></i></div>
-                  <strong>{{ item.count }}</strong>
+              <div class="alarm-overview-layout">
+                <section class="alarm-now-card">
+                  <span>当前发生</span>
+                  <strong>{{ alarmSituationTitle }}</strong>
+                  <p>{{ alarmSituationDesc }}</p>
+                </section>
+                <section class="alarm-kpi-strip">
+                  <div v-for="k in alarmCommandKpis" :key="k.name" class="alarm-kpi" :class="k.tone">
+                    <span>{{ k.name }}</span>
+                    <strong>{{ k.value }}</strong>
+                  </div>
+                </section>
+              </div>
+              <div class="alarm-type-overview" @mouseleave="showAlarmTypeOther = false">
+                <div class="alarm-type-title">
+                  <span>事件类型 Top</span>
+                  <strong>{{ activeAlarmAreaCount }} 个区域有记录</strong>
+                </div>
+                <div class="alarm-type-list">
+                  <button
+                    v-for="item in alarmTypeStats"
+                    :key="item.name"
+                    class="alarm-type-item"
+                    :class="{ clickable: item.isOther }"
+                    type="button"
+                    @click="toggleAlarmTypeOther(item)"
+                  >
+                    <span>{{ item.name }}</span>
+                    <div class="trend-bar"><i :style="{ width: `${item.percent}%` }"></i></div>
+                    <strong>{{ item.count }}</strong>
+                  </button>
+                  <div v-if="showAlarmTypeOther && alarmTypeOtherItems.length" class="alarm-type-popover">
+                    <div class="alarm-type-popover-head">
+                      <span>其他类型明细</span>
+                      <strong>{{ alarmTypeOtherCount }} 条</strong>
+                    </div>
+                    <div class="alarm-type-popover-list">
+                      <div v-for="item in alarmTypeOtherItems" :key="item.name" class="alarm-type-popover-row">
+                        <span>{{ item.name }}</span>
+                        <strong>{{ item.count }}</strong>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </article>
 
-            <article class="card">
-              <div class="panel-headline small">
-                <h3>类别图表</h3>
-                <div class="chart-filter">
-                  <span>时间段</span>
-                  <select v-model="chartTimeRange">
-                    <option value="day">今日</option>
-                    <option value="week">近7天</option>
-                    <option value="month">近30天</option>
-                  </select>
+            <div class="alarm-bottom-row">
+              <article class="card selected-alarm-card selected-alarm-compact" :class="selectedAlarmTone">
+                <div class="panel-headline small command-head">
+                  <h3>选中报警处置</h3>
+                  <span class="state-chip" :class="selectedAlarmIsPending ? 'pending' : 'done'">
+                    {{ selectedAlarmView.deal }}
+                  </span>
                 </div>
-              </div>
-              <div class="chart-panel">
-                <div class="chart-item">
-                  <h4>报警类别分布</h4>
-                  <PieChart1 />
+                <div class="selected-alarm-main">
+                  <span class="alarm-eyebrow">当前选中</span>
+                  <h4>{{ selectedAlarmView.eventName }}</h4>
+                  <span class="level-chip" :class="severityClass(selectedAlarmView.level)">
+                    {{ severityText(selectedAlarmView.level) }}等级
+                  </span>
                 </div>
-                <div class="chart-item">
-                  <h4>报警趋势</h4>
-                  <LineChart />
+                <div class="selected-alarm-grid">
+                  <div><span>区域</span><strong>{{ selectedAlarmView.department }}</strong></div>
+                  <div><span>时间</span><strong>{{ selectedAlarmView.date }}</strong></div>
+                  <div><span>状态</span><strong>{{ selectedAlarmView.deal }}</strong></div>
+                  <div><span>联系人</span><strong>{{ selectedAlarmView.phone || '--' }}</strong></div>
                 </div>
-              </div>
-            </article>
-
-            <article class="card">
-              <div class="panel-headline small">
-                <h3>快速处置建议</h3>
-                <span>{{ filteredAlarmRows.length }} 条记录</span>
-              </div>
-              <ul class="advice-list">
-                <li v-for="item in alarmSuggestions" :key="item">{{ item }}</li>
-              </ul>
-            </article>
+                <p class="selected-alarm-note">{{ selectedAlarmHint }}</p>
+                <div class="alarm-action-row">
+                  <button class="mini-action primary" type="button" @click="openSelectedAlarmVideo">
+                    <span class="mini-icon video-icon" aria-hidden="true"></span>
+                    <span>报警视频片段</span>
+                  </button>
+                  <button class="mini-action danger" type="button" :disabled="!selectedAlarmIsPending" @click="processSelectedAlarm">
+                    标记处理
+                  </button>
+                </div>
+                <div class="ai-advice-card">
+                  <span>AI 分析建议</span>
+                  <strong>处置参考</strong>
+                </div>
+                <p class="ai-advice-text">{{ selectedAlarmAiAdvice }}</p>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -161,19 +212,183 @@
           </div>
         </div>
 
+        <section v-show="activeTab === 'analysis'" class="panel analysis-panel">
+          <article class="card analysis-hero-card">
+            <div class="panel-headline analysis-headline">
+              <div>
+                <h3>报警统计分析</h3>
+                <p>复盘报警规律、时间分布和重复隐患点，辅助后续预防和治理。</p>
+              </div>
+              <div class="analysis-range-tabs">
+                <button
+                  v-for="option in analysisRangeOptions"
+                  :key="option.value"
+                  class="analysis-range-btn"
+                  :class="{ active: analysisRange === option.value }"
+                  type="button"
+                  @click="analysisRange = option.value"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+            <div class="analysis-kpi-grid">
+              <div v-for="item in analysisKpis" :key="item.name" class="analysis-kpi" :class="item.tone">
+                <span>{{ item.name }}</span>
+                <strong>{{ item.value }}</strong>
+                <em>{{ item.desc }}</em>
+              </div>
+            </div>
+          </article>
+
+          <article class="card analysis-type-card">
+            <div class="panel-headline small">
+              <h3>报警类型分布</h3>
+              <span class="analysis-sub-label">全部类型 / 占比 / 高等级</span>
+            </div>
+            <div class="analysis-type-stage">
+              <div class="analysis-donut" :style="{ background: analysisTypeDonutStyle }">
+                <div class="analysis-donut-core">
+                  <strong>{{ topAnalysisType }}</strong>
+                  <span>高频类型</span>
+                </div>
+              </div>
+              <div class="analysis-type-grid">
+                <div
+                  v-for="item in analysisTypeDistribution"
+                  :key="item.eventType"
+                  class="analysis-type-cardlet"
+                  :style="{ '--type-color': item.color }"
+                >
+                  <div class="analysis-type-cardlet-head">
+                    <span>{{ item.eventType }}</span>
+                    <strong>{{ item.percent }}%</strong>
+                  </div>
+                  <div class="analysis-type-cardlet-meta">
+                    <em>{{ item.eventCount }} 次</em>
+                    <em>高 {{ item.highCount }}</em>
+                    <em>{{ item.areaCount }} 区</em>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!analysisTypeDistribution.length" class="analysis-empty-state">暂无类型数据</div>
+            </div>
+          </article>
+
+          <article class="card analysis-trend-card">
+            <div class="panel-headline small">
+              <h3>报警趋势</h3>
+              <span class="analysis-sub-label">{{ analysisRangeLabel }}</span>
+            </div>
+            <div class="analysis-sparkline-card">
+              <svg class="analysis-sparkline" viewBox="0 0 100 48" preserveAspectRatio="none">
+                <path :d="analysisTrendAreaPath" class="analysis-spark-area" />
+                <path :d="analysisTrendLinePath" class="analysis-spark-line" />
+                <circle
+                  v-for="point in analysisTrendSvgPoints"
+                  :key="`${point.x}-${point.y}`"
+                  :cx="point.x"
+                  :cy="point.y"
+                  r="1.5"
+                  class="analysis-spark-dot"
+                />
+              </svg>
+              <div class="analysis-trend-snapshot">
+                <div>
+                  <span>峰值</span>
+                  <strong>{{ analysisPeakPoint.value }} 条</strong>
+                  <em>{{ analysisPeakPoint.label }}</em>
+                </div>
+                <div>
+                  <span>环比</span>
+                  <strong :class="analysisDeltaTone">{{ analysisDeltaText }}</strong>
+                  <em>较上一周期</em>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card analysis-cross-card">
+            <div class="panel-headline small">
+              <h3>类型 × 区域热力矩阵</h3>
+              <span class="analysis-sub-label">看清哪类问题集中在哪</span>
+            </div>
+            <div class="analysis-cross-table">
+              <div class="analysis-cross-head">
+                <span>区域 / 类型</span>
+                <strong v-for="type in analysisCrossTypes" :key="type">{{ type }}</strong>
+              </div>
+              <div v-for="row in analysisCrossRows" :key="row.area" class="analysis-cross-row">
+                <span>{{ row.area }}</span>
+                <strong
+                  v-for="type in analysisCrossTypes"
+                  :key="type"
+                  :class="{ hot: row.values[type] > 0 }"
+                  :style="{ background: getCrossHeat(row.values[type], analysisCrossMax) }"
+                >
+                  {{ row.values[type] || '-' }}
+                </strong>
+              </div>
+              <div v-if="!analysisCrossRows.length" class="analysis-empty-state">暂无交叉数据</div>
+            </div>
+          </article>
+
+          <article class="card analysis-insight-card">
+            <div class="panel-headline small">
+              <h3>时段与重复隐患</h3>
+              <span class="analysis-sub-label">辅助治理建议</span>
+            </div>
+            <div class="analysis-insight-body">
+              <div class="analysis-time-orbit" :style="{ background: analysisTimeConicStyle }">
+                <div>
+                  <strong>{{ analysisPeakBucket?.label || '暂无' }}</strong>
+                  <span>高发时段</span>
+                </div>
+              </div>
+              <div class="analysis-insight-copy">
+                <div class="analysis-time-pills">
+                  <span v-for="item in analysisTimeBuckets" :key="item.label" :class="{ active: item.isPeak }">
+                    {{ item.label }} {{ item.count }}
+                  </span>
+                </div>
+                <p class="analysis-mini-summary">{{ analysisSummary }}</p>
+                <div class="analysis-repeat-list compact">
+                  <div v-for="item in analysisRepeatPointVisible" :key="item.area" class="analysis-repeat-item">
+                    <div>
+                      <span>{{ item.area }}</span>
+                      <em>{{ item.topType }}</em>
+                    </div>
+                    <strong>{{ item.count }} 次</strong>
+                  </div>
+                  <div v-if="!analysisRepeatPointData.length" class="analysis-empty-state">暂无重复点位</div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+
         <section v-show="activeTab === 'video'" class="panel video-panel">
           <article class="card video-main">
-            <div class="panel-headline">
-              <h3>监控视频总览</h3>
-              <button class="btn" type="button" @click="openMonitorModal">全部监控点</button>
+            <div class="panel-headline video-headline">
+              <div class="video-title-row">
+                <h3>实时视频墙</h3>
+                <span class="video-subtitle">点击画面可进入大屏预览</span>
+              </div>
+              <span class="inline-status">当前预览 {{ cameraTiles.length }} 路</span>
             </div>
-            <div class="monitor-grid monitor-grid-large">
+            <TransitionGroup name="tile-flow" tag="div" class="monitor-grid monitor-grid-large">
               <div
                 v-for="tile in cameraTiles"
-                :key="tile.name"
+                :key="monitorKey(tile)"
                 class="video-tile"
-                :class="{ 'tile-breathing': true, 'tile-alert': tileHasAlert(tile.name) }"
-                @click="openFocus(tile)"
+                :class="{
+                  'tile-online': tileStatus(tile).tone === 'online',
+                  'tile-alert': tileStatus(tile).tone === 'alert',
+                  'tile-offline': tileStatus(tile).tone === 'offline',
+                  'tile-selected': selectedMonitorName === tile.name
+                }"
+                @click="selectPreviewTile(tile)"
+                @dblclick="openFocus(tile)"
               >
                 <video
                   :ref="(el) => setTileVideoRef(tile.name, el as HTMLVideoElement | null)"
@@ -182,173 +397,220 @@
                   autoplay
                   playsinline
                 ></video>
-                <div v-if="!tile.streamUrl" class="tile-empty-state">
+                <div v-if="tileStatus(tile).tone === 'offline'" class="tile-offline-state">
                   <svg class="tile-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9A2.25 2.25 0 0013.5 5.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
-                  <span>等待接入</span>
+                  <span>设备离线</span>
+                </div>
+                <div class="tile-status-badge" :class="tileStatus(tile).tone">
+                  <i></i>
+                  <span>{{ tileStatus(tile).label }}</span>
+                </div>
+                <div v-if="tilePendingCount(tile) > 0" class="tile-pending-badge">
+                  未处理 {{ tilePendingCount(tile) }}
                 </div>
                 <div class="tile-overlay">
-                  <div class="tile-title">{{ tile.name }}</div>
-                  <div class="tile-sub">{{ tile.streamUrl ? '实时画面' : '未配置流地址' }}</div>
+                  <div class="tile-copy">
+                    <div class="tile-title">{{ tileDisplayName(tile) }}</div>
+                    <div class="tile-sub">{{ tileSubtitle(tile) }}</div>
+                  </div>
+                  <button class="tile-focus-btn" type="button" @click.stop="openFocus(tile)">大屏</button>
                 </div>
               </div>
-            </div>
+            </TransitionGroup>
           </article>
 
-          <article class="card video-side">
-            <h3 class="map-title">点位地图联动 <span class="live-dot"></span></h3>
-            <div class="map-square">
-              <AMapLinkage3D :points="mapPoints" :alarm-counts="mapAlarmCounts" @point-click="onMapPointClick" />
-            </div>
-            <div class="video-stats-grid">
-              <div class="mini-kpi kpi-online"><span>在线</span><strong>{{ onlineCount }}</strong></div>
-              <div class="mini-kpi kpi-offline"><span>离线</span><strong>{{ offlineCount }}</strong></div>
-              <div class="mini-kpi kpi-total"><span>总监控点</span><strong>{{ monitors.length }}</strong></div>
-              <div class="mini-kpi kpi-preview"><span>当前预览</span><strong>{{ cameraTiles.length }}</strong></div>
-            </div>
-            <div class="event-stream">
-              <div class="event-stream-head">
-                <span class="event-stream-title">AI 实时事件</span>
-                <span class="event-stream-count">{{ recentEvents.length }} 条</span>
+          <aside class="video-side">
+            <article class="card video-map-card">
+              <div class="panel-headline map-headline">
+                <h3 class="map-title">点位地图联动 <span class="live-dot"></span></h3>
+                <div class="map-legend" aria-label="地图图例">
+                  <span><i class="legend-dot normal"></i>正常</span>
+                  <span><i class="legend-dot alert"></i>报警</span>
+                </div>
               </div>
-              <div class="event-stream-list">
-                <div
-                  v-for="ev in recentEvents"
-                  :key="ev.id"
-                  class="event-item"
-                  :class="['event-' + ev.severity, { 'event-item-pending': ev.isPending, 'event-item-done': !ev.isPending }]"
+              <div class="map-square">
+                <AMapLinkage3D :points="mapPoints" :alarm-counts="mapAlarmCounts" @point-click="onMapPointClick" />
+              </div>
+              <div class="map-insight-strip">
+                <div class="map-insight-main">
+                  <div class="monitor-insight-title">
+                    <strong>{{ selectedMonitorOverview.name }}</strong>
+                    <span class="risk-pill" :class="selectedMonitorRisk.tone">{{ selectedMonitorRisk.label }}</span>
+                  </div>
+                  <div class="monitor-health-row">
+                    <span>{{ selectedMonitorOverview.department }}</span>
+                    <span class="meta-separator">·</span>
+                    <span :class="['insight-pending-text', selectedMonitorAlertStats.pending ? 'bad' : 'ok']">
+                      未处理
+                      {{ selectedMonitorAlertStats.pending }} 条
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="card ai-alarm-card">
+              <div class="event-stream">
+                <div class="event-stream-head">
+                  <span class="event-stream-title">AI 实时报警时间轴</span>
+                  <span class="event-stream-count">{{ recentEvents.length }} 条</span>
+                </div>
+                <TransitionGroup
+                  v-if="recentEvents.length"
+                  name="event-flow"
+                  tag="div"
+                  class="event-stream-list"
                 >
-                  <span class="event-time">{{ ev.time }}</span>
-                  <span class="event-dot" :class="['dot-' + ev.severity, { 'dot-pulse': ev.isPending }]"></span>
-                  <span class="event-text">{{ ev.text }}</span>
-                  <span class="event-deal" :class="ev.isPending ? 'pending' : 'done'">{{ ev.dealText }}</span>
-                </div>
-                <div v-if="!recentEvents.length" class="event-item event-empty">
-                  <span class="event-text">暂无事件，系统运行正常</span>
+                  <div
+                    v-for="ev in recentEvents"
+                    :key="ev.id"
+                    class="event-item"
+                    :class="['event-' + ev.severity, { 'event-item-pending': ev.isPending, 'event-item-done': !ev.isPending }]"
+                  >
+                    <span class="event-time">{{ ev.time }}</span>
+                    <span class="event-dot" :class="['dot-' + ev.severity, { 'dot-pulse': ev.isPending }]"></span>
+                    <span class="event-text">{{ ev.text }}</span>
+                    <span class="event-deal" :class="ev.isPending ? 'pending' : 'done'">{{ ev.dealText }}</span>
+                  </div>
+                </TransitionGroup>
+                <div v-else class="event-stream-list event-stream-empty-list">
+                  <div class="event-item event-empty">
+                    <span class="event-text">暂无事件，系统运行正常</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </article>
+            </article>
+          </aside>
         </section>
 
         <section v-show="activeTab === 'env'" class="panel env-panel">
-          <article v-for="metric in envTrendMetrics" :key="metric.key" class="card env-metric-card">
-            <div class="panel-headline small env-metric-head">
-              <h3>{{ metric.label }}趋势</h3>
-              <div class="env-live-badge" :style="{ color: metric.color }">
-                <strong>{{ envCurrentValues[metric.key] }}</strong>
-                <span>{{ metric.unit }}</span>
+          <article class="card env-overview-card">
+            <div class="panel-headline env-overview-head">
+              <div>
+                <h3>环境和车位总览</h3>
+                <p>重点关注环境异常、车位余量和高占用区域。</p>
               </div>
-              <div v-if="metric.key === 'aqi'" class="chart-filter">
-                <span>时间段</span>
-                <select v-model="envTrendRange">
-                  <option value="day">今日</option>
-                  <option value="week">近7天</option>
-                  <option value="month">近30天</option>
-                </select>
+              <div class="analysis-range-tabs">
+                <button
+                  v-for="option in envRangeOptions"
+                  :key="option.value"
+                  class="analysis-range-btn"
+                  :class="{ active: envTrendRange === option.value }"
+                  type="button"
+                  @click="envTrendRange = option.value"
+                >
+                  {{ option.label }}
+                </button>
               </div>
-              <span v-else>{{ metric.unit }}</span>
             </div>
-            <div class="env-trend-item single">
-              <svg
-                class="env-trend-svg"
-                viewBox="0 0 360 156"
-                preserveAspectRatio="none"
-                :aria-label="`${metric.label} 折线图`"
-              >
-                <line x1="40" y1="128" x2="344" y2="128" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
-                <line x1="40" y1="16" x2="40" y2="128" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
-                <line
-                  v-for="tick in envTrendCharts[metric.key].yTicks"
-                  :key="`${metric.key}-y-${tick.value}`"
-                  x1="40"
-                  :y1="tick.y"
-                  x2="344"
-                  :y2="tick.y"
-                  stroke="rgba(168,198,232,0.16)"
-                  stroke-width="1"
-                />
-                <text
-                  v-for="tick in envTrendCharts[metric.key].yTicks"
-                  :key="`${metric.key}-yl-${tick.value}`"
-                  x="34"
-                  :y="tick.y + 4"
-                  text-anchor="end"
-                  fill="rgba(214, 230, 255, 0.86)"
-                  font-size="10"
-                >
-                  {{ tick.value }}
-                </text>
-                <text
-                  v-for="tick in envTrendCharts[metric.key].xTicks"
-                  :key="`${metric.key}-x-${tick.label}`"
-                  :x="tick.x"
-                  y="144"
-                  text-anchor="middle"
-                  fill="rgba(214, 230, 255, 0.78)"
-                  font-size="10"
-                >
-                  {{ tick.label }}
-                </text>
-                <path :d="envTrendCharts[metric.key].areaPath" :fill="metric.areaColor" />
-                <polyline
-                  :points="envTrendCharts[metric.key].points"
-                  fill="none"
-                  :stroke="metric.color"
-                  stroke-width="2.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <circle
-                  v-for="(dot, idx) in envTrendCharts[metric.key].dots"
-                  :key="`${metric.key}-dot-${idx}`"
-                  :cx="dot.x"
-                  :cy="dot.y"
-                  r="2.6"
-                  :fill="metric.color"
-                  stroke="rgba(255,255,255,0.82)"
-                  stroke-width="0.8"
-                />
-              </svg>
+            <div class="env-kpi-grid">
+              <div v-for="item in envOverviewKpis" :key="item.name" class="env-kpi" :class="item.tone">
+                <span>{{ item.name }}</span>
+                <strong>{{ item.value }}</strong>
+                <em>{{ item.desc }}</em>
+              </div>
             </div>
           </article>
 
-          <article class="card env-dual-card">
+          <article class="card env-status-card">
             <div class="panel-headline small">
-              <h3>环境与车位快览</h3>
+              <h3>环境实时状态</h3>
               <span>{{ envParkingDataModeLabel }} · {{ envParkingRefreshSeconds }}s 刷新</span>
             </div>
-            <div class="dual-card-grid">
-              <section class="dual-mini-block">
-                <header>
-                  <strong>AQI日内波动</strong>
-                  <span>{{ envCurrentValues.aqi }} 指数</span>
-                </header>
-                <div class="dual-mini-chart">
-                  <div v-for="(point, idx) in aqiMiniBars" :key="`${point.label}-${idx}`" class="mini-col">
-                    <i :style="{ height: `${point.height}%` }"></i>
-                    <span>{{ showParkingTrendLabel(idx, aqiMiniBars.length) ? point.label : '' }}</span>
-                  </div>
+            <div class="env-status-grid">
+              <div v-for="item in envStatusCards" :key="item.key" class="env-status-item" :class="item.tone">
+                <div class="env-status-top">
+                  <span>{{ item.label }}</span>
+                  <em>{{ item.status }}</em>
                 </div>
-              </section>
-              <section class="dual-mini-block">
-                <header>
-                  <strong>车位占用动态</strong>
-                  <span>{{ parkingOccupancy }}%</span>
-                </header>
-                <div class="dual-mini-chart">
-                  <div v-for="(point, idx) in parkingMiniBars" :key="`${point.label}-${idx}`" class="mini-col">
-                    <i class="parking" :style="{ height: `${point.height}%` }"></i>
-                    <span>{{ showParkingTrendLabel(idx, parkingMiniBars.length) ? point.label : '' }}</span>
-                  </div>
-                </div>
-              </section>
+                <strong>{{ item.value }}<small>{{ item.unit }}</small></strong>
+                <div class="env-status-bar"><i :style="{ width: `${item.percent}%`, background: item.color }"></i></div>
+              </div>
             </div>
           </article>
 
-          <article class="card env-slot-card">
-            <h3>车位占用数据</h3>
-            <div class="parking-dashboard">
-              <div class="parking-ring-wrap">
+          <article class="card env-trend-card">
+            <div class="panel-headline small">
+              <h3>环境趋势</h3>
+              <span>{{ envRangeLabel }}</span>
+            </div>
+            <div class="env-trend-grid">
+              <div v-for="chart in envTrendCards" :key="chart.key" class="env-trend-item main">
+                <div class="env-trend-title">
+                  <span>{{ chart.title }}</span>
+                  <em>{{ chart.desc }}</em>
+                </div>
+                <svg
+                  class="env-trend-svg"
+                  viewBox="0 0 360 168"
+                  preserveAspectRatio="none"
+                  :aria-label="`${chart.title} 趋势图`"
+                >
+                  <line x1="40" y1="136" x2="344" y2="136" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
+                  <line x1="40" y1="10" x2="40" y2="136" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
+                  <line
+                    v-for="tick in envTrendCharts[chart.key].yTicks"
+                    :key="`${chart.key}-y-${tick.value}`"
+                    x1="40"
+                    :y1="tick.y"
+                    x2="344"
+                    :y2="tick.y"
+                    stroke="rgba(168,198,232,0.16)"
+                    stroke-width="1"
+                  />
+                  <text
+                    v-for="tick in envTrendCharts[chart.key].yTicks"
+                    :key="`${chart.key}-yl-${tick.value}`"
+                    x="34"
+                    :y="tick.y + 4"
+                    text-anchor="end"
+                    fill="rgba(214, 230, 255, 0.86)"
+                    font-size="10"
+                  >
+                    {{ tick.value }}
+                  </text>
+                  <text
+                    v-for="tick in envTrendCharts[chart.key].xTicks"
+                    :key="`${chart.key}-x-${tick.label}`"
+                    :x="tick.x"
+                    y="156"
+                    text-anchor="middle"
+                    fill="rgba(214, 230, 255, 0.78)"
+                    font-size="10"
+                  >
+                    {{ tick.label }}
+                  </text>
+                  <path :d="envTrendCharts[chart.key].areaPath" :fill="chart.areaColor" />
+                  <polyline
+                    :points="envTrendCharts[chart.key].points"
+                    fill="none"
+                    :stroke="chart.color"
+                    stroke-width="2.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <circle
+                    v-for="(dot, idx) in envTrendCharts[chart.key].dots"
+                    :key="`${chart.key}-dot-${idx}`"
+                    :cx="dot.x"
+                    :cy="dot.y"
+                    r="2.6"
+                    :fill="chart.color"
+                    stroke="rgba(255,255,255,0.82)"
+                    stroke-width="0.8"
+                  />
+                </svg>
+              </div>
+            </div>
+          </article>
+
+          <article class="card env-parking-card">
+            <div class="panel-headline small">
+              <h3>车位占用</h3>
+              <span>总车位 {{ parkingTotal }} · 空闲 {{ parkingFree }}</span>
+            </div>
+            <div class="parking-overview-layout">
+              <div class="parking-ring-wrap compact">
                 <svg class="parking-ring" viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(126,197,255,0.12)" stroke-width="10" />
                   <circle cx="60" cy="60" r="50" fill="none"
@@ -367,60 +629,51 @@
                   <span>空闲 <strong>{{ parkingFree }}</strong></span>
                 </div>
               </div>
-              <div class="bar-grid">
-                <div class="bar-row" v-for="item in parkingBars" :key="item.name">
-                  <span>{{ item.name }}</span>
-                  <div class="bar"><i :style="{ width: `${item.percent}%` }"></i></div>
-                  <strong>{{ item.value }}</strong>
-                </div>
-              </div>
-            </div>
-            <div class="parking-map">
-              <div class="parking-map-head">
-                <h4>车位地图（示意）</h4>
-                <span>总车位 {{ parkingTotal }} · 已占 {{ parkingUsed }} · 空闲 {{ parkingFree }}</span>
-              </div>
-              <div class="parking-zone-grid">
-                <div v-for="zone in parkingMapZones" :key="zone.name" class="parking-zone-card">
-                  <div class="zone-top">
-                    <strong>{{ zone.name }}</strong>
-                    <span>{{ zone.used }}/{{ zone.capacity }}</span>
+              <div class="parking-zone-list">
+                <div v-for="zone in parkingZoneCards" :key="zone.name" class="parking-zone-row" :class="zone.tone">
+                  <div class="parking-zone-info">
+                    <span>{{ zone.name }}</span>
+                    <strong>{{ zone.used }}/{{ zone.capacity }}</strong>
                   </div>
-                  <div class="zone-slots">
-                    <i v-for="slot in zone.sampleSlots" :key="slot.id" :class="{ busy: slot.busy }"></i>
-                  </div>
+                  <div class="parking-zone-bar"><i :style="{ width: `${zone.percent}%` }"></i></div>
                 </div>
               </div>
             </div>
           </article>
 
-          <article class="card env-comfort-card">
+          <article class="card env-parking-map-card">
+            <div class="panel-headline small">
+              <h3>车位区域分布</h3>
+              <span>红色表示已占用</span>
+            </div>
+            <div class="parking-zone-grid compact">
+              <div v-for="zone in parkingMapZones" :key="zone.name" class="parking-zone-card">
+                <div class="zone-top">
+                  <strong>{{ zone.name }}</strong>
+                  <span>{{ zone.used }}/{{ zone.capacity }}</span>
+                </div>
+                <div class="zone-slots">
+                  <i v-for="slot in zone.sampleSlots" :key="slot.id" :class="{ busy: slot.busy }"></i>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card env-insight-card">
             <div class="comfort-head">
-              <h3>环境舒适度</h3>
+              <h3>运行研判</h3>
               <span class="comfort-label" :style="{ color: comfortColor }">{{ comfortLabel }}</span>
             </div>
-            <div class="comfort-score-wrap">
-              <div class="comfort-score" :style="{ '--score-color': comfortColor }">
+            <div class="env-insight-body">
+              <div class="comfort-score compact" :style="{ '--score-color': comfortColor }">
                 <strong>{{ comfortScore }}</strong>
                 <span>/ 100</span>
               </div>
-              <div class="comfort-factors">
-                <div class="comfort-factor">
-                  <span>AQI</span>
-                  <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.aqi)}%`, background: '#63b8ff' }"></i></div>
-                </div>
-                <div class="comfort-factor">
-                  <span>湿度</span>
-                  <div class="comfort-bar"><i :style="{ width: `${envCurrentValues.humidity}%`, background: '#53d5a5' }"></i></div>
-                </div>
-                <div class="comfort-factor">
-                  <span>PM2.5</span>
-                  <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.pm25 * 1.2)}%`, background: '#f8cb71' }"></i></div>
-                </div>
-                <div class="comfort-factor">
-                  <span>可燃气体</span>
-                  <div class="comfort-bar"><i :style="{ width: `${Math.min(100, envCurrentValues.combustibleGas * 2.5)}%`, background: '#ff8d8d' }"></i></div>
-                </div>
+              <div class="env-insight-copy">
+                <p>{{ envParkingSummary }}</p>
+                <ul>
+                  <li v-for="item in envParkingAdviceList" :key="item">{{ item }}</li>
+                </ul>
               </div>
             </div>
           </article>
@@ -581,6 +834,59 @@
             <button class="btn" type="button">抓拍</button>
             <button class="btn" type="button">录像</button>
           </div>
+          <section class="focus-state-card" :class="focusPanelState.tone">
+            <header class="focus-state-head">
+              <span>当前点位态势</span>
+              <strong>{{ focusPanelState.label }}</strong>
+            </header>
+            <div class="focus-state-list">
+              <div class="focus-state-row">
+                <span>点位</span>
+                <strong>{{ focusPanelInfo.pointName }}</strong>
+              </div>
+              <div class="focus-state-row">
+                <span>状态</span>
+                <strong>{{ focusPanelInfo.statusLabel }}</strong>
+              </div>
+              <div class="focus-state-row">
+                <span>事件</span>
+                <strong>{{ focusPanelInfo.eventName }}</strong>
+              </div>
+              <div class="focus-state-row">
+                <span>时间</span>
+                <strong>{{ focusPanelInfo.timeLabel }}</strong>
+              </div>
+              <div class="focus-state-row">
+                <span>处理状态</span>
+                <strong>{{ focusPanelInfo.dealText }}</strong>
+              </div>
+            </div>
+            <div v-if="focusPendingAlarms.length > 1" class="focus-alarm-switch">
+              <div class="focus-switch-head">
+                <span>未处理报警</span>
+                <strong>{{ focusPendingAlarms.length }} 条</strong>
+              </div>
+              <button
+                v-for="alarm in focusVisibleAlarms"
+                :key="focusAlarmKey(alarm)"
+                class="focus-alarm-option"
+                :class="{ active: focusAlarmKey(alarm) === focusActiveAlarmKey }"
+                type="button"
+                @click="selectFocusAlarm(alarm)"
+              >
+                <span>{{ alarm.eventName || alarm.name || '报警事件' }}</span>
+                <em>{{ toTimeLabel(parseAlarmTimestamp(alarm)) }}</em>
+              </button>
+              <p v-if="focusHiddenAlarmCount > 0" class="focus-switch-more">
+                还有 {{ focusHiddenAlarmCount }} 条，请到报警列表查看
+              </p>
+            </div>
+            <div class="focus-action-row">
+              <button class="btn" type="button" :disabled="!focusActivePendingAlarm" @click="viewFocusAlarm">查看报警</button>
+              <button class="btn" type="button" :disabled="!focusActivePendingAlarm" @click="processFocusAlarm">标记处理</button>
+              <button class="btn primary" type="button" @click="handoffFocusToAgent">交给 Agent</button>
+            </div>
+          </section>
           <button class="btn primary focus-close" type="button" @click="closeFocus">关闭大屏</button>
         </aside>
       </div>
@@ -591,24 +897,30 @@
         <header class="monitor-head">
           <div>
             <h4>全部监控点</h4>
-            <p class="muted">查看在线/离线状态，点击可联动大屏</p>
+            <p class="muted">点击点位会切换进当前选中的预览格，不会自动打开大屏</p>
           </div>
           <button class="btn" type="button" @click="closeMonitorModal">关闭</button>
         </header>
         <div class="monitor-list">
           <div
             v-for="item in monitors"
-            :key="item.name"
+            :key="monitorKey(item)"
             class="monitor-row"
-            @click="openFocus(item)"
+            :class="{ active: selectedMonitorName === item.name, previewing: isMonitorInPreview(item) }"
+            @click="switchMonitorIntoPreview(item, true)"
           >
             <div>
               <div class="row-title">{{ item.name }}</div>
               <div class="row-sub">{{ item.department || '未标注区域' }}</div>
             </div>
-            <span class="status" :class="{ online: item.status === 1 || item.status === 'online' }">
-              {{ item.status === 1 || item.status === 'online' ? '在线' : '离线' }}
-            </span>
+            <div class="monitor-row-actions">
+              <span class="status" :class="{ online: monitorIsOnline(item) }">
+                {{ monitorIsOnline(item) ? '在线' : '离线' }}
+              </span>
+              <span class="preview-tag" :class="{ active: isMonitorInPreview(item) }">
+                {{ isMonitorInPreview(item) ? '预览中' : '切换' }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -620,8 +932,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '@/components/DashboardLayout.vue'
-import PieChart1 from '@/components/piechart1.vue'
-import LineChart from '@/components/LineChart.vue'
 import AMapLinkage3D from '@/components/AMapLinkage3D.vue'
 import VirtualAgentStage from '@/components/VirtualAgentStage.vue'
 import ChatPanel from '@/components/chat_panel.vue'
@@ -632,7 +942,7 @@ import { demoAlarmVideoMap, rtmpAddressList, simulateChannelName } from '@/confi
 import { useAlarmStore } from '@/stores/alarm'
 import { useAppStore } from '@/stores/app'
 
-type ModuleTab = 'alarm' | 'video' | 'env' | 'agent'
+type ModuleTab = 'alarm' | 'analysis' | 'video' | 'env' | 'agent'
 type AgentStageStatus = 'idle' | 'listening' | 'thinking' | 'speaking'
 type VoiceInteractionState = 'idle' | 'listening' | 'speaking'
 
@@ -640,7 +950,7 @@ interface MonitorStreamItem {
   id?: number | string
   name: string
   department?: string
-  status?: number | string
+  status?: number | string | boolean
   streamUrl?: string
 }
 
@@ -676,6 +986,7 @@ const appStore = useAppStore()
 
 const tabs: Array<{ key: ModuleTab; label: string }> = [
   { key: 'alarm', label: '报警消息' },
+  { key: 'analysis', label: '统计分析' },
   { key: 'video', label: '监控视频' },
   { key: 'env', label: '环境和车位' },
   { key: 'agent', label: 'Agent' },
@@ -687,6 +998,7 @@ const currentTabLabel = computed(() => tabs.find(item => item.key === activeTab.
 const focusVisible = ref(false)
 const alarmDialogVisible = ref(false)
 const currentAlarmItem = ref<any>(null)
+const selectedAlarmRow = ref<any>(null)
 const processDialogVisible = ref(false)
 const processingRow = ref<any>(null)
 const processingContent = ref('')
@@ -696,6 +1008,11 @@ const alarmTableWrapRef = ref<HTMLDivElement | null>(null)
 const openAlarmDetail = (row: any) => {
   currentAlarmItem.value = row
   alarmDialogVisible.value = true
+}
+
+const selectAlarmRow = (row: any) => {
+  if (!row || row.eventName === '暂无报警') return
+  selectedAlarmRow.value = row
 }
 
 const openProcessDialog = (row: any) => {
@@ -761,6 +1078,8 @@ const cameraTiles = ref<MonitorStreamItem[]>([
   { name: '2号机位 - 车库入口实时画面', streamUrl: rtmpAddressList[2] },
   { name: '3号机位 - 东侧步道实时画面', streamUrl: rtmpAddressList[3] },
 ])
+const selectedMonitorName = ref(cameraTiles.value[0]?.name || '')
+const focusSelectedAlarmKey = ref('')
 
 const mapPoints = ref<MapPointItem[]>([
   { title: '北门监测点', camera: '1号机位 - 北门实时画面', className: 'p1' },
@@ -770,11 +1089,10 @@ const mapPoints = ref<MapPointItem[]>([
 
 const RECENT_EVENT_LIMIT = 6
 const RECENT_EVENT_POLL_MS = 8000
-const RECENT_EVENT_DONE_REMOVE_MS = 12000
+const PREVIEW_TILE_LIMIT = 6
 const recentEvents = ref<RecentEventItem[]>([])
 const recentEventInitialized = ref(false)
 let recentEventPollTimer: number | null = null
-const recentEventResolvedAt = new Map<string, number>()
 
 const withNoCache = (url: string) => {
   if (!url) return url
@@ -827,10 +1145,9 @@ const isAlarmPending = (item: any): boolean => {
 const syncRecentEvents = (rawList: any[]): void => {
   if (!Array.isArray(rawList)) return
   const seenIds = new Set<string>()
-  const now = Date.now()
 
   const normalized = rawList
-    .filter(item => item && item.caseType !== 13)
+    .filter(item => item && item.caseType !== 13 && isAlarmPending(item))
     .map((item, idx) => {
       const timestamp = parseAlarmTimestamp(item)
       const fallbackId = `${item?.eventName || '事件'}-${timestamp}-${idx}`
@@ -851,40 +1168,17 @@ const syncRecentEvents = (rawList: any[]): void => {
       return true
     })
 
-  const mapped = normalized.map(item => {
-    const pending = isAlarmPending(item)
-    if (pending) {
-      recentEventResolvedAt.delete(item.__id)
-    } else if (!recentEventResolvedAt.has(item.__id)) {
-      recentEventResolvedAt.set(item.__id, now)
-    }
-    return {
+  recentEvents.value = normalized
+    .map(item => ({
       id: item.__id,
       time: toTimeLabel(item.__ts),
       text: `${item.department || item.location || '未标注'} ${item.eventName || '事件'}`,
       severity: toSeverity(item.level),
-      isPending: pending,
-      dealText: pending ? '未处理' : '已处理',
+      isPending: true,
+      dealText: '未处理',
       timestamp: item.__ts,
-    }
-  })
-
-  const visibleEvents: RecentEventItem[] = mapped
-    .filter(item => {
-      if (item.isPending) return true
-      const resolvedAt = recentEventResolvedAt.get(item.id)
-      return resolvedAt === undefined ? false : now - resolvedAt < RECENT_EVENT_DONE_REMOVE_MS
-    })
+    }))
     .slice(0, RECENT_EVENT_LIMIT)
-
-  recentEvents.value = visibleEvents
-
-  const visibleIds = new Set(mapped.map(item => item.id))
-  for (const id of recentEventResolvedAt.keys()) {
-    if (!visibleIds.has(id)) {
-      recentEventResolvedAt.delete(id)
-    }
-  }
 }
 
 const alarmPageNum = ref(1)
@@ -1000,14 +1294,14 @@ const fetchRecentEventStream = async (): Promise<void> => {
       },
     })
     const list = data?.data?.alarmList || data?.data?.list || []
-    if (Array.isArray(list) && list.length) {
+    if (Array.isArray(list)) {
       syncRecentEvents(list)
       recentEventInitialized.value = true
     }
   } catch (e) {
     if (!recentEventInitialized.value) {
       const fallbackList = alarmStore.getAlarmList || []
-      if (Array.isArray(fallbackList) && fallbackList.length) {
+      if (Array.isArray(fallbackList)) {
         syncRecentEvents(fallbackList)
         recentEventInitialized.value = true
       }
@@ -1030,7 +1324,6 @@ const stopRecentEventPolling = (): void => {
     window.clearInterval(recentEventPollTimer)
     recentEventPollTimer = null
   }
-  recentEventResolvedAt.clear()
 }
 
 // 隐藏遥控器通信
@@ -1189,30 +1482,375 @@ const alarmTableRows = computed(() => {
 })
 
 const alarmKeyword = ref('')
-const alarmDealFilter = ref<'all' | 'pending' | 'done'>('all')
-const chartTimeRange = ref<'day' | 'week' | 'month'>('week')
+const alarmDealFilter = ref<'all' | 'pending' | 'done'>('pending')
+const analysisRange = ref<'day' | 'week' | 'month'>('week')
+const showAlarmTypeOther = ref(false)
+const analysisRangeOptions: Array<{ value: 'day' | 'week' | 'month'; label: string }> = [
+  { value: 'day', label: '今日' },
+  { value: 'week', label: '近7天' },
+  { value: 'month', label: '近30天' },
+]
+const analysisPalette = ['#7ee8ff', '#6ce2b2', '#f8cb71', '#ff8d8d', '#9ca7ff', '#52b7ff', '#ffb86b', '#d6f1ff']
+
+const analysisRangeLabel = computed(() => analysisRangeOptions.find(item => item.value === analysisRange.value)?.label || '近7天')
 
 const filteredAlarmRows = computed(() => {
   const keyword = alarmKeyword.value.toLowerCase()
-  return alarmTableRows.value.filter((row) => {
-    const eventName = String(row.eventName || '').toLowerCase()
-    const department = String(row.department || '').toLowerCase()
-    const matchKeyword =
-      !keyword ||
-      eventName.includes(keyword) ||
-      department.includes(keyword)
-    if (!matchKeyword) return false
+  return alarmTableRows.value
+    .filter((row) => {
+      const eventName = String(row.eventName || '').toLowerCase()
+      const department = String(row.department || '').toLowerCase()
+      const matchKeyword =
+        !keyword ||
+        eventName.includes(keyword) ||
+        department.includes(keyword)
+      if (!matchKeyword) return false
 
-    if (alarmDealFilter.value === 'pending') return !row.deal.includes('已')
-    if (alarmDealFilter.value === 'done') return row.deal.includes('已')
-    return true
+      if (alarmDealFilter.value === 'done') return row.deal.includes('已')
+      return true
+    })
+    .sort((a, b) => {
+      if (alarmDealFilter.value === 'pending') {
+        const pendingDiff = Number(!b.deal.includes('已')) - Number(!a.deal.includes('已'))
+        if (pendingDiff !== 0) return pendingDiff
+      }
+      const levelDiff = Number(b.level || 0) - Number(a.level || 0)
+      if (levelDiff !== 0) return levelDiff
+      return parseAlarmTimestamp(b) - parseAlarmTimestamp(a)
+    })
+})
+
+const alarmChartItemsFromEntries = (entries: Array<[string, number]>) => (
+  entries.map(([eventType, eventCount]) => ({ eventType, eventCount }))
+)
+
+const analysisRangeStart = computed(() => {
+  const now = new Date()
+  const start = new Date(now)
+  if (analysisRange.value === 'day') {
+    start.setHours(0, 0, 0, 0)
+    return start.getTime()
+  }
+  const days = analysisRange.value === 'week' ? 6 : 29
+  start.setDate(start.getDate() - days)
+  start.setHours(0, 0, 0, 0)
+  return start.getTime()
+})
+
+const analysisRangeEnd = computed(() => Date.now())
+
+const analysisRangeDuration = computed(() => (
+  Math.max(analysisRangeEnd.value - analysisRangeStart.value, 1)
+))
+
+const analysisAlarmRows = computed(() => (
+  alarmTableRows.value.filter((row) => {
+    if (row.eventName === '暂无报警') return false
+    const timestamp = parseAlarmTimestamp(row)
+    return timestamp >= analysisRangeStart.value
+  })
+))
+
+const analysisPreviousRows = computed(() => {
+  const currentStart = analysisRangeStart.value
+  const previousStart = currentStart - analysisRangeDuration.value
+  return alarmTableRows.value.filter((row) => {
+    if (row.eventName === '暂无报警') return false
+    const timestamp = parseAlarmTimestamp(row)
+    return timestamp >= previousStart && timestamp < currentStart
   })
 })
 
+const analysisTypeChartData = computed(() => {
+  const counts: Record<string, number> = {}
+  analysisAlarmRows.value.forEach((row) => {
+    const name = row.eventName || '未知事件'
+    counts[name] = (counts[name] || 0) + 1
+  })
+  return alarmChartItemsFromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8))
+})
+
+const analysisTypeDistribution = computed(() => {
+  const map: Record<string, { eventCount: number; highCount: number; areas: Set<string> }> = {}
+  analysisAlarmRows.value.forEach((row) => {
+    const type = row.eventName || '未知事件'
+    const area = row.department || row.location || '未标注区域'
+    if (!map[type]) map[type] = { eventCount: 0, highCount: 0, areas: new Set<string>() }
+    map[type].eventCount += 1
+    if (Number(row.level || 1) >= 3) map[type].highCount += 1
+    map[type].areas.add(area)
+  })
+  const total = Math.max(analysisAlarmRows.value.length, 1)
+  return Object.entries(map)
+    .sort((a, b) => b[1].eventCount - a[1].eventCount)
+    .map(([eventType, item], index) => ({
+      eventType,
+      eventCount: item.eventCount,
+      highCount: item.highCount,
+      areaCount: item.areas.size,
+      percent: Math.round((item.eventCount / total) * 100),
+      color: analysisPalette[index % analysisPalette.length],
+    }))
+})
+
+const analysisTypeDonutStyle = computed(() => {
+  const items = analysisTypeDistribution.value
+  if (!items.length) return 'conic-gradient(rgba(126, 197, 255, 0.12) 0deg 360deg)'
+  let cursor = 0
+  const total = items.reduce((sum, item) => sum + item.eventCount, 0) || 1
+  const stops = items.map((item) => {
+    const start = cursor
+    const end = cursor + (item.eventCount / total) * 360
+    cursor = end
+    return `${item.color} ${start.toFixed(1)}deg ${end.toFixed(1)}deg`
+  })
+  return `conic-gradient(${stops.join(', ')})`
+})
+
+const analysisAreaChartData = computed(() => {
+  const counts: Record<string, number> = {}
+  analysisAlarmRows.value.forEach((row) => {
+    const area = row.department || row.location || '未标注区域'
+    counts[area] = (counts[area] || 0) + 1
+  })
+  return alarmChartItemsFromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6))
+})
+
+const analysisTrendPoints = computed(() => {
+  const now = new Date()
+  if (analysisRange.value === 'day') {
+    return Array.from({ length: 8 }, (_, index) => {
+      const startHour = index * 3
+      const endHour = startHour + 3
+      const count = analysisAlarmRows.value.filter((row) => {
+        const timestamp = parseAlarmTimestamp(row)
+        if (!timestamp) return false
+        const d = new Date(timestamp)
+        return d.getHours() >= startHour && d.getHours() < endHour
+      }).length
+      return { label: `${String(startHour).padStart(2, '0')}:00`, value: count }
+    })
+  }
+
+  const days = analysisRange.value === 'week' ? 7 : 30
+  return Array.from({ length: days }, (_, index) => {
+    const d = new Date(now)
+    d.setDate(now.getDate() - (days - index - 1))
+    d.setHours(0, 0, 0, 0)
+    const next = new Date(d)
+    next.setDate(d.getDate() + 1)
+    const count = analysisAlarmRows.value.filter((row) => {
+      const timestamp = parseAlarmTimestamp(row)
+      return timestamp >= d.getTime() && timestamp < next.getTime()
+    }).length
+    const label = analysisRange.value === 'week'
+      ? `${d.getMonth() + 1}/${d.getDate()}`
+      : index % 5 === 0 || index === days - 1 ? `${d.getMonth() + 1}/${d.getDate()}` : ''
+    return { label, value: count }
+  })
+})
+
+const analysisTrendMax = computed(() => Math.max(...analysisTrendPoints.value.map(item => item.value), 0))
+
+const analysisTrendSvgPoints = computed(() => {
+  const points = analysisTrendPoints.value
+  if (!points.length) return []
+  const max = Math.max(analysisTrendMax.value, 1)
+  const count = Math.max(points.length - 1, 1)
+  return points.map((item, index) => ({
+    x: Number(((index / count) * 100).toFixed(2)),
+    y: Number((44 - (item.value / max) * 34).toFixed(2)),
+    value: item.value,
+    label: item.label,
+  }))
+})
+
+const buildSmoothPath = (points: Array<{ x: number; y: number }>) => {
+  if (!points.length) return ''
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
+  return points.reduce((path, point, index) => {
+    if (index === 0) return `M ${point.x} ${point.y}`
+    const prev = points[index - 1]
+    const controlX = Number(((prev.x + point.x) / 2).toFixed(2))
+    return `${path} C ${controlX} ${prev.y}, ${controlX} ${point.y}, ${point.x} ${point.y}`
+  }, '')
+}
+
+const analysisTrendLinePath = computed(() => buildSmoothPath(analysisTrendSvgPoints.value))
+
+const analysisTrendAreaPath = computed(() => {
+  const points = analysisTrendSvgPoints.value
+  if (!points.length) return ''
+  return `M ${points[0].x} 46 ${analysisTrendLinePath.value.replace(/^M/, 'L')} L ${points[points.length - 1].x} 46 Z`
+})
+
+const analysisPeakPoint = computed(() => (
+  analysisTrendPoints.value.reduce(
+    (max, item) => (item.value > max.value ? item : max),
+    { label: '--', value: 0 },
+  )
+))
+
+const analysisDeltaValue = computed(() => analysisAlarmRows.value.length - analysisPreviousRows.value.length)
+const analysisDeltaText = computed(() => {
+  const delta = analysisDeltaValue.value
+  if (delta > 0) return `+${delta}`
+  if (delta < 0) return String(delta)
+  return '持平'
+})
+const analysisDeltaTone = computed(() => {
+  if (analysisDeltaValue.value > 0) return 'up'
+  if (analysisDeltaValue.value < 0) return 'down'
+  return 'flat'
+})
+
+const analysisPendingCount = computed(() => analysisAlarmRows.value.filter(row => isAlarmPending(row)).length)
+const analysisHighCount = computed(() => analysisAlarmRows.value.filter(row => Number(row.level || 1) >= 3).length)
+const analysisDoneCount = computed(() => Math.max(analysisAlarmRows.value.length - analysisPendingCount.value, 0))
+const analysisCompletionRate = computed(() => {
+  const total = analysisAlarmRows.value.length
+  return total ? Math.round((analysisDoneCount.value / total) * 100) : 100
+})
+
+const topAnalysisType = computed(() => analysisTypeChartData.value[0]?.eventType || '暂无')
+const topAnalysisArea = computed(() => analysisAreaChartData.value[0]?.eventType || '暂无')
+const analysisTypeMax = computed(() => Math.max(...analysisTypeChartData.value.map(item => item.eventCount), 0))
+const analysisAreaMax = computed(() => Math.max(...analysisAreaChartData.value.map(item => item.eventCount), 0))
+const analysisHighRatio = computed(() => (
+  analysisAlarmRows.value.length ? Math.round((analysisHighCount.value / analysisAlarmRows.value.length) * 100) : 0
+))
+const analysisAreaCoverage = computed(() => (
+  new Set(analysisAlarmRows.value.map(row => row.department || row.location || '未标注区域')).size
+))
+
+const analysisRepeatPointData = computed(() => {
+  const areaMap: Record<string, { count: number; typeCounts: Record<string, number> }> = {}
+  analysisAlarmRows.value.forEach((row) => {
+    const area = row.department || row.location || '未标注区域'
+    const type = row.eventName || '未知事件'
+    if (!areaMap[area]) areaMap[area] = { count: 0, typeCounts: {} }
+    areaMap[area].count += 1
+    areaMap[area].typeCounts[type] = (areaMap[area].typeCounts[type] || 0) + 1
+  })
+  return Object.entries(areaMap)
+    .filter(([, value]) => value.count > 1)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 4)
+    .map(([area, value]) => ({
+      area,
+      count: value.count,
+      topType: Object.entries(value.typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '未知事件',
+    }))
+})
+
+const analysisRepeatPointVisible = computed(() => analysisRepeatPointData.value.slice(0, 2))
+
+const analysisCrossTypes = computed(() => analysisTypeChartData.value.slice(0, 4).map(item => item.eventType))
+
+const analysisCrossRows = computed(() => {
+  const topAreas = analysisAreaChartData.value.slice(0, 4).map(item => item.eventType)
+  return topAreas.map((area) => {
+    const values: Record<string, number> = {}
+    analysisCrossTypes.value.forEach((type) => {
+      values[type] = analysisAlarmRows.value.filter((row) => {
+        const rowArea = row.department || row.location || '未标注区域'
+        const rowType = row.eventName || '未知事件'
+        return rowArea === area && rowType === type
+      }).length
+    })
+    return { area, values }
+  })
+})
+
+const analysisCrossMax = computed(() => (
+  Math.max(
+    ...analysisCrossRows.value.flatMap(row => Object.values(row.values)),
+    0,
+  )
+))
+
+const getCrossHeat = (value: number, max: number) => {
+  if (!value || !max) return 'rgba(126, 197, 255, 0.08)'
+  const ratio = Math.min(value / max, 1)
+  const alpha = 0.16 + ratio * 0.5
+  if (ratio > 0.66) return `linear-gradient(135deg, rgba(255, 141, 141, ${alpha}), rgba(248, 203, 113, ${alpha - 0.08}))`
+  if (ratio > 0.33) return `linear-gradient(135deg, rgba(248, 203, 113, ${alpha}), rgba(126, 232, 255, ${alpha - 0.08}))`
+  return `linear-gradient(135deg, rgba(126, 232, 255, ${alpha}), rgba(108, 226, 178, ${alpha - 0.06}))`
+}
+
+const analysisTimeBuckets = computed(() => {
+  const buckets = [
+    { label: '凌晨', range: '00:00-06:00', start: 0, end: 6 },
+    { label: '上午', range: '06:00-12:00', start: 6, end: 12 },
+    { label: '下午', range: '12:00-18:00', start: 12, end: 18 },
+    { label: '夜间', range: '18:00-24:00', start: 18, end: 24 },
+  ]
+  const counts = buckets.map((bucket) => {
+    const count = analysisAlarmRows.value.filter((row) => {
+      const timestamp = parseAlarmTimestamp(row)
+      if (!timestamp) return false
+      const hour = new Date(timestamp).getHours()
+      return hour >= bucket.start && hour < bucket.end
+    }).length
+    return { ...bucket, count }
+  })
+  const max = Math.max(...counts.map(item => item.count), 1)
+  const peak = Math.max(...counts.map(item => item.count), 0)
+  return counts.map(item => ({
+    ...item,
+    percent: Math.max(Math.round((item.count / max) * 100), item.count > 0 ? 12 : 0),
+    isPeak: item.count > 0 && item.count === peak,
+  }))
+})
+
+const analysisPeakBucket = computed(() => {
+  const peak = analysisTimeBuckets.value.reduce(
+    (max, item) => (item.count > max.count ? item : max),
+    analysisTimeBuckets.value[0] || { label: '暂无', range: '', start: 0, end: 0, count: 0, percent: 0, isPeak: false },
+  )
+  return peak.count > 0 ? peak : null
+})
+
+const analysisTimeConicStyle = computed(() => {
+  const colors = ['#5ed7ff', '#6ce2b2', '#f8cb71', '#ff8d8d']
+  const buckets = analysisTimeBuckets.value
+  const total = buckets.reduce((sum, item) => sum + item.count, 0)
+  if (!total) return 'conic-gradient(rgba(126, 197, 255, 0.12) 0deg 360deg)'
+  let cursor = 0
+  const stops = buckets.map((item, index) => {
+    const start = cursor
+    const end = cursor + (item.count / total) * 360
+    cursor = end
+    return `${colors[index % colors.length]} ${start.toFixed(1)}deg ${end.toFixed(1)}deg`
+  })
+  return `conic-gradient(${stops.join(', ')})`
+})
+
+const analysisKpis = computed(() => [
+  { name: '样本总量', value: analysisAlarmRows.value.length, desc: analysisRangeLabel.value, tone: 'info' },
+  { name: '环比变化', value: analysisDeltaText.value, desc: '较上一周期', tone: analysisDeltaTone.value },
+  { name: '高等级占比', value: `${analysisHighRatio.value}%`, desc: `${analysisHighCount.value} 条高等级`, tone: analysisHighRatio.value >= 50 ? 'warn' : 'ok' },
+  { name: '覆盖区域', value: analysisAreaCoverage.value, desc: '涉及报警区域', tone: 'area' },
+  { name: '重复点位', value: analysisRepeatPointData.value.length, desc: '多次触发区域', tone: analysisRepeatPointData.value.length ? 'danger' : 'ok' },
+])
+
+const analysisSummary = computed(() => {
+  if (!analysisAlarmRows.value.length) return `${analysisRangeLabel.value}暂无报警记录，社区整体运行平稳。`
+  const peakBucket = analysisTimeBuckets.value.find(item => item.isPeak)
+  if (analysisRepeatPointData.value.length > 0) {
+    return `${analysisRangeLabel.value}报警主要集中在 ${topAnalysisArea.value}，重复触发点位 ${analysisRepeatPointData.value.length} 个，高频类型为 ${topAnalysisType.value}，高发时段为 ${peakBucket?.label || '暂无'}。`
+  }
+  if (analysisHighRatio.value >= 40) {
+    return `${analysisRangeLabel.value}高等级报警占比 ${analysisHighRatio.value}%，建议复盘 ${topAnalysisType.value} 的触发条件和现场处置流程。`
+  }
+  return `${analysisRangeLabel.value}报警分布相对分散，可重点观察 ${topAnalysisArea.value} 与 ${topAnalysisType.value} 是否继续上升。`
+})
+
 const alarmCompletionRate = computed(() => {
-  const total = alarmTableRows.value.length
-  if (!total) return 0
-  const done = alarmTableRows.value.filter(item => item.deal.includes('已')).length
+  const validRows = alarmTableRows.value.filter(row => row.eventName !== '暂无报警')
+  const total = validRows.length
+  if (!total) return 100
+  const done = validRows.filter(item => !isAlarmPending(item)).length
   return Math.round((done / total) * 100)
 })
 
@@ -1232,6 +1870,191 @@ const alarmSeverityStats = computed(() => {
       percent: Math.max(Math.round((count / max) * 100), count > 0 ? 12 : 0),
     }
   })
+})
+
+const alarmRowKey = (row: any, idx = 0): string => (
+  String(row?.id ?? `${row?.eventName || 'alarm'}-${row?.department || 'area'}-${row?.date || idx}`)
+)
+
+const actionableAlarmRows = computed(() => (
+  filteredAlarmRows.value.filter(row => row.eventName !== '暂无报警')
+))
+
+const activeAlarmRow = computed(() => {
+  if (!actionableAlarmRows.value.length) return null
+  const selectedKey = alarmRowKey(selectedAlarmRow.value)
+  return actionableAlarmRows.value.find(row => alarmRowKey(row) === selectedKey) || actionableAlarmRows.value[0]
+})
+
+const selectedAlarmView = computed(() => activeAlarmRow.value || {
+  eventName: '暂无报警',
+  department: '--',
+  date: '--',
+  level: 1,
+  deal: '已处理',
+  phone: '--',
+})
+
+const isSelectedAlarm = (row: any): boolean => (
+  Boolean(row && activeAlarmRow.value && alarmRowKey(row) === alarmRowKey(activeAlarmRow.value))
+)
+
+const selectedAlarmIsPending = computed(() => !String(selectedAlarmView.value.deal || '').includes('已'))
+
+const selectedAlarmTone = computed(() => {
+  if (!selectedAlarmIsPending.value) return 'resolved'
+  return severityClass(Number(selectedAlarmView.value.level || 1))
+})
+
+const selectedAlarmHint = computed(() => {
+  const alarm = selectedAlarmView.value
+  if (alarm.eventName === '暂无报警') return '当前无可处置报警，系统处于观察状态。'
+  if (!selectedAlarmIsPending.value) return '该报警已完成处理，可继续复核其他未处理事项。'
+  if (Number(alarm.level || 1) >= 3) return '高等级未处理报警，建议立即查看报警视频片段并形成处置闭环。'
+  return '建议先查看报警视频片段，再根据现场情况完成处理记录。'
+})
+
+const selectedAlarmAiAdvice = computed(() => {
+  const alarm = selectedAlarmView.value
+  if (alarm.eventName === '暂无报警') return '当前暂无报警任务，可保持巡检与视频轮询。'
+  if (!selectedAlarmIsPending.value) return `该 ${alarm.eventName} 报警已处理，建议抽查 ${alarm.department} 的视频回放，确认处置记录完整。`
+  const levelText = severityText(Number(alarm.level || 1))
+  const urgentPrefix = Number(alarm.level || 1) >= 3 ? '优先级较高，建议立即' : '建议'
+  return `${urgentPrefix}查看 ${alarm.department} 的报警视频片段，复核 ${alarm.eventName} 发生时的现场情况；确认异常后通知值班员现场核验，并在处理完成后补充处置说明。当前等级：${levelText}。`
+})
+
+const pendingAlarmCount = computed(() => (
+  alarmTableRows.value.filter(row => row.eventName !== '暂无报警' && isAlarmPending(row)).length
+))
+
+const highPendingAlarmCount = computed(() => (
+  alarmTableRows.value.filter(row => row.eventName !== '暂无报警' && isAlarmPending(row) && Number(row.level || 1) >= 3).length
+))
+
+const todayAlarmCount = computed(() => {
+  const now = new Date()
+  return alarmTableRows.value.filter((row) => {
+    if (row.eventName === '暂无报警') return false
+    const timestamp = parseAlarmTimestamp(row)
+    if (!timestamp) return false
+    const d = new Date(timestamp)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  }).length
+})
+
+const topAlarmArea = computed(() => {
+  const counts: Record<string, number> = {}
+  alarmTableRows.value.forEach((row) => {
+    if (row.eventName === '暂无报警') return
+    const area = row.department || '未标注'
+    counts[area] = (counts[area] || 0) + 1
+  })
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || '暂无'
+})
+
+const alarmCommandKpis = computed(() => [
+  { name: '未处理', value: pendingAlarmCount.value, tone: 'danger' },
+  { name: '高等级', value: highPendingAlarmCount.value, tone: 'warn' },
+  { name: '今日新增', value: todayAlarmCount.value, tone: 'info' },
+  { name: '处理率', value: `${alarmCompletionRate.value}%`, tone: 'ok' },
+  { name: '重点区域', value: topAlarmArea.value, tone: 'area' },
+])
+
+interface AlarmTypeStat {
+  name: string
+  count: number
+  percent: number
+  isOther?: boolean
+}
+
+const alarmTypeSortedEntries = computed(() => {
+  const counts: Record<string, number> = {}
+  alarmTableRows.value.forEach((row) => {
+    if (row.eventName === '暂无报警') return
+    const eventName = row.eventName || '未知事件'
+    counts[eventName] = (counts[eventName] || 0) + 1
+  })
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+})
+
+const alarmTypeOtherItems = computed<AlarmTypeStat[]>(() => {
+  const rest = alarmTypeSortedEntries.value.slice(3)
+  return rest.map(([name, count]) => ({
+    name,
+    count,
+    percent: 0,
+  }))
+})
+
+const alarmTypeOtherCount = computed(() => (
+  alarmTypeOtherItems.value.reduce((sum, item) => sum + item.count, 0)
+))
+
+const alarmTypeStats = computed<AlarmTypeStat[]>(() => {
+  const entries = alarmTypeSortedEntries.value
+  const topList = entries.length > 4 ? entries.slice(0, 3) : entries.slice(0, 4)
+  const otherCount = entries.length > 4 ? alarmTypeOtherCount.value : 0
+  const list = otherCount > 0
+    ? [...topList, ['其他', otherCount] as [string, number]]
+    : topList
+  if (!list.length) {
+    return [{ name: '暂无报警', count: 0, percent: 0 }]
+  }
+  const max = Math.max(...list.map(([, count]) => count), 1)
+  return list.map(([name, count]) => ({
+    name,
+    count,
+    percent: Math.max(Math.round((count / max) * 100), count > 0 ? 16 : 0),
+    isOther: name === '其他',
+  }))
+})
+
+const toggleAlarmTypeOther = (item: AlarmTypeStat) => {
+  if (!item.isOther) {
+    showAlarmTypeOther.value = false
+    return
+  }
+  showAlarmTypeOther.value = !showAlarmTypeOther.value
+}
+
+const activeAlarmAreaCount = computed(() => {
+  const areas = new Set<string>()
+  alarmTableRows.value.forEach((row) => {
+    if (row.eventName === '暂无报警') return
+    areas.add(row.department || '未标注')
+  })
+  return areas.size
+})
+
+const alarmSituationTone = computed(() => {
+  if (highPendingAlarmCount.value > 0) return 'high'
+  if (pendingAlarmCount.value > 0) return 'pending'
+  return 'calm'
+})
+
+const alarmSituationStatus = computed(() => {
+  if (highPendingAlarmCount.value > 0) return '高风险待处置'
+  if (pendingAlarmCount.value > 0) return '有报警待处理'
+  return '运行平稳'
+})
+
+const alarmSituationTitle = computed(() => {
+  if (highPendingAlarmCount.value > 0) return `${highPendingAlarmCount.value} 条高等级未处理报警`
+  if (pendingAlarmCount.value > 0) return `${pendingAlarmCount.value} 条未处理报警`
+  if (todayAlarmCount.value > 0) return `今日新增 ${todayAlarmCount.value} 条报警`
+  return '当前暂无未处理报警'
+})
+
+const alarmSituationDesc = computed(() => {
+  const topType = alarmTypeStats.value[0]?.name || '暂无报警'
+  if (pendingAlarmCount.value > 0) {
+    return `主要集中在 ${topAlarmArea.value}，高频类型为 ${topType}，建议先处理未闭环事件。`
+  }
+  if (todayAlarmCount.value > 0) {
+    return `今日报警已纳入处置闭环，重点复盘 ${topAlarmArea.value} 和 ${topType}。`
+  }
+  return '系统当前未发现待处置报警，可继续保持巡检和视频轮询。'
 })
 
 const alarmSuggestions = computed(() => {
@@ -1289,6 +2112,12 @@ interface ParkingDayPoint {
 }
 
 const envTrendRange = ref<'day' | 'week' | 'month'>('week')
+const envRangeOptions: Array<{ value: 'day' | 'week' | 'month'; label: string }> = [
+  { value: 'day', label: '今日' },
+  { value: 'week', label: '近7天' },
+  { value: 'month', label: '近30天' },
+]
+const envRangeLabel = computed(() => envRangeOptions.find(item => item.value === envTrendRange.value)?.label || '近7天')
 
 const envTrendMetrics = [
   { key: 'aqi', label: 'AQI', unit: '指数', color: '#63b8ff', areaColor: 'rgba(99,184,255,0.22)' },
@@ -1379,21 +2208,39 @@ interface TrendRenderData {
   xTicks: TrendXTick[]
 }
 
+interface TrendCardConfig {
+  key: EnvMetricKey
+  title: string
+  desc: string
+  color: string
+  areaColor: string
+}
+
+const envTrendCards: TrendCardConfig[] = [
+  { key: 'aqi', title: 'AQI 趋势', desc: '空气质量指数', color: '#63b8ff', areaColor: 'rgba(99,184,255,0.22)' },
+  { key: 'pm25', title: 'PM2.5 趋势', desc: '细颗粒物变化', color: '#f8cb71', areaColor: 'rgba(248,203,113,0.2)' },
+]
+
 const buildTrendRender = (metric: EnvMetricKey): TrendRenderData => {
   const series = envTrendSeries.value
   const left = 40
   const right = 344
-  const top = 16
-  const bottom = 128
+  const top = metric === 'aqi' || metric === 'pm25' ? 10 : 16
+  const bottom = metric === 'aqi' || metric === 'pm25' ? 136 : 128
   const width = right - left
   const height = bottom - top
   const values = series.map(item => item[metric])
   const min = Math.min(...values)
   const max = Math.max(...values)
   const diff = Math.max(max - min, 1)
-  const pad = Math.max(Math.round(diff * 0.2), 2)
-  const yMin = Math.max(min - pad, 0)
-  const yMax = max + pad
+  const focusMetric = metric === 'aqi' || metric === 'pm25'
+  const padRatio = focusMetric ? 0.04 : 0.2
+  const minPad = focusMetric ? 0.5 : 2
+  const rawMin = Math.max(min - Math.max(diff * padRatio, minPad), 0)
+  const rawMax = max + Math.max(diff * padRatio, minPad)
+  const tickStep = Math.max(Math.ceil((rawMax - rawMin) / 4), 1)
+  const yMin = Math.max(Math.floor(rawMin / tickStep) * tickStep, 0)
+  const yMax = Math.ceil(rawMax / tickStep) * tickStep
   const yDiff = Math.max(yMax - yMin, 1)
   const stepX = series.length > 1 ? width / (series.length - 1) : 0
 
@@ -1429,12 +2276,6 @@ const parkingZoneState = ref<ParkingZone[]>([
   { name: '地面西侧', capacity: 24, used: 11 },
 ])
 
-const parkingBars = computed(() => parkingZoneState.value.map((item) => ({
-  name: item.name,
-  value: item.used,
-  percent: Math.round((item.used / Math.max(item.capacity, 1)) * 100),
-})))
-
 const parkingDayTrend = ref<ParkingDayPoint[]>([
   { label: '00:00', occupancy: 41, used: 66 },
   { label: '04:00', occupancy: 37, used: 59 },
@@ -1444,28 +2285,6 @@ const parkingDayTrend = ref<ParkingDayPoint[]>([
   { label: '20:00', occupancy: 61, used: 98 },
   { label: '24:00', occupancy: 48, used: 77 },
 ])
-
-const parkingTrendBars = computed(() => parkingDayTrend.value.slice(-8))
-const aqiMiniBars = computed(() => {
-  const series = envTrendDataState.value.day.slice(-8)
-  if (!series.length) return []
-  const values = series.map(item => item.aqi)
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const diff = Math.max(max - min, 1)
-  return series.map((item) => ({
-    label: item.label,
-    height: clamp(Math.round(((item.aqi - min) / diff) * 80 + 20), 16, 100),
-  }))
-})
-const parkingMiniBars = computed(() => parkingTrendBars.value.map((item) => ({
-  label: item.label,
-  height: clamp(item.occupancy, 16, 100),
-})))
-const showParkingTrendLabel = (idx: number, total: number): boolean => {
-  if (idx === total - 1) return true
-  return idx % 2 === 0
-}
 const parkingMapZones = computed(() => parkingZoneState.value.map((zone) => {
   const sampleCount = Math.min(zone.capacity, 24)
   const ratio = zone.capacity > 0 ? zone.used / zone.capacity : 0
@@ -1595,19 +2414,268 @@ const stopEnvParkingRefresh = () => {
   envParkingTimer = null
 }
 
-const onlineCount = computed(() => monitors.value.filter(item => item.status === 1 || item.status === 'online').length)
-const offlineCount = computed(() => Math.max(monitors.value.length - onlineCount.value, 0))
+const monitorIsOnline = (monitor?: MonitorStreamItem): boolean => {
+  if (!monitor) return false
+  const status = monitor.status as unknown
+  return status === 1 || status === 'online' || status === true || status === undefined
+}
 
-const tileHasAlert = (tileName: string) => {
+const monitorKey = (monitor?: MonitorStreamItem | null): string => (
+  String(monitor?.id ?? monitor?.name ?? '')
+)
+
+const normalizeMonitorId = (value: unknown): string => {
+  if (value === undefined || value === null || value === '') return ''
+  return String(value)
+}
+
+const onlineCount = computed(() => monitors.value.filter(item => monitorIsOnline(item)).length)
+const offlineCount = computed(() => Math.max(monitors.value.length - onlineCount.value, 0))
+const pendingAlertCount = computed(() => (alarmStore.getAlarmList || []).filter((item: any) => isAlarmPending(item)).length)
+
+const alarmMatchesMonitor = (item: any, monitorName: string, department = '', monitorId?: number | string): boolean => {
+  const targetMonitorId = normalizeMonitorId(monitorId)
+  const alarmMonitorId = normalizeMonitorId(item?.monitorId ?? item?.monitor_id ?? item?.monitorID)
+  if (targetMonitorId && alarmMonitorId) return targetMonitorId === alarmMonitorId
+
+  const name = normalizeName(monitorName)
+  const dept = normalizeName(department)
+  const alarmName = normalizeName(item?.cameraName || item?.monitorName || item?.monitor || item?.camera || item?.name || item?.eventName)
+  const alarmDept = normalizeName(item?.department || item?.location || item?.area)
+
+  if (alarmName && (name.includes(alarmName) || alarmName.includes(name))) return true
+  if (dept && alarmDept && (dept.includes(alarmDept) || alarmDept.includes(dept))) return true
+  if (alarmDept && name.includes(alarmDept.slice(0, 2))) return true
+  return false
+}
+
+const getMonitorAlertList = (monitorName: string, department = '', monitorId?: number | string) => {
   const list = alarmStore.getAlarmList || []
-  return list.some((item: any) => {
-    const dept = String(item.department || '').toLowerCase()
-    const name = tileName.toLowerCase()
-    return dept && name.includes(dept.slice(0, 2))
+  return list
+    .filter((item: any) => alarmMatchesMonitor(item, monitorName, department, monitorId))
+    .sort((a: any, b: any) => parseAlarmTimestamp(b) - parseAlarmTimestamp(a))
+}
+
+const tilePendingCount = (tile: MonitorStreamItem): number => (
+  getMonitorAlertList(tile.name, tile.department, tile.id).filter((item: any) => isAlarmPending(item)).length
+)
+
+const monitorPriorityStats = (monitor: MonitorStreamItem) => {
+  const pendingAlarms = getMonitorAlertList(monitor.name, monitor.department, monitor.id)
+    .filter((item: any) => isAlarmPending(item))
+  const latestAlarm = pendingAlarms[0]
+  const maxLevel = pendingAlarms.reduce((max, item: any) => Math.max(max, Number(item?.level || item?.warningLevel || 0)), 0)
+  return {
+    pendingCount: pendingAlarms.length,
+    latestTimestamp: latestAlarm ? parseAlarmTimestamp(latestAlarm) : 0,
+    maxLevel,
+  }
+}
+
+const sortMonitorsForPriority = (items: MonitorStreamItem[]): MonitorStreamItem[] => {
+  const originalOrder = new Map(monitors.value.map((item, index) => [monitorKey(item), index]))
+  const orderOf = (item: MonitorStreamItem) => originalOrder.get(monitorKey(item)) ?? Number.MAX_SAFE_INTEGER
+
+  return [...items].sort((a, b) => {
+    const aStats = monitorPriorityStats(a)
+    const bStats = monitorPriorityStats(b)
+    if (bStats.pendingCount !== aStats.pendingCount) return bStats.pendingCount - aStats.pendingCount
+    if (bStats.latestTimestamp !== aStats.latestTimestamp) return bStats.latestTimestamp - aStats.latestTimestamp
+    if (bStats.maxLevel !== aStats.maxLevel) return bStats.maxLevel - aStats.maxLevel
+    const onlineDiff = Number(monitorIsOnline(b)) - Number(monitorIsOnline(a))
+    if (onlineDiff !== 0) return onlineDiff
+    return orderOf(a) - orderOf(b)
   })
 }
 
+const previewSignature = (tile: MonitorStreamItem): string => (
+  [
+    monitorKey(tile),
+    tile.name,
+    tile.department || '',
+    String(tile.status ?? ''),
+    tile.streamUrl || '',
+  ].join('|')
+)
+
+const syncPriorityPreviewTiles = (): void => {
+  const sourceList = monitors.value.length ? monitors.value : cameraTiles.value
+  if (!sourceList.length) return
+
+  const hasMonitorSource = monitors.value.length > 0
+  const sourceByKey = new Map(sourceList.map(item => [monitorKey(item), item]))
+  const currentPreview = cameraTiles.value
+    .map(tile => sourceByKey.get(monitorKey(tile)) || (hasMonitorSource ? null : tile))
+    .filter((tile): tile is MonitorStreamItem => Boolean(tile))
+  const selectedMonitor =
+    sourceList.find(item => item.name === selectedMonitorName.value) ||
+    currentPreview.find(item => item.name === selectedMonitorName.value)
+  const nextTiles: MonitorStreamItem[] = []
+  const seenKeys = new Set<string>()
+  const addTile = (tile?: MonitorStreamItem | null) => {
+    if (!tile || nextTiles.length >= PREVIEW_TILE_LIMIT) return
+    const key = monitorKey(tile)
+    if (!key || seenKeys.has(key)) return
+    seenKeys.add(key)
+    nextTiles.push(tile)
+  }
+  const prioritizedSource = sortMonitorsForPriority(sourceList)
+  const alertMonitors = prioritizedSource.filter(item => monitorPriorityStats(item).pendingCount > 0)
+
+  alertMonitors.forEach(addTile)
+
+  addTile(selectedMonitor)
+
+  if (alertMonitors.length > 0) {
+    currentPreview
+      .filter(item => monitorPriorityStats(item).pendingCount === 0)
+      .forEach(addTile)
+  }
+
+  prioritizedSource.forEach(addTile)
+
+  const hasChanged =
+    cameraTiles.value.length !== nextTiles.length ||
+    cameraTiles.value.some((tile, index) => previewSignature(tile) !== previewSignature(nextTiles[index]))
+
+  if (hasChanged) {
+    cameraTiles.value = nextTiles
+  }
+
+  if (!selectedMonitorName.value && nextTiles[0]) {
+    selectedMonitorName.value = nextTiles[0].name
+  } else if (selectedMonitorName.value && !nextTiles.some(item => item.name === selectedMonitorName.value) && nextTiles[0]) {
+    selectedMonitorName.value = nextTiles[0].name
+  }
+}
+
+const tileIsOffline = (tile: MonitorStreamItem): boolean => (
+  !monitorIsOnline(tile) || !tile.streamUrl
+)
+
+const tileStatus = (tile: MonitorStreamItem) => {
+  if (tileIsOffline(tile)) return { label: '离线', tone: 'offline' }
+  if (tilePendingCount(tile) > 0) return { label: '报警中', tone: 'alert' }
+  return { label: '在线', tone: 'online' }
+}
+
+const inferMonitorAreaName = (name = ''): string => {
+  const raw = String(name).trim()
+  if (!raw) return ''
+  const parts = raw.split(/\s*[-－—]\s*/).filter(Boolean)
+  const source = parts.length > 1 ? parts[parts.length - 1] : raw
+  const cleaned = source
+    .replace(/^\d+号机位\s*/, '')
+    .replace(/(?:实时)?(?:画面|视频|摄像头)$/g, '')
+    .trim()
+
+  if (!cleaned) return raw
+  if (cleaned.length <= 4 && /(门|入口|车库|中庭|楼道|步道|电梯|停车)/.test(cleaned)) {
+    return `${cleaned}监测点`
+  }
+  return cleaned
+}
+
+const tileDisplayName = (tile: MonitorStreamItem): string => (
+  String(tile.department || '').trim() || inferMonitorAreaName(tile.name) || tile.name
+)
+
+const tileSubtitle = (tile: MonitorStreamItem): string => {
+  const name = String(tile.name || '').trim()
+  const displayName = tileDisplayName(tile)
+  if (name && name !== displayName) return name
+  return tile.streamUrl ? '视频流已接入' : '未配置视频流'
+}
+
 const normalizeName = (value: unknown): string => String(value || '').replace(/\s+/g, '').toLowerCase()
+
+const selectedMonitorItem = computed(() => (
+  monitors.value.find(item => item.name === selectedMonitorName.value) ||
+  cameraTiles.value.find(item => item.name === selectedMonitorName.value) ||
+  cameraTiles.value[0]
+))
+
+const selectedMonitorAlarms = computed(() => {
+  const monitor = selectedMonitorItem.value
+  if (!monitor) return []
+  return getMonitorAlertList(monitor.name, monitor.department, monitor.id)
+})
+
+const selectedMonitorAlertStats = computed(() => {
+  const alarms = selectedMonitorAlarms.value
+  const pending = alarms.filter((item: any) => isAlarmPending(item)).length
+  const last = alarms[0]
+  return {
+    total: alarms.length,
+    pending,
+    lastTime: last ? toTimeLabel(parseAlarmTimestamp(last)) : '无',
+  }
+})
+
+const selectedMonitorOverview = computed(() => {
+  const monitor = selectedMonitorItem.value
+  const online = monitorIsOnline(monitor)
+  return {
+    name: monitor?.name || '暂无选中点位',
+    department: monitor?.department || '未标注区域',
+    online,
+  }
+})
+
+const selectedMonitorRisk = computed(() => {
+  const pending = selectedMonitorAlertStats.value.pending
+  if (!selectedMonitorOverview.value.online) return { label: '离线风险', tone: 'offline', percent: 68 }
+  if (pending > 1) return { label: '高风险', tone: 'danger', percent: 88 }
+  if (pending === 1) return { label: '中风险', tone: 'alert', percent: 58 }
+  return { label: '运行正常', tone: 'normal', percent: 22 }
+})
+
+const focusAlarmKey = (alarm: any): string => {
+  if (!alarm) return ''
+  const id = normalizeMonitorId(alarm?.id)
+  if (id) return id
+  return [
+    alarm?.eventName || alarm?.name || 'alarm',
+    alarm?.department || alarm?.location || '',
+    alarm?.level || alarm?.warningLevel || '',
+    parseAlarmTimestamp(alarm),
+  ].join('|')
+}
+
+const focusPendingAlarms = computed(() => (
+  selectedMonitorAlarms.value.filter((item: any) => isAlarmPending(item))
+))
+
+const focusActivePendingAlarm = computed(() => {
+  if (!focusPendingAlarms.value.length) return null
+  return (
+    focusPendingAlarms.value.find((item: any) => focusAlarmKey(item) === focusSelectedAlarmKey.value) ||
+    focusPendingAlarms.value[0]
+  )
+})
+
+const focusActiveAlarmKey = computed(() => focusAlarmKey(focusActivePendingAlarm.value))
+const focusVisibleAlarms = computed(() => focusPendingAlarms.value.slice(0, 5))
+const focusHiddenAlarmCount = computed(() => Math.max(focusPendingAlarms.value.length - focusVisibleAlarms.value.length, 0))
+
+const focusPanelState = computed(() => {
+  const monitor = selectedMonitorItem.value
+  if (!monitorIsOnline(monitor)) return { label: '离线', tone: 'offline' }
+  if (focusActivePendingAlarm.value) return { label: '报警中', tone: 'alert' }
+  return { label: '在线', tone: 'online' }
+})
+
+const focusPanelInfo = computed(() => {
+  const monitor = selectedMonitorItem.value
+  const alarm = focusActivePendingAlarm.value
+  return {
+    pointName: monitor ? tileDisplayName(monitor) : '暂无点位',
+    statusLabel: focusPanelState.value.label,
+    eventName: alarm?.eventName || alarm?.name || '暂无未处理事件',
+    timeLabel: alarm ? toTimeLabel(parseAlarmTimestamp(alarm)) : '--',
+    dealText: alarm ? '未处理' : '无',
+  }
+})
 
 const mapAlarmCounts = computed(() => {
   const list = alarmStore.getAlarmList || []
@@ -1619,7 +2687,7 @@ const mapAlarmCounts = computed(() => {
     const pending = !(item?.status === 1 || item?.status === true || String(item?.deal || '').includes('已'))
     if (!pending) return
 
-    const cameraName = String(item?.name || '').trim()
+    const cameraName = String(item?.cameraName || item?.monitorName || item?.monitor || item?.camera || '').trim()
     if (cameraName) {
       countsByCamera[cameraName] = (countsByCamera[cameraName] || 0) + 1
       return
@@ -1677,6 +2745,58 @@ const envCurrentValues = computed(() => {
     pm25: last?.pm25 ?? 0,
     combustibleGas: last?.combustibleGas ?? 0,
   }
+})
+
+const parkingZoneCards = computed(() => parkingZoneState.value.map((zone) => {
+  const percent = Math.round((zone.used / Math.max(zone.capacity, 1)) * 100)
+  return {
+    ...zone,
+    percent,
+    tone: percent >= 85 ? 'danger' : percent >= 65 ? 'warn' : 'ok',
+  }
+}))
+
+const envStatusCards = computed(() => {
+  const values = envCurrentValues.value
+  const rows = [
+    { key: 'aqi', label: '空气质量', value: values.aqi, unit: 'AQI', limit: 100, color: '#63b8ff', good: values.aqi <= 80 },
+    { key: 'humidity', label: '湿度', value: values.humidity, unit: '%', limit: 100, color: '#53d5a5', good: values.humidity >= 40 && values.humidity <= 70 },
+    { key: 'pm25', label: 'PM2.5', value: values.pm25, unit: 'ug/m³', limit: 100, color: '#f8cb71', good: values.pm25 <= 55 },
+    { key: 'combustibleGas', label: '可燃气体', value: values.combustibleGas, unit: 'ppm', limit: 40, color: '#ff8d8d', good: values.combustibleGas <= 20 },
+  ]
+  return rows.map(item => ({
+    ...item,
+    percent: clamp(Math.round((item.value / item.limit) * 100), 4, 100),
+    status: item.good ? '正常' : '关注',
+    tone: item.good ? 'ok' : 'warn',
+  }))
+})
+
+const envWarningCount = computed(() => envStatusCards.value.filter(item => item.tone !== 'ok').length)
+const parkingTenseZones = computed(() => parkingZoneCards.value.filter(item => item.percent >= 85).length)
+const parkingTopZone = computed(() => [...parkingZoneCards.value].sort((a, b) => b.percent - a.percent)[0])
+
+const envOverviewKpis = computed(() => [
+  { name: '舒适度', value: comfortScore.value, desc: comfortLabel.value, tone: comfortScore.value >= 80 ? 'ok' : comfortScore.value >= 60 ? 'warn' : 'danger' },
+  { name: '异常指标', value: envWarningCount.value, desc: envWarningCount.value ? '需要关注' : '全部正常', tone: envWarningCount.value ? 'warn' : 'ok' },
+  { name: '空闲车位', value: parkingFree.value, desc: `总车位 ${parkingTotal.value}`, tone: parkingFree.value < 20 ? 'danger' : 'ok' },
+  { name: '占用率', value: `${parkingOccupancy.value}%`, desc: parkingOccupancy.value >= 85 ? '车位紧张' : '余量可用', tone: parkingOccupancy.value >= 85 ? 'danger' : parkingOccupancy.value >= 65 ? 'warn' : 'ok' },
+  { name: '高占用区', value: parkingTenseZones.value, desc: parkingTopZone.value?.name || '暂无', tone: parkingTenseZones.value ? 'warn' : 'ok' },
+])
+
+const envParkingSummary = computed(() => {
+  if (envWarningCount.value > 0 && parkingOccupancy.value >= 85) return `当前有 ${envWarningCount.value} 项环境指标需要关注，车位占用率 ${parkingOccupancy.value}%，建议同步安排巡检和停车引导。`
+  if (envWarningCount.value > 0) return `当前有 ${envWarningCount.value} 项环境指标需要关注，优先复核空气质量与设备点位。`
+  if (parkingOccupancy.value >= 85) return `环境整体平稳，但车位占用率已达 ${parkingOccupancy.value}%，${parkingTopZone.value?.name || '重点区域'} 需要加强引导。`
+  return `环境指标整体稳定，车位占用率 ${parkingOccupancy.value}%，当前运行状态良好。`
+})
+
+const envParkingAdviceList = computed(() => {
+  const list: string[] = []
+  if (envWarningCount.value > 0) list.push('复核关注指标对应点位，确认是否存在短时波动或设备异常。')
+  if (parkingOccupancy.value >= 85) list.push(`优先引导车辆前往空闲区域，缓解 ${parkingTopZone.value?.name || '高占用区域'} 压力。`)
+  if (!list.length) list.push('保持常规巡检，重点观察晚高峰车位占用变化。')
+  return list
 })
 
 // ====== 车位仪表盘 ======
@@ -2029,12 +3149,15 @@ const fetchMonitors = async () => {
         id: item.id,
         name: item.name,
         department: item.department,
-        status: item.status,
-        streamUrl: rtmpAddressList[item.id],
+        status: item.status ?? item.running,
+        streamUrl: item.streamUrl || item.streamLink || item.video || rtmpAddressList[item.id],
       }))
       monitors.value = monitorList
       if (monitorList.length) {
-        cameraTiles.value = monitorList.slice(0, 6)
+        syncPriorityPreviewTiles()
+        if (!monitorList.some(item => item.name === selectedMonitorName.value)) {
+          selectedMonitorName.value = monitorList[0].name
+        }
         nextTick(() => {
           initTilePlayers()
         })
@@ -2179,7 +3302,64 @@ const initFocusPlayer = (url: string) => {
   videoEl.play().catch(() => {})
 }
 
+const selectPreviewTile = (camera: MonitorStreamItem) => {
+  selectedMonitorName.value = camera.name
+}
+
+const isMonitorInPreview = (monitor: MonitorStreamItem) => (
+  cameraTiles.value.some(tile => tile.name === monitor.name)
+)
+
+const findMonitorByName = (name?: string) => {
+  if (!name) return null
+  return (
+    monitors.value.find(item => item.name === name) ||
+    monitors.value.find(item => item.name.includes(name) || name.includes(item.name)) ||
+    cameraTiles.value.find(item => item.name === name) ||
+    cameraTiles.value.find(item => item.name.includes(name) || name.includes(item.name)) ||
+    null
+  )
+}
+
+const switchMonitorIntoPreview = (monitor: MonitorStreamItem, closeModal = false) => {
+  activeTab.value = 'video'
+
+  const existingIndex = cameraTiles.value.findIndex(tile => tile.name === monitor.name)
+  if (existingIndex >= 0) {
+    selectPreviewTile(cameraTiles.value[existingIndex])
+    if (closeModal) closeMonitorModal()
+    return
+  }
+
+  const nextTiles = [...cameraTiles.value]
+  if (nextTiles.length < PREVIEW_TILE_LIMIT) {
+    nextTiles.push(monitor)
+  } else {
+    const selectedIndex = nextTiles.findIndex(tile => tile.name === selectedMonitorName.value)
+    const replaceIndex = selectedIndex >= 0 ? selectedIndex : 0
+    nextTiles.splice(replaceIndex, 1, monitor)
+  }
+
+  cameraTiles.value = nextTiles.slice(0, PREVIEW_TILE_LIMIT)
+  selectPreviewTile(monitor)
+  if (closeModal) closeMonitorModal()
+}
+
+const processSelectedAlarm = () => {
+  const alarm = activeAlarmRow.value
+  if (!alarm || !selectedAlarmIsPending.value) return
+  openProcessDialog(alarm)
+}
+
+const openSelectedAlarmVideo = () => {
+  const alarm = activeAlarmRow.value
+  if (!alarm) return
+  openAlarmDetail(alarm)
+}
+
 const openFocus = (camera: MonitorStreamItem) => {
+  selectPreviewTile(camera)
+  focusSelectedAlarmKey.value = ''
   focusText.value = camera.name + '（大屏预览）'
   focusStreamUrl.value = camera.streamUrl || rtmpAddressList[0]
   focusVisible.value = true
@@ -2190,6 +3370,30 @@ const openFocus = (camera: MonitorStreamItem) => {
   })
 }
 
+const selectFocusAlarm = (alarm: any) => {
+  focusSelectedAlarmKey.value = focusAlarmKey(alarm)
+}
+
+const viewFocusAlarm = () => {
+  const alarm = focusActivePendingAlarm.value
+  if (!alarm) return
+  openAlarmDetail(alarm)
+}
+
+const processFocusAlarm = () => {
+  const alarm = focusActivePendingAlarm.value
+  if (!alarm) return
+  openProcessDialog(alarm)
+}
+
+const handoffFocusToAgent = () => {
+  const info = focusPanelInfo.value
+  closeFocus()
+  activeTab.value = 'agent'
+  agentStatus.value = 'thinking'
+  agentPreview.value = `已接收 ${info.pointName} 的${info.statusLabel}事件：${info.eventName}，时间 ${info.timeLabel}，处理状态 ${info.dealText}。`
+}
+
 const closeFocus = () => {
   focusVisible.value = false
   focusStreamUrl.value = ''
@@ -2197,14 +3401,13 @@ const closeFocus = () => {
 }
 
 const onMapPointClick = (point: MapPointItem) => {
-  const target =
-    monitors.value.find(item => item.name === point.camera) ||
-    monitors.value.find(item => item.name.includes(point.camera)) ||
-    cameraTiles.value.find(item => item.name === point.camera)
+  const target = findMonitorByName(point.camera)
   if (target) {
-    activeTab.value = 'video'
-    openFocus(target)
+    switchMonitorIntoPreview(target)
+    return
   }
+  selectedMonitorName.value = point.camera
+  activeTab.value = 'video'
 }
 
 const openMonitorModal = () => {
@@ -2218,8 +3421,9 @@ const closeMonitorModal = () => {
 watch(
   () => alarmStore.getAlarmList,
   (list) => {
-    if (!recentEventInitialized.value && Array.isArray(list) && list.length > 0) {
+    if (Array.isArray(list)) {
       syncRecentEvents(list)
+      syncPriorityPreviewTiles()
       recentEventInitialized.value = true
     }
   },
@@ -2284,12 +3488,9 @@ watch(envTrendRange, () => {
 })
 
 watch(activeTab, (tab) => {
-  if (tab === 'alarm') {
-    alarmStore.setAlarmList([])  // 清空旧数据
-    nextTick(() => {
-      fetchAlarmList()
-      window.dispatchEvent(new Event('resize'))
-    })
+  if (tab === 'alarm' || tab === 'analysis') {
+    void fetchAlarmList()
+    window.dispatchEvent(new Event('resize'))
   }
 
   if (tab === 'agent') {
@@ -2310,18 +3511,21 @@ watch(activeTab, (tab) => {
   grid-template-columns: 1fr;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 :deep(.grid > *) {
   min-width: 0;
+  min-height: 0;
 }
 
 .page-shell {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 .nav-bar {
@@ -2358,20 +3562,74 @@ watch(activeTab, (tab) => {
 }
 
 .nav-current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
   font-size: 18px;
   font-weight: 600;
   color: #d9ecff;
   letter-spacing: 0.02em;
 }
 
+.video-current {
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.nav-current-title {
+  color: #eefaff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.nav-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: rgba(217, 236, 255, 0.72);
+  font-size: 12px;
+}
+
+.nav-metric b {
+  color: #eefaff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.nav-metric.ok b {
+  color: #6ce2b2;
+}
+
+.nav-metric.warn b {
+  color: #f8cb71;
+}
+
+.nav-metric.muted b {
+  color: rgba(214, 230, 255, 0.68);
+}
+
+.nav-mini-action {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+}
+
 .content-shell {
   min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 .panel {
   min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 .panel .card {
@@ -2383,8 +3641,9 @@ watch(activeTab, (tab) => {
 
 .alarm-panel {
   display: grid;
-  grid-template-columns: 0.58fr 1.42fr;
+  grid-template-columns: minmax(360px, 0.42fr) minmax(0, 1fr);
   gap: 8px;
+  min-height: 0;
 }
 
 .alarm-left,
@@ -2393,18 +3652,530 @@ watch(activeTab, (tab) => {
 .video-side,
 .agent-main-card {
   min-height: 0;
+  overflow: hidden;
 }
 
 .alarm-left {
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 
 .alarm-right {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   min-height: 0;
+}
+
+.alarm-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.alarm-list-head h3 {
+  margin: 0;
+  color: #eef8ff;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.alarm-list-head p {
+  margin: 4px 0 0;
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 11px;
+}
+
+.queue-count {
+  border: 1px solid rgba(126, 197, 255, 0.24);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(17, 47, 75, 0.58);
+  color: #d9edff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.table-filters.alarm-table-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(118px, 0.46fr);
+  gap: 8px;
+}
+
+.table-filters.alarm-table-filters input {
+  width: 100%;
+}
+
+.alarm-overview-card,
+.selected-alarm-compact {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.alarm-overview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-color: rgba(126, 197, 255, 0.18);
+  background:
+    radial-gradient(circle at 8% 0, rgba(126, 232, 255, 0.12), transparent 34%),
+    radial-gradient(circle at 100% 0, rgba(83, 213, 165, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(15, 46, 78, 0.9), rgba(10, 30, 54, 0.86));
+}
+
+.alarm-overview-card.high {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 141, 141, 0.14),
+    0 0 24px rgba(255, 78, 102, 0.08);
+}
+
+.alarm-overview-card.pending {
+  box-shadow:
+    inset 0 0 0 1px rgba(248, 203, 113, 0.12),
+    0 0 20px rgba(248, 203, 113, 0.06);
+}
+
+.overview-head {
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+
+.overview-head h3 {
+  margin: 0;
+  color: #eef8ff;
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.overview-head p {
+  margin: 4px 0 0;
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.alarm-situation-pill {
+  flex: 0 0 auto;
+  border: 1px solid rgba(126, 197, 255, 0.26);
+  border-radius: 999px;
+  background: rgba(17, 47, 75, 0.62);
+  color: #d9edff;
+  padding: 5px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.alarm-overview-card.high .alarm-situation-pill {
+  border-color: rgba(255, 141, 141, 0.46);
+  background: rgba(90, 24, 38, 0.5);
+  color: #ffb3bb;
+}
+
+.alarm-overview-card.pending .alarm-situation-pill {
+  border-color: rgba(248, 203, 113, 0.44);
+  background: rgba(86, 65, 24, 0.42);
+  color: #ffe0a3;
+}
+
+.alarm-overview-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.82fr) minmax(0, 1.68fr);
+  gap: 8px;
+  min-height: 0;
+}
+
+.alarm-now-card {
+  min-width: 0;
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(126, 232, 255, 0.1), transparent 42%),
+    rgba(8, 30, 54, 0.62);
+  padding: 10px;
+}
+
+.alarm-now-card span {
+  display: block;
+  color: rgba(214, 230, 255, 0.6);
+  font-size: 11px;
+}
+
+.alarm-now-card strong {
+  display: block;
+  margin-top: 5px;
+  color: #eef8ff;
+  font-size: 20px;
+  line-height: 1.18;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alarm-overview-card.high .alarm-now-card strong {
+  color: #ff9aa3;
+}
+
+.alarm-overview-card.pending .alarm-now-card strong {
+  color: #f8cb71;
+}
+
+.alarm-now-card p {
+  margin: 7px 0 0;
+  color: rgba(233, 246, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.48;
+}
+
+.alarm-type-overview {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(8, 30, 54, 0.46);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 0;
+}
+
+.alarm-type-title span {
+  display: block;
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 11px;
+}
+
+.alarm-type-title strong {
+  display: block;
+  margin-top: 4px;
+  color: #eef8ff;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.alarm-type-list {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.alarm-type-item {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 0.78fr) minmax(0, 1fr) 1.7rem;
+  gap: 7px;
+  align-items: center;
+  color: rgba(233, 246, 255, 0.78);
+  font-size: 12px;
+  min-width: 0;
+  text-align: left;
+}
+
+.alarm-type-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alarm-type-item.clickable {
+  cursor: pointer;
+}
+
+.alarm-type-item.clickable span,
+.alarm-type-item.clickable strong {
+  color: #7ee8ff;
+}
+
+.alarm-type-item.clickable:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.alarm-type-item strong {
+  color: #eef8ff;
+  font-size: 12px;
+  text-align: right;
+}
+
+.alarm-type-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  width: min(260px, 100%);
+  border: 1px solid rgba(126, 197, 255, 0.28);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(126, 232, 255, 0.12), transparent 40%),
+    rgba(6, 24, 43, 0.96);
+  box-shadow: 0 18px 34px rgba(2, 12, 24, 0.42);
+  padding: 9px;
+}
+
+.alarm-type-popover-head,
+.alarm-type-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.alarm-type-popover-head {
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(126, 197, 255, 0.14);
+  color: rgba(214, 230, 255, 0.66);
+  font-size: 11px;
+}
+
+.alarm-type-popover-head strong {
+  color: #eef8ff;
+}
+
+.alarm-type-popover-list {
+  max-height: 11rem;
+  overflow: auto;
+  display: grid;
+  gap: 5px;
+  padding-top: 7px;
+}
+
+.alarm-type-popover-row {
+  border-radius: 8px;
+  background: rgba(17, 47, 75, 0.42);
+  padding: 6px 8px;
+  color: rgba(233, 246, 255, 0.8);
+  font-size: 12px;
+}
+
+.alarm-type-popover-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alarm-type-popover-row strong {
+  flex: 0 0 auto;
+  color: #7ee8ff;
+}
+
+.command-head {
+  margin-bottom: 8px;
+}
+
+.selected-alarm-card {
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 141, 141, 0.09), transparent 36%),
+    rgba(9, 32, 56, 0.58);
+  padding: 10px;
+  min-height: 0;
+}
+
+.selected-alarm-compact {
+  display: flex;
+  flex-direction: column;
+}
+
+.selected-alarm-compact.high {
+  border-color: rgba(255, 141, 141, 0.42);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 141, 141, 0.12),
+    0 0 24px rgba(255, 78, 102, 0.08);
+}
+
+.selected-alarm-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.alarm-eyebrow {
+  grid-column: 1 / -1;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+}
+
+.selected-alarm-main h4 {
+  margin: 0;
+  color: #eef8ff;
+  font-size: 18px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-alarm-grid {
+  margin-top: 9px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.selected-alarm-grid div {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 9px;
+  background: rgba(17, 47, 75, 0.45);
+  padding: 7px 8px;
+  min-width: 0;
+}
+
+.selected-alarm-grid span {
+  display: block;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 10px;
+}
+
+.selected-alarm-grid strong {
+  display: block;
+  margin-top: 3px;
+  color: #eef8ff;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-alarm-note {
+  margin: 8px 0 0;
+  color: rgba(233, 246, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.alarm-action-row {
+  margin-top: 9px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 7px;
+}
+
+.alarm-action-row .mini-action {
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.mini-action.danger {
+  border-color: rgba(255, 141, 141, 0.42);
+  color: #ffb3bb;
+  background: rgba(86, 26, 38, 0.48);
+}
+
+.mini-action.primary {
+  border-color: rgba(126, 232, 255, 0.58);
+  color: #ecfbff;
+  background:
+    radial-gradient(circle at 20% 0, rgba(126, 232, 255, 0.32), transparent 52%),
+    linear-gradient(135deg, rgba(31, 135, 206, 0.76), rgba(20, 86, 152, 0.72));
+  box-shadow: 0 8px 20px rgba(50, 154, 230, 0.18);
+}
+
+.mini-action[disabled] {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.ai-advice-card {
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(17, 47, 75, 0.38);
+  color: #d9edff;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ai-advice-card span {
+  font-size: 12px;
+  color: rgba(233, 246, 255, 0.78);
+}
+
+.ai-advice-card strong {
+  flex: 0 0 auto;
+  color: #7ee8ff;
+  font-size: 11px;
+}
+
+.ai-advice-text {
+  margin: 7px 0 0;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(7, 24, 45, 0.5);
+  color: rgba(233, 246, 255, 0.76);
+  padding: 8px 9px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.alarm-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  min-height: 0;
+}
+
+.alarm-kpi {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(17, 47, 75, 0.5);
+  padding: 8px;
+  min-width: 0;
+}
+
+.alarm-kpi span {
+  display: block;
+  color: rgba(214, 230, 255, 0.6);
+  font-size: 10px;
+}
+
+.alarm-kpi strong {
+  display: block;
+  margin-top: 4px;
+  color: #eef8ff;
+  font-size: 17px;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alarm-kpi.danger strong {
+  color: #ff8d8d;
+}
+
+.alarm-kpi.warn strong {
+  color: #f8cb71;
+}
+
+.alarm-kpi.ok strong {
+  color: #6ce2b2;
+}
+
+.alarm-kpi.info strong {
+  color: #7ee8ff;
+}
+
+.alarm-bottom-row {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  overflow: hidden;
 }
 
 .severity-list {
@@ -2527,6 +4298,29 @@ watch(activeTab, (tab) => {
   padding: 4px 8px;
 }
 
+.info-table tbody tr.high.pending {
+  background: linear-gradient(90deg, rgba(255, 78, 102, 0.2), rgba(255, 141, 141, 0.08));
+  box-shadow:
+    inset 4px 0 0 rgba(255, 78, 102, 0.88),
+    inset 0 0 0 1px rgba(255, 123, 136, 0.1);
+}
+
+.info-table tbody tr.mid.pending {
+  background: linear-gradient(90deg, rgba(248, 203, 113, 0.16), rgba(248, 203, 113, 0.06));
+  box-shadow: inset 4px 0 0 rgba(248, 203, 113, 0.76);
+}
+
+.info-table tbody tr.pending .state-chip.pending {
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(255, 78, 102, 0.18);
+}
+
+.info-table tbody tr.high.pending .level-chip.high {
+  color: #ffd7dc;
+  border-color: rgba(255, 123, 136, 0.74);
+  background: rgba(255, 78, 102, 0.28);
+}
+
 .info-table tbody tr.high {
   background: rgba(255, 141, 141, 0.08);
 }
@@ -2569,7 +4363,7 @@ watch(activeTab, (tab) => {
 }
 
 .chart-panel {
-  min-height: 230px;
+  min-height: 0;
   height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
@@ -2624,10 +4418,619 @@ watch(activeTab, (tab) => {
   font-size: 12px;
 }
 
+.analysis-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.42fr) minmax(320px, 0.78fr);
+  grid-template-rows: minmax(82px, auto) minmax(268px, 1.05fr) minmax(188px, 0.74fr);
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.analysis-hero-card {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.46fr) minmax(0, 1.54fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 0;
+  padding: 10px 14px;
+}
+
+.analysis-headline {
+  margin-bottom: 0;
+  align-items: center;
+}
+
+.analysis-headline h3 {
+  margin: 0;
+  color: #eef8ff;
+  font-size: 16px;
+}
+
+.analysis-headline p {
+  margin: 4px 0 0;
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analysis-range-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(8, 30, 54, 0.46);
+  padding: 4px;
+}
+
+.analysis-range-btn {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(214, 230, 255, 0.7);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.analysis-range-btn.active {
+  background: rgba(126, 197, 255, 0.18);
+  color: #eef8ff;
+}
+
+.analysis-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.analysis-kpi {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(17, 47, 75, 0.48);
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.analysis-kpi span,
+.analysis-kpi em {
+  display: block;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.analysis-kpi strong {
+  display: block;
+  margin: 4px 0 3px;
+  color: #eef8ff;
+  font-size: 18px;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-kpi.danger strong,
+.analysis-kpi.up strong {
+  color: #ff8d8d;
+}
+
+.analysis-kpi.warn strong {
+  color: #f8cb71;
+}
+
+.analysis-kpi.ok strong,
+.analysis-kpi.down strong {
+  color: #6ce2b2;
+}
+
+.analysis-kpi.info strong,
+.analysis-kpi.flat strong,
+.analysis-kpi.area strong {
+  color: #7ee8ff;
+}
+
+.analysis-type-card,
+.analysis-trend-card,
+.analysis-cross-card,
+.analysis-insight-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.analysis-type-card {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.analysis-trend-card {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.analysis-cross-card {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.analysis-insight-card {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.analysis-type-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.44fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.analysis-donut {
+  position: relative;
+  width: min(190px, 100%);
+  aspect-ratio: 1;
+  justify-self: center;
+  border-radius: 50%;
+  box-shadow:
+    0 0 28px rgba(126, 232, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.analysis-donut::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: inherit;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  background: rgba(5, 19, 34, 0.48);
+}
+
+.analysis-donut-core {
+  position: absolute;
+  inset: 30px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(126, 232, 255, 0.18), transparent 48%),
+    rgba(8, 30, 54, 0.92);
+  text-align: center;
+  padding: 14px;
+}
+
+.analysis-donut-core strong,
+.analysis-donut-core span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-donut-core strong {
+  color: #eef8ff;
+  font-size: 18px;
+}
+
+.analysis-donut-core span {
+  margin-top: 5px;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+}
+
+.analysis-type-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.analysis-type-cardlet {
+  position: relative;
+  min-width: 0;
+  border: 1px solid rgba(126, 197, 255, 0.13);
+  border-left: 3px solid var(--type-color);
+  border-radius: 13px;
+  background:
+    linear-gradient(135deg, rgba(126, 232, 255, 0.08), transparent 62%),
+    rgba(17, 47, 75, 0.36);
+  padding: 9px 10px;
+}
+
+.analysis-type-cardlet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.analysis-type-cardlet-head span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(233, 246, 255, 0.88);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.analysis-type-cardlet-head strong {
+  flex: 0 0 auto;
+  color: var(--type-color);
+  font-size: 18px;
+}
+
+.analysis-type-cardlet-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.analysis-type-cardlet-meta em {
+  border-radius: 999px;
+  background: rgba(8, 30, 54, 0.45);
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 10px;
+  font-style: normal;
+  padding: 2px 6px;
+}
+
+.analysis-sparkline-card {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.analysis-sparkline {
+  width: 100%;
+  height: 100%;
+  min-height: 132px;
+  border: 1px solid rgba(126, 197, 255, 0.13);
+  border-radius: 14px;
+  background:
+    linear-gradient(rgba(126, 197, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(126, 197, 255, 0.08) 1px, transparent 1px),
+    radial-gradient(circle at 20% 10%, rgba(126, 232, 255, 0.12), transparent 30%),
+    rgba(8, 30, 54, 0.34);
+  background-size: 100% 12px, 20px 100%, auto, auto;
+  padding: 8px;
+}
+
+.analysis-spark-area {
+  fill: rgba(126, 232, 255, 0.14);
+}
+
+.analysis-spark-line {
+  fill: none;
+  stroke: #7ee8ff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px rgba(126, 232, 255, 0.35));
+}
+
+.analysis-spark-dot {
+  fill: #d8fbff;
+  stroke: rgba(8, 30, 54, 0.9);
+  stroke-width: 0.6;
+}
+
+.analysis-trend-snapshot {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.analysis-trend-snapshot div {
+  min-width: 0;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(17, 47, 75, 0.36);
+  padding: 8px 10px;
+}
+
+.analysis-trend-snapshot span,
+.analysis-trend-snapshot em {
+  display: block;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.analysis-trend-snapshot strong {
+  display: block;
+  margin: 3px 0 1px;
+  color: #eef8ff;
+  font-size: 18px;
+}
+
+.analysis-trend-snapshot strong.up {
+  color: #ff8d8d;
+}
+
+.analysis-trend-snapshot strong.down {
+  color: #6ce2b2;
+}
+
+.analysis-trend-snapshot strong.flat {
+  color: #7ee8ff;
+}
+
+.analysis-cross-table {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto;
+  gap: 6px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.analysis-cross-head,
+.analysis-cross-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 1fr) repeat(4, minmax(4rem, 0.72fr));
+  gap: 6px;
+  align-items: center;
+}
+
+.analysis-cross-head {
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+}
+
+.analysis-cross-row {
+  border: 1px solid rgba(126, 197, 255, 0.13);
+  border-radius: 11px;
+  background: rgba(17, 47, 75, 0.34);
+  padding: 7px 8px;
+}
+
+.analysis-cross-head span,
+.analysis-cross-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-cross-row span {
+  color: rgba(233, 246, 255, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.analysis-cross-head strong,
+.analysis-cross-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-cross-head strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.analysis-cross-row strong {
+  border: 1px solid rgba(126, 197, 255, 0.1);
+  border-radius: 9px;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 12px;
+  padding: 5px 6px;
+}
+
+.analysis-cross-row strong.hot {
+  color: #eef8ff;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.analysis-insight-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  overflow: hidden;
+}
+
+.analysis-time-orbit {
+  position: relative;
+  width: 88px;
+  aspect-ratio: 1;
+  justify-self: center;
+  border-radius: 50%;
+  box-shadow: 0 0 26px rgba(126, 232, 255, 0.11);
+}
+
+.analysis-time-orbit::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: inherit;
+  background: rgba(6, 23, 40, 0.84);
+}
+
+.analysis-time-orbit div {
+  position: absolute;
+  inset: 18px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(17, 47, 75, 0.9);
+  text-align: center;
+}
+
+.analysis-time-orbit strong {
+  color: #eef8ff;
+  font-size: 14px;
+}
+
+.analysis-time-orbit span {
+  margin-top: 2px;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 10px;
+}
+
+.analysis-insight-copy {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.analysis-time-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.analysis-time-pills span {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(17, 47, 75, 0.38);
+  color: rgba(214, 230, 255, 0.66);
+  font-size: 10px;
+  padding: 2px 7px;
+}
+
+.analysis-time-pills span.active {
+  border-color: rgba(248, 203, 113, 0.45);
+  background: rgba(86, 65, 24, 0.28);
+  color: #f8cb71;
+}
+
+.analysis-repeat-list {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+}
+
+.analysis-repeat-list.compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.analysis-repeat-item {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 11px;
+  background: rgba(17, 47, 75, 0.34);
+  padding: 7px 9px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.analysis-repeat-list.compact .analysis-repeat-item {
+  display: inline-flex;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 5px 8px;
+}
+
+.analysis-repeat-list.compact .analysis-repeat-item div {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.analysis-repeat-item span,
+.analysis-repeat-item em {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-repeat-item span {
+  color: rgba(233, 246, 255, 0.84);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.analysis-repeat-item em {
+  color: rgba(214, 230, 255, 0.56);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.analysis-repeat-item strong {
+  color: #ffb3bb;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.analysis-empty-state {
+  flex: 1;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(126, 197, 255, 0.16);
+  border-radius: 12px;
+  color: rgba(214, 230, 255, 0.56);
+  font-size: 12px;
+}
+
+.analysis-sub-label {
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 11px;
+}
+
+.analysis-mini-summary {
+  margin: 0;
+  border: 1px solid rgba(126, 197, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(8, 30, 54, 0.36);
+  color: rgba(233, 246, 255, 0.78);
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow: hidden;
+  padding: 7px 9px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .video-panel {
   display: grid;
-  grid-template-columns: 1.65fr 1fr;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1.62fr) minmax(360px, 0.98fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
 }
 
 .video-main {
@@ -2635,8 +5038,60 @@ watch(activeTab, (tab) => {
   flex-direction: column;
 }
 
+.video-headline {
+  align-items: center;
+  flex-wrap: nowrap;
+  min-height: 28px;
+  margin-bottom: 6px;
+}
+
+.video-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.video-title-row h3 {
+  flex: 0 0 auto;
+  margin: 0;
+  line-height: 1;
+}
+
+.video-subtitle {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.video-subtitle::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  margin-right: 12px;
+  vertical-align: -2px;
+  background: rgba(168, 198, 232, 0.34);
+}
+
+.inline-status {
+  flex: 0 0 auto;
+  border: 1px solid rgba(126, 197, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(17, 47, 75, 0.58);
+  padding: 4px 10px;
+  color: #d9edff !important;
+  line-height: 1.15;
+}
+
 .monitor-grid-large {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }
@@ -2649,10 +5104,29 @@ watch(activeTab, (tab) => {
 .video-tile {
   position: relative;
   overflow: hidden;
-  min-height: 170px;
+  min-height: 0;
+  height: 100%;
   border-radius: 8px;
   border: 1px dashed rgba(107, 176, 255, 0.55);
   background: rgba(7, 21, 38, 0.8);
+  transition:
+    border-color 0.24s ease,
+    box-shadow 0.24s ease,
+    filter 0.24s ease;
+}
+
+.tile-flow-move,
+.tile-flow-enter-active,
+.tile-flow-leave-active {
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease;
+}
+
+.tile-flow-enter-from,
+.tile-flow-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
 }
 
 .tile-video {
@@ -2661,53 +5135,133 @@ watch(activeTab, (tab) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition:
+    filter 0.28s ease,
+    opacity 0.28s ease;
 }
 
 .tile-overlay {
   position: absolute;
   inset: auto 0 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
   background: linear-gradient(180deg, rgba(3, 10, 18, 0), rgba(3, 10, 18, 0.72));
-  padding: 18px 10px 8px;
+  padding: 22px 12px 10px;
+}
+
+.tile-copy {
+  min-width: 0;
 }
 
 .tile-title {
   font-weight: 600;
-  text-align: center;
+  text-align: left;
+  color: #eaf6ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-focus-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(126, 197, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(17, 47, 75, 0.68);
+  color: #d9edff;
+  padding: 4px 9px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.tile-focus-btn:hover {
+  border-color: rgba(126, 232, 255, 0.72);
+  background: rgba(31, 77, 116, 0.84);
+  transform: translateY(-1px);
 }
 
 .tile-sub {
   margin-top: 4px;
   color: var(--sub);
   font-size: 12px;
-  text-align: center;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .video-side {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(180px, 0.4fr);
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.video-map-card,
+.ai-alarm-card {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.map-headline {
+  align-items: center;
+}
+
+.map-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--sub);
+  font-size: 11px;
+}
+
+.map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legend-dot.normal {
+  background: #63b8ff;
+  box-shadow: 0 0 8px rgba(99, 184, 255, 0.58);
+}
+
+.legend-dot.alert {
+  background: #ff8d8d;
+  box-shadow: 0 0 8px rgba(255, 141, 141, 0.58);
 }
 
 .map-square {
   border: 1px dashed rgba(107, 176, 255, 0.55);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 0;
   background: linear-gradient(145deg, rgba(30, 67, 105, 0.86), rgba(22, 51, 83, 0.92));
-  min-height: 280px;
+  min-height: 0;
+  flex: 1;
   overflow: hidden;
-}
-
-.video-stats-grid {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
 }
 
 .mini-kpi {
   border: 1px solid rgba(126, 197, 255, 0.24);
-  border-radius: 8px;
+  border-radius: 10px;
   background: rgba(17, 47, 75, 0.56);
-  padding: 8px 8px 8px 14px;
+  padding: 7px 8px 7px 14px;
 }
 
 .mini-kpi span {
@@ -2722,142 +5276,393 @@ watch(activeTab, (tab) => {
   font-size: 20px;
 }
 
-.env-panel {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: minmax(228px, auto);
-  gap: 10px;
-  align-content: start;
-}
-
-.env-slot-card {
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto auto;
-  gap: 12px;
-}
-
-.env-metric-card {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  min-height: 248px;
-}
-
-.env-dual-card {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  min-height: 248px;
-}
-
-.dual-card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  min-height: 0;
-}
-
-.dual-mini-block {
+.map-insight-strip {
+  display: block;
+  margin-top: 8px;
   border: 1px solid rgba(126, 197, 255, 0.18);
   border-radius: 10px;
-  background: rgba(10, 36, 61, 0.58);
-  padding: 8px 9px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  min-height: 0;
+  background:
+    linear-gradient(90deg, rgba(10, 36, 61, 0.76), rgba(17, 47, 75, 0.42)),
+    rgba(10, 30, 52, 0.58);
+  padding: 7px 10px;
+  flex: 0 0 auto;
 }
 
-.dual-mini-block header {
+.map-insight-main {
+  min-width: 0;
+}
+
+.risk-pill {
+  border: 1px solid rgba(126, 197, 255, 0.24);
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: rgba(17, 47, 75, 0.58);
+  font-size: 11px !important;
+}
+
+.risk-pill.normal {
+  color: #6ce2b2 !important;
+  border-color: rgba(108, 226, 178, 0.34);
+}
+
+.risk-pill.alert {
+  color: #f8cb71 !important;
+  border-color: rgba(248, 203, 113, 0.45);
+}
+
+.risk-pill.danger,
+.risk-pill.offline {
+  color: #ff8d8d !important;
+  border-color: rgba(255, 141, 141, 0.5);
+}
+
+.monitor-insight-title {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 10px;
 }
 
-.dual-mini-block strong {
-  font-size: 12px;
-  color: #d8ecff;
+.monitor-insight-title strong {
+  color: #eaf6ff;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.dual-mini-block span {
+.monitor-insight-title span,
+.monitor-health-row {
+  color: rgba(214, 230, 255, 0.68);
   font-size: 11px;
-  color: rgba(214, 230, 255, 0.72);
 }
 
-.dual-mini-chart {
+.monitor-health-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta-separator {
+  color: rgba(214, 230, 255, 0.36);
+}
+
+.insight-pending-text.bad {
+  color: #ff8d8d;
+}
+
+.insight-pending-text.ok {
+  color: #6ce2b2;
+}
+
+.env-panel {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  align-items: end;
-  gap: 3px;
-  min-height: 88px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr) minmax(320px, 0.9fr);
+  grid-template-rows: auto minmax(220px, 1fr) minmax(210px, 0.95fr);
+  gap: 10px;
+  min-height: 0;
 }
 
-.mini-col {
+.env-overview-card {
+  grid-column: 1 / -1;
   display: grid;
-  justify-items: center;
-  gap: 2px;
+  grid-template-columns: minmax(0, 0.68fr) minmax(0, 1.32fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
 }
 
-.mini-col i {
-  width: 100%;
-  min-height: 7px;
-  border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(180deg, rgba(99, 184, 255, 0.95), rgba(99, 184, 255, 0.38));
+.env-overview-head {
+  margin-bottom: 0;
+  align-items: center;
 }
 
-.mini-col i.parking {
-  background: linear-gradient(180deg, rgba(83, 213, 165, 0.95), rgba(83, 213, 165, 0.35));
+.env-overview-head h3 {
+  margin: 0;
+  color: #eef8ff;
+  font-size: 17px;
 }
 
-.mini-col span {
-  min-height: 10px;
-  font-size: 10px;
+.env-overview-head p {
+  margin: 5px 0 0;
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 12px;
+}
+
+.env-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.env-kpi {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(17, 47, 75, 0.48);
+  padding: 10px;
+  min-width: 0;
+}
+
+.env-kpi span,
+.env-kpi em {
+  display: block;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.env-kpi strong {
+  display: block;
+  margin: 5px 0 4px;
+  color: #eef8ff;
+  font-size: 19px;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-kpi.ok strong {
+  color: #6ce2b2;
+}
+
+.env-kpi.warn strong {
+  color: #f8cb71;
+}
+
+.env-kpi.danger strong {
+  color: #ff8d8d;
+}
+
+.env-status-card,
+.env-trend-card,
+.env-parking-card,
+.env-parking-map-card,
+.env-insight-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.env-trend-card {
+  grid-column: span 2;
+}
+
+.env-status-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.env-status-item {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(17, 47, 75, 0.42);
+  padding: 10px;
+  min-width: 0;
+}
+
+.env-status-item.warn {
+  border-color: rgba(248, 203, 113, 0.3);
+  background: rgba(80, 58, 24, 0.28);
+}
+
+.env-status-top,
+.parking-zone-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.env-status-top span,
+.parking-zone-info span {
+  min-width: 0;
+  color: rgba(214, 230, 255, 0.66);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-status-top em {
+  flex: 0 0 auto;
+  color: #6ce2b2;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.env-status-item.warn .env-status-top em {
+  color: #f8cb71;
+}
+
+.env-status-item strong {
+  display: block;
+  margin: 8px 0 7px;
+  color: #eef8ff;
+  font-size: 24px;
   line-height: 1;
-  color: rgba(214, 230, 255, 0.52);
+  font-variant-numeric: tabular-nums;
 }
 
-.env-metric-head {
-  margin-bottom: 4px;
+.env-status-item small {
+  margin-left: 4px;
+  color: rgba(214, 230, 255, 0.5);
+  font-size: 11px;
+  font-weight: 500;
 }
 
-.chart-wrap {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(24, 56, 92, 0.66);
+.env-status-bar,
+.parking-zone-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(126, 197, 255, 0.1);
+  overflow: hidden;
+}
+
+.env-status-bar i,
+.parking-zone-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.parking-overview-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.parking-ring-wrap.compact .parking-ring {
+  width: 104px;
+  height: 104px;
+}
+
+.parking-zone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.parking-zone-row {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(17, 47, 75, 0.34);
   padding: 8px;
+}
+
+.parking-zone-info strong {
+  flex: 0 0 auto;
+  color: #d9edff;
+  font-size: 12px;
+}
+
+.parking-zone-bar {
+  margin-top: 7px;
+}
+
+.parking-zone-row.ok .parking-zone-bar i {
+  background: linear-gradient(90deg, rgba(83, 213, 165, 0.88), rgba(126, 232, 255, 0.62));
+}
+
+.parking-zone-row.warn .parking-zone-bar i {
+  background: linear-gradient(90deg, rgba(248, 203, 113, 0.9), rgba(255, 190, 102, 0.68));
+}
+
+.parking-zone-row.danger .parking-zone-bar i {
+  background: linear-gradient(90deg, rgba(255, 141, 141, 0.92), rgba(255, 78, 102, 0.68));
+}
+
+.parking-zone-grid.compact {
+  flex: 1;
+  min-height: 0;
+}
+
+.env-insight-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.comfort-score.compact strong {
+  font-size: 40px;
+}
+
+.env-insight-copy {
+  min-width: 0;
+}
+
+.env-insight-copy p {
+  margin: 0;
+  color: rgba(233, 246, 255, 0.8);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.env-insight-copy ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: rgba(233, 246, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+
+
+.env-trend-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.env-trend-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.env-trend-title span {
+  color: #eef8ff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.env-trend-title em {
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+  font-style: normal;
 }
 
 .env-trend-item {
   border: 1px solid rgba(126, 197, 255, 0.16);
   border-radius: 10px;
   background: rgba(12, 40, 68, 0.48);
-  padding: 6px 8px 4px;
+  padding: 8px 8px 4px;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
 }
 
 .env-trend-item.single {
   height: 100%;
-}
-
-.env-trend-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 2px;
-}
-
-.env-trend-title span {
-  font-size: 12px;
-  color: #d6ecff;
-  font-weight: 600;
-}
-
-.env-trend-title em {
-  font-style: normal;
-  font-size: 11px;
-  color: rgba(214, 230, 255, 0.72);
 }
 
 .env-trend-svg {
@@ -2866,71 +5671,56 @@ watch(activeTab, (tab) => {
   min-height: 72px;
 }
 
-.legend {
-  display: flex;
-  gap: 10px;
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--sub);
-}
-
-.dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 4px;
-}
-
-.bar-grid {
-  display: grid;
-  gap: 9px;
-}
-
-.bar-row {
-  display: grid;
-  grid-template-columns: 4.6rem 1fr 2rem;
-  gap: 8px;
-  align-items: center;
-  font-size: 12px;
-}
-
-.bar {
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.bar i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, rgba(126, 197, 255, 0.88), rgba(83, 213, 165, 0.86));
-}
-
-/* ====== 1. 视频卡片呼吸灯 ====== */
-@keyframes tile-breathe {
-  0%, 100% { border-color: rgba(107, 176, 255, 0.35); box-shadow: 0 0 0 0 rgba(99, 184, 255, 0); }
-  50% { border-color: rgba(107, 176, 255, 0.65); box-shadow: 0 0 12px 0 rgba(99, 184, 255, 0.15); }
-}
-
+/* ====== 1. 视频卡片状态边框 ====== */
 @keyframes tile-alert-pulse {
   0%, 100% { border-color: rgba(255, 120, 120, 0.5); box-shadow: 0 0 0 0 rgba(255, 100, 100, 0); }
   50% { border-color: rgba(255, 100, 100, 0.85); box-shadow: 0 0 18px 0 rgba(255, 80, 80, 0.25); }
 }
 
-.tile-breathing {
-  animation: tile-breathe 3.5s ease-in-out infinite;
+.tile-online {
+  animation: none;
   border-style: solid;
+  border-color: rgba(108, 226, 178, 0.48);
+  box-shadow: inset 0 0 0 1px rgba(108, 226, 178, 0.08);
 }
 
 .tile-alert {
   animation: tile-alert-pulse 1.8s ease-in-out infinite;
 }
 
-.tile-empty-state {
+.tile-offline {
+  animation: none;
+  border-color: rgba(168, 198, 232, 0.18);
+  background: rgba(6, 14, 24, 0.92);
+}
+
+.tile-offline .tile-video {
+  filter: grayscale(1) brightness(0.38);
+  opacity: 0.48;
+}
+
+.tile-offline .tile-overlay {
+  background: linear-gradient(180deg, rgba(3, 10, 18, 0), rgba(3, 10, 18, 0.88));
+}
+
+.tile-selected {
+  border-color: rgba(126, 232, 255, 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 232, 255, 0.22),
+    0 0 24px rgba(126, 232, 255, 0.18);
+}
+
+.tile-offline.tile-selected {
+  border-color: rgba(168, 198, 232, 0.24);
+  box-shadow:
+    inset 0 0 0 1px rgba(168, 198, 232, 0.08),
+    0 0 18px rgba(18, 32, 48, 0.32);
+}
+
+.tile-offline-state {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2946,9 +5736,72 @@ watch(activeTab, (tab) => {
   opacity: 0.5;
 }
 
-.tile-empty-state span {
+.tile-offline-state span {
   font-size: 12px;
   letter-spacing: 1px;
+}
+
+.tile-status-badge,
+.tile-pending-badge {
+  position: absolute;
+  top: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(126, 197, 255, 0.26);
+  border-radius: 999px;
+  background: rgba(5, 18, 32, 0.66);
+  color: #d9edff;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.tile-status-badge {
+  left: 10px;
+  max-width: calc(100% - 110px);
+}
+
+.tile-pending-badge {
+  right: 10px;
+  color: #ff9fa9;
+  border-color: rgba(255, 141, 141, 0.52);
+  background: rgba(86, 26, 38, 0.72);
+}
+
+.tile-status-badge i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+  flex: 0 0 auto;
+}
+
+.tile-status-badge span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-status-badge.online {
+  color: #6ce2b2;
+  border-color: rgba(108, 226, 178, 0.3);
+}
+
+.tile-status-badge.alert {
+  color: #ff8d8d;
+  border-color: rgba(255, 141, 141, 0.62);
+  animation: event-breathe 1.4s ease-in-out infinite;
+}
+
+.tile-status-badge.offline {
+  color: rgba(214, 230, 255, 0.62);
+  border-color: rgba(168, 198, 232, 0.26);
+  background: rgba(16, 27, 40, 0.76);
 }
 
 /* ====== 2. 地图标题脉冲点 ====== */
@@ -2995,16 +5848,16 @@ watch(activeTab, (tab) => {
 .kpi-offline::before { background: #ff8d8d; }
 .kpi-total::before { background: #63b8ff; }
 .kpi-preview::before { background: #a78bfa; }
+.kpi-alert::before { background: #f8cb71; }
 
 /* ====== 4. AI 事件流 ====== */
 .event-stream {
-  margin-top: 10px;
   border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(10, 30, 52, 0.6);
   padding: 8px 10px;
-  height: 220px;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -3029,13 +5882,29 @@ watch(activeTab, (tab) => {
 }
 
 .event-stream-list {
+  position: relative;
   min-height: 0;
   overflow-y: auto;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   padding-right: 2px;
+}
+
+.event-stream-list::before {
+  content: '';
+  position: absolute;
+  left: 49px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(126, 197, 255, 0.08), rgba(126, 197, 255, 0.38), rgba(126, 197, 255, 0.08));
+  pointer-events: none;
+}
+
+.event-stream-empty-list::before {
+  display: none;
 }
 
 .event-stream-list::-webkit-scrollbar {
@@ -3053,14 +5922,52 @@ watch(activeTab, (tab) => {
 }
 
 .event-item {
-  display: flex;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 36px 12px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   padding: 5px 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   background: rgba(17, 47, 75, 0.5);
   font-size: 11px;
   transition: background 0.2s;
+}
+
+.event-flow-move,
+.event-flow-enter-active,
+.event-flow-leave-active {
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease,
+    max-height 0.28s ease,
+    padding 0.28s ease,
+    border-color 0.28s ease;
+}
+
+.event-flow-enter-active,
+.event-flow-leave-active {
+  overflow: hidden;
+  max-height: 46px;
+}
+
+.event-flow-enter-from {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.985);
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
+}
+
+.event-flow-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
 }
 
 .event-item-pending {
@@ -3088,6 +5995,8 @@ watch(activeTab, (tab) => {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+  justify-self: center;
+  outline: 3px solid rgba(10, 30, 52, 0.86);
 }
 
 .dot-pulse {
@@ -3131,6 +6040,7 @@ watch(activeTab, (tab) => {
 }
 
 .event-empty {
+  grid-template-columns: 1fr;
   justify-content: center;
   color: rgba(214, 230, 255, 0.4);
 }
@@ -3173,14 +6083,6 @@ watch(activeTab, (tab) => {
   opacity: 0.7;
 }
 
-/* ====== 6. 车位圆环仪表盘 ====== */
-.parking-dashboard {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 16px;
-  align-items: center;
-}
-
 .parking-ring-wrap {
   display: flex;
   flex-direction: column;
@@ -3203,75 +6105,6 @@ watch(activeTab, (tab) => {
 .parking-summary strong {
   color: #eaf6ff;
   margin-left: 2px;
-}
-
-.parking-day-trend {
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(11, 39, 66, 0.58);
-  padding: 8px 10px 6px;
-}
-
-.parking-day-trend-head {
-  display: flex;
-  justify-content: space-between;
-  color: rgba(214, 230, 255, 0.8);
-  font-size: 11px;
-  margin-bottom: 6px;
-}
-
-.parking-day-trend-bars {
-  height: 74px;
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  align-items: end;
-  gap: 4px;
-}
-
-.trend-col {
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-}
-
-.trend-col i {
-  width: 100%;
-  border-radius: 6px 6px 2px 2px;
-  min-height: 5px;
-  background: linear-gradient(180deg, rgba(126, 197, 255, 0.95), rgba(83, 213, 165, 0.9));
-  box-shadow: 0 0 10px rgba(83, 213, 165, 0.22);
-}
-
-.trend-col span {
-  color: rgba(214, 230, 255, 0.55);
-  font-size: 10px;
-  line-height: 1;
-  min-height: 10px;
-}
-
-.parking-map {
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(10, 33, 55, 0.62);
-  padding: 8px 10px;
-}
-
-.parking-map-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.parking-map-head h4 {
-  margin: 0;
-  font-size: 13px;
-}
-
-.parking-map-head span {
-  color: var(--sub);
-  font-size: 11px;
 }
 
 .parking-zone-grid {
@@ -3318,14 +6151,6 @@ watch(activeTab, (tab) => {
   border-color: rgba(255, 128, 146, 0.45);
 }
 
-/* ====== 7. 环境舒适度评分卡 ====== */
-.env-comfort-card {
-  background:
-    radial-gradient(circle at 20% 10%, rgba(83, 213, 165, 0.08), transparent 40%),
-    linear-gradient(180deg, rgba(17, 46, 75, 0.82), rgba(13, 33, 56, 0.8));
-  border: 1px solid rgba(83, 213, 165, 0.18);
-}
-
 .comfort-head {
   display: flex;
   align-items: center;
@@ -3336,13 +6161,6 @@ watch(activeTab, (tab) => {
 .comfort-label {
   font-size: 13px;
   font-weight: 600;
-}
-
-.comfort-score-wrap {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 16px;
-  align-items: center;
 }
 
 .comfort-score {
@@ -3362,41 +6180,13 @@ watch(activeTab, (tab) => {
   margin-left: 2px;
 }
 
-.comfort-factors {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.comfort-factor {
-  display: grid;
-  grid-template-columns: 3.4rem 1fr;
-  gap: 8px;
-  align-items: center;
-  font-size: 11px;
-  color: var(--sub);
-}
-
-.comfort-bar {
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-}
-
-.comfort-bar i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  transition: width 0.4s ease;
-}
-
 
 .agent-panel {
   display: grid;
   grid-template-columns: minmax(0, 2.1fr) minmax(20rem, 0.78fr);
   gap: 8px;
   align-items: stretch;
+  min-height: 0;
 }
 
 .main-col,
@@ -3417,13 +6207,13 @@ watch(activeTab, (tab) => {
 }
 
 .main-col {
-  grid-template-rows: 1fr;
-  min-height: 30rem;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
 }
 
 .side-col {
   display: grid;
-  grid-template-rows: minmax(8rem, 0.34fr) minmax(18rem, 1fr);
+  grid-template-rows: minmax(0, 0.34fr) minmax(0, 1fr);
   gap: 0.85rem;
 }
 
@@ -3433,8 +6223,12 @@ watch(activeTab, (tab) => {
 }
 
 .hero-card {
+  display: flex;
+  flex-direction: column;
   gap: 0.95rem;
   padding: 1rem;
+  min-height: 0;
+  overflow: hidden;
   background:
     radial-gradient(circle at 12% 0%, rgba(126, 197, 255, 0.12), transparent 26%),
     linear-gradient(180deg, rgba(18, 48, 79, 0.86), rgba(11, 28, 48, 0.8));
@@ -3617,7 +6411,7 @@ watch(activeTab, (tab) => {
 .hero-shell {
   position: relative;
   flex: 1;
-  min-height: 32rem;
+  min-height: 0;
   height: 100%;
   overflow: hidden;
   border-radius: 30px;
@@ -3862,6 +6656,7 @@ watch(activeTab, (tab) => {
 
 .info-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 12px;
 }
@@ -3871,6 +6666,9 @@ watch(activeTab, (tab) => {
   border-bottom: 1px solid rgba(126, 197, 255, 0.16);
   padding: 8px 6px;
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .info-table th {
@@ -3881,6 +6679,49 @@ watch(activeTab, (tab) => {
   z-index: 2;
   background: rgba(13, 44, 73, 0.95);
   backdrop-filter: blur(2px);
+}
+
+.info-table th:nth-child(1),
+.info-table td:nth-child(1) {
+  width: 18%;
+}
+
+.info-table th:nth-child(2),
+.info-table td:nth-child(2) {
+  width: 30%;
+}
+
+.info-table th:nth-child(3),
+.info-table td:nth-child(3) {
+  width: 24%;
+}
+
+.info-table th:nth-child(4),
+.info-table td:nth-child(4) {
+  width: 12%;
+}
+
+.info-table th:nth-child(5),
+.info-table td:nth-child(5) {
+  width: 16%;
+}
+
+.info-table tbody tr {
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.info-table tbody tr.pending {
+  box-shadow: inset 3px 0 0 rgba(255, 141, 141, 0.42);
+}
+
+.info-table tbody tr.selected {
+  background: rgba(126, 197, 255, 0.16);
+  box-shadow:
+    inset 3px 0 0 rgba(126, 232, 255, 0.88),
+    inset 0 0 0 1px rgba(126, 232, 255, 0.12);
 }
 
 .state-chip {
@@ -4040,10 +6881,15 @@ watch(activeTab, (tab) => {
   border-radius: 8px;
   background: rgba(9, 34, 63, 0.82);
   padding: 9px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
 }
 
 .focus-title {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 13px;
 }
 
@@ -4053,8 +6899,168 @@ watch(activeTab, (tab) => {
   gap: 6px;
 }
 
+.focus-state-card {
+  border: 1px solid rgba(126, 197, 255, 0.22);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 0 0, rgba(126, 197, 255, 0.12), transparent 42%),
+    rgba(8, 29, 54, 0.7);
+  padding: 10px;
+  display: grid;
+  gap: 9px;
+}
+
+.focus-state-card.alert {
+  border-color: rgba(255, 141, 141, 0.46);
+  box-shadow: inset 0 0 0 1px rgba(255, 141, 141, 0.08);
+}
+
+.focus-state-card.online {
+  border-color: rgba(108, 226, 178, 0.32);
+}
+
+.focus-state-card.offline {
+  border-color: rgba(168, 198, 232, 0.22);
+  background: rgba(12, 24, 38, 0.72);
+}
+
+.focus-state-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.focus-state-head span,
+.focus-state-row span {
+  color: rgba(214, 230, 255, 0.66);
+  font-size: 11px;
+}
+
+.focus-state-head strong {
+  border: 1px solid rgba(126, 197, 255, 0.24);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #d9edff;
+  font-size: 11px;
+}
+
+.focus-state-card.alert .focus-state-head strong {
+  color: #ff9fa9;
+  border-color: rgba(255, 141, 141, 0.5);
+  background: rgba(86, 26, 38, 0.48);
+}
+
+.focus-state-card.online .focus-state-head strong {
+  color: #6ce2b2;
+  border-color: rgba(108, 226, 178, 0.38);
+  background: rgba(21, 78, 61, 0.34);
+}
+
+.focus-state-list {
+  display: grid;
+  gap: 6px;
+}
+
+.focus-state-row {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+}
+
+.focus-state-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #eef8ff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.focus-alarm-switch {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(7, 24, 45, 0.5);
+  padding: 7px;
+  display: grid;
+  gap: 5px;
+}
+
+.focus-switch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(214, 230, 255, 0.7);
+  font-size: 11px;
+}
+
+.focus-switch-head strong {
+  color: #ffb3bb;
+  font-size: 11px;
+}
+
+.focus-alarm-option {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(17, 47, 75, 0.46);
+  color: #d9edff;
+  padding: 5px 7px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.focus-alarm-option.active {
+  border-color: rgba(255, 141, 141, 0.58);
+  background: rgba(86, 26, 38, 0.54);
+}
+
+.focus-alarm-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  text-align: left;
+}
+
+.focus-alarm-option em {
+  color: rgba(214, 230, 255, 0.68);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.focus-switch-more {
+  margin: 0;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.focus-action-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.focus-action-row .btn {
+  padding: 5px 6px;
+  white-space: nowrap;
+}
+
+.focus-action-row .btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .focus-close {
-  margin-top: 10px;
+  margin-top: auto;
   width: 100%;
 }
 
@@ -4113,6 +7119,15 @@ watch(activeTab, (tab) => {
   border-color: var(--accent);
 }
 
+.monitor-row.active {
+  border-color: rgba(126, 232, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(126, 232, 255, 0.12);
+}
+
+.monitor-row.previewing {
+  background: rgba(16, 48, 78, 0.82);
+}
+
 .row-title {
   font-weight: 600;
 }
@@ -4121,6 +7136,13 @@ watch(activeTab, (tab) => {
   color: var(--sub);
   font-size: 12px;
   margin-top: 2px;
+}
+
+.monitor-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .status {
@@ -4138,34 +7160,116 @@ watch(activeTab, (tab) => {
   border-color: rgba(83, 213, 165, 0.45);
 }
 
+.preview-tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 197, 255, 0.24);
+  background: rgba(17, 47, 75, 0.54);
+  color: rgba(214, 230, 255, 0.76);
+  font-size: 12px;
+}
+
+.preview-tag.active {
+  color: #7ee8ff;
+  border-color: rgba(126, 232, 255, 0.52);
+  background: rgba(40, 94, 136, 0.42);
+}
+
 @media (max-width: 1400px) {
   .alarm-panel,
-  .video-panel,
-  .env-panel,
+  .analysis-panel,
   .agent-panel {
     grid-template-columns: 1fr;
   }
 
-  .env-chart-card,
-  .env-slot-card,
-  .env-table-card {
+  .alarm-panel {
+    grid-template-rows: minmax(26rem, 0.95fr) minmax(34rem, 1.05fr);
+  }
+
+  .analysis-panel {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-auto-rows: minmax(16rem, auto);
+  }
+
+  .analysis-hero-card,
+  .analysis-type-card,
+  .analysis-trend-card,
+  .analysis-cross-card,
+  .analysis-insight-card {
     grid-column: auto;
     grid-row: auto;
+  }
+
+  .analysis-hero-card {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-type-stage {
+    grid-template-columns: minmax(160px, 0.36fr) minmax(0, 1fr);
+  }
+
+  .analysis-insight-body {
+    grid-template-columns: minmax(120px, 0.3fr) minmax(0, 1fr);
+  }
+
+  .alarm-kpi-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .alarm-type-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .video-panel {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(28rem, 1fr) minmax(36rem, auto);
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .video-side {
+    grid-template-rows: minmax(24rem, 1fr) minmax(14rem, auto);
+  }
+
+  .alarm-panel,
+  .analysis-panel,
+  .env-panel,
+  .agent-panel {
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .env-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .env-overview-card,
+  .env-status-card,
+  .env-parking-card,
+  .env-parking-map-card,
+  .env-insight-card {
+    min-height: 220px;
+  }
+
+  .env-trend-card {
+    grid-column: auto;
+    min-height: 260px;
+  }
+
+  .env-parking-map-card {
+    grid-column: auto;
   }
 
   .main-col,
   .side-col {
     height: auto;
+    min-height: 0;
     overflow: visible;
     grid-template-rows: auto;
-  }
-
-  .hero-shell {
-    min-height: 28rem;
-  }
-
-  .hero-shell {
-    min-height: 34rem;
   }
 
   .section-head,
@@ -4176,22 +7280,89 @@ watch(activeTab, (tab) => {
     align-items: flex-start;
   }
 
-  .dual-card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .hero-shell {
+    height: min(34rem, calc(100dvh - 16rem));
+    min-height: 24rem;
   }
 }
 
 @media (max-width: 900px) {
+  .video-headline {
+    flex-wrap: wrap;
+  }
+
+  .video-title-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    white-space: normal;
+  }
+
+  .video-subtitle {
+    white-space: normal;
+  }
+
   .monitor-grid-large {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(11rem, auto);
+  }
+
+  .env-panel {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .env-overview-card,
+  .env-status-card,
+  .env-parking-card,
+  .env-parking-map-card,
+  .env-insight-card {
+    min-height: 220px;
+  }
+
+  .env-trend-card {
+    min-height: 270px;
+  }
+
+  .env-trend-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .env-overview-card {
+    grid-template-columns: 1fr;
+  }
+
+  .env-kpi-grid,
+  .env-status-grid,
+  .parking-overview-layout,
+  .env-insight-body {
+    grid-template-columns: 1fr;
+  }
+
+  .env-trend-item.single {
+    min-height: 12rem;
   }
 
   .nav-current {
     font-size: 15px;
   }
 
-  .video-stats-grid {
-    grid-template-columns: 1fr;
+  .video-current {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .alarm-kpi-strip,
+  .alarm-type-list,
+  .alarm-bottom-row,
+  .analysis-kpi-grid,
+  .analysis-type-grid,
+  .analysis-trend-snapshot,
+  .selected-alarm-grid,
+  .alarm-action-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .summary-kpis,
@@ -4199,23 +7370,70 @@ watch(activeTab, (tab) => {
     grid-template-columns: 1fr;
   }
 
-  .parking-dashboard {
-    grid-template-columns: 1fr;
-    justify-items: center;
-  }
-
   .parking-zone-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .dual-card-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
+  .page-shell {
+    gap: 6px;
+  }
+
+  .nav-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .monitor-grid-large {
     grid-template-columns: 1fr;
+    grid-auto-rows: minmax(10rem, auto);
+  }
+
+  .video-panel {
+    grid-template-rows: minmax(22rem, 1fr) minmax(32rem, auto);
+  }
+
+  .alarm-kpi-strip,
+  .alarm-type-list,
+  .selected-alarm-grid,
+  .analysis-kpi-grid,
+  .analysis-type-grid,
+  .analysis-trend-snapshot,
+  .alarm-action-row,
+  .table-filters.alarm-table-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-type-stage,
+  .analysis-insight-body {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-donut,
+  .analysis-time-orbit {
+    width: 132px;
+  }
+
+  .selected-alarm-main {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-shell {
+    height: min(30rem, calc(100dvh - 15rem));
+    min-height: 20rem;
+  }
+
+  .hero-shell :deep(.chat-messages) {
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+  }
+
+  .hero-shell :deep(.chat-input),
+  .hero-shell :deep(.realtime-banner) {
+    right: 1rem;
+    width: min(18rem, calc(100% - 2rem));
   }
 
   .focus-shell {

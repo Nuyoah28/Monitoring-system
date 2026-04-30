@@ -20,6 +20,7 @@ public class GetAlarmRes
         OssUtil ossUtil = new OssUtil();
         SimpleDateFormat sdf = new SimpleDateFormat("MM-dd hh:mm");
         this.setId(sqlGetAlarm.getId());
+        this.setMonitorId(sqlGetAlarm.getMonitorId());
         this.setName(sqlGetAlarm.getName());
         this.setEventName(sqlGetAlarm.getCaseTypeName());
         this.setLevel(sqlGetAlarm.getWarningLevel());
@@ -32,6 +33,7 @@ public class GetAlarmRes
     }
 
     private Integer id;
+    private Integer monitorId;
     @ExcelProperty("事件")
     private String name;
     @ExcelProperty("类别")

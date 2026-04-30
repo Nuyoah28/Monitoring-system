@@ -61,11 +61,13 @@ public class GetMonitorListRes {
         this.id = monitor.getId();
         this.number = monitor.getId().toString(); // 新增：摄像头编号（使用ID）
         this.name = monitor.getName();
-        this.deal = monitor.getRunning() ? "正在运行" : "停止";
+        this.deal = Boolean.TRUE.equals(monitor.getRunning()) ? "正在运行" : "停止";
         this.department = monitor.getArea();
         this.leader = monitor.getLeader();
         this.running = monitor.getRunning();
-        this.video = "http://8.152.219.117:1975/flv?port=1985&app=live&stream=test" + monitor.getId();
+        this.streamLink = monitor.getStreamLink();
+        this.streamUrl = monitor.getStreamLink();
+        this.video = monitor.getStreamLink();
         this.border = new ArrayList<>();
         if (!(monitor.getLeftX() == null || monitor.getLeftY() == null || monitor.getRightX() == null
                 || monitor.getRightY() == null)) {
@@ -87,6 +89,8 @@ public class GetMonitorListRes {
     private String leader;
     private Boolean running;
     private List<MonitorBorder> border;
+    private String streamLink;
+    private String streamUrl;
     private String video;
     private List<MonitorAbility> ability;
 

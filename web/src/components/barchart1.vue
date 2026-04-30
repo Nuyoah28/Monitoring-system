@@ -1,189 +1,146 @@
 <template>
-    <div class="panel">
-        <div class="chart" ref="barchart" id="demoDiv"></div>
-        <div class="panel-footer"></div>
-    </div>
+  <div class="bar-panel">
+    <div class="chart" ref="barchart"></div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import * as echarts from 'echarts';
-import axios from 'axios';
-import { useAlarmStore } from '@/stores/alarm';
-import { storeToRefs } from 'pinia';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import * as echarts from 'echarts'
+import { storeToRefs } from 'pinia'
+import { useAlarmStore } from '@/stores/alarm'
 
-// 定义图表数据接口
 interface ChartItem {
-    eventType: string;
-    eventCount: number;
+  eventType: string
+  eventCount: number
 }
 
-const alarmStore = useAlarmStore();
-const { getDayStatistics } = storeToRefs(alarmStore);
+const props = withDefaults(defineProps<{
+  data?: ChartItem[]
+  title?: string
+  seriesName?: string
+}>(), {
+  data: undefined,
+  title: '重点排行',
+  seriesName: '数量',
+})
 
-const barchart = ref<HTMLDivElement>();
-let mychart: any = null; // 保存echarts实例
-const chartData = computed(() => getDayStatistics.value);
+const alarmStore = useAlarmStore()
+const { getDayStatistics } = storeToRefs(alarmStore)
+const barchart = ref<HTMLDivElement>()
+let mychart: echarts.ECharts | null = null
 
-// 初始化图表
-const initChart = (): void => {
-    if(barchart.value) {
-        mychart = echarts.init(barchart.value);
-        mychart.setOption({
-            title: {
-                text: '今日危险事件统计',
-                textStyle: {
-                    color: 'white',
-                    fontSize: '1.5rem',
-                },
-            },
-            tooltip: {
-                trigger: 'axis',
-                // trigger:'item',
-                axisPointer: {
-                    type: 'cross',
-                },
-            },
-            grid: {
-                left: '3%',
-                right: '4%',
-                bottom: '8%', // 增加底部空间放文字
-                containLabel: true
-            },
-            xAxis: {
-                type: 'category',
-                data: [],
-                axisLabel: {
-                    color: 'white',
-                    fontSize: '0.9rem', // 稍微变小
-                    interval: 0,
-                    rotate: 25, // 旋转标签，防止文字堆叠在一起
-                },
-            },
-            yAxis: {
-                type: 'value',
-                minInterval: 1, // 确保刻度为整数
-                name: '单位：次', // 添加单位
-                nameTextStyle: {
-                    color: 'white',
-                    fontSize: '1rem',
-                    padding: [0, 0, 0, 10] // name 的位置微调
-                },
-                axisLabel: {
-                    color: 'white',
-                    fontSize: '1rem',
-                },
-            },
-            series: [
-                {
-                    name: ['数量'],
-                    type: 'bar',
-                    data: [],
-                    colorBy: 'data',
-                    showBackground: true,
-                    itemStyle: {
-                        borderRadius: 8,
-                    },
-                    barWidth: '40%', // 改为相对比例
-                    barMaxWidth: 35, // 限制最大宽度
-                },
-            ],
-            
-        });
+const chartData = computed(() => props.data ?? getDayStatistics.value)
+const normalizedData = computed(() => chartData.value.map(item => ({
+  name: item.eventType || '未知类型',
+  value: Number(item.eventCount || 0),
+})))
 
-        // 添加窗口大小改变的监听事件
-        window.addEventListener('resize', () => {
-            if(mychart) {
-                mychart.resize();
-            }
-        });
-    }
-};
+const updateChart = (): void => {
+  if (!mychart) return
+  mychart.setOption({
+    title: {
+      text: props.title,
+      textStyle: {
+        color: '#eaf6ff',
+        fontSize: 13,
+        fontWeight: 600,
+      },
+      top: 2,
+      left: 4,
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      top: 34,
+      bottom: '8%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: normalizedData.value.map(item => item.name),
+      axisLabel: {
+        color: '#d6e6ff',
+        fontSize: 10,
+        interval: 0,
+        rotate: normalizedData.value.length > 4 ? 24 : 0,
+      },
+      axisLine: {
+        lineStyle: { color: 'rgba(214, 230, 255, 0.28)' },
+      },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLabel: {
+        color: '#d6e6ff',
+        fontSize: 10,
+      },
+      splitLine: {
+        lineStyle: { color: 'rgba(255, 255, 255, 0.1)' },
+      },
+    },
+    series: [
+      {
+        name: props.seriesName,
+        type: 'bar',
+        data: normalizedData.value.map(item => item.value),
+        colorBy: 'data',
+        showBackground: true,
+        backgroundStyle: { color: 'rgba(126, 197, 255, 0.08)' },
+        itemStyle: { borderRadius: 8 },
+        barWidth: '40%',
+        barMaxWidth: 34,
+      },
+    ],
+  })
+}
 
-// 从Pinia获取数据
-const fetchData = (): void => {
-    // 直接从Pinia获取数据并更新图表
-    updateChart(chartData.value);
-};
+const handleResize = (): void => {
+  mychart?.resize()
+}
 
-// 更新图表
-const updateChart = (data: ChartItem[]): void => {
-    console.log('更新图表', data);
-    
-    const processedData = data.map(item => ({
-        value: item.eventCount, // 设定 y 轴的值
-        name: item.eventType // 图例和 x 轴的名称
-    }));
-
-    // console.log('chartData',processedData);              
-
-    if(mychart) {
-        mychart.setOption({
-            series: [
-                {
-                    data: processedData, // 将转换后的数据更新到图表中
-                },
-            ],
-            xAxis: {
-                data: data.map(item => item.eventType)
-            },
-        });
-    }
-};
-
-// 处理事件总线的回调函数
-let alarmHandler: (() => void) | null = null;
+let alarmHandler: (() => void) | null = null
 
 onMounted(() => {
-    initChart(); // 初始化图表
-    
-    //测试，截图使用，一会删了
-    // updateChart(chartData.value);
+  if (barchart.value) {
+    mychart = echarts.init(barchart.value)
+    updateChart()
+  }
 
-    fetchData(); // 首次获取数据
-    
-    // 监听数据变化，自动更新图表
-    watch(chartData, (newData) => {
-        updateChart(newData);
-    }, { deep: true });
-    
-    // 获取事件总线实例
-    const bus = (window as any).$bus;
-    if(bus) {
-        alarmHandler = () => {
-            console.log('barchart1接收到报警信息，准备更新');
-            fetchData(); // 获取数据
-        };
-        bus.$on('alarm', alarmHandler);
-    }
-});
+  const bus = (window as any).$bus
+  if (bus) {
+    alarmHandler = updateChart
+    bus.$on('alarm', alarmHandler)
+  }
+
+  window.addEventListener('resize', handleResize)
+})
+
+watch(chartData, updateChart, { deep: true })
+watch(() => props.title, updateChart)
+watch(() => props.seriesName, updateChart)
 
 onUnmounted(() => {
-    console.log('即将销毁');
-    
-    // 移除事件监听
-    const bus = (window as any).$bus;
-    if(bus && alarmHandler) {
-        bus.$off('alarm', alarmHandler);
-    }
-    
-    // 销毁图表实例
-    if(mychart) {
-        mychart.dispose();
-    }
-    
-    // 移除窗口大小改变的监听事件
-    window.removeEventListener('resize', () => {
-        if(mychart) {
-            mychart.resize();
-        }
-    });
-});
+  const bus = (window as any).$bus
+  if (bus && alarmHandler) bus.$off('alarm', alarmHandler)
+  mychart?.dispose()
+  window.removeEventListener('resize', handleResize)
+})
 </script>
 
-<style scoped lang="less">
-    #demoDiv {
-        width: 32rem;
-        height: 19rem;
-    }
+<style scoped>
+.bar-panel {
+  width: 100%;
+  height: 100%;
+}
+
+.chart {
+  width: 100%;
+  height: 100%;
+}
 </style>

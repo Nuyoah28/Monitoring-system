@@ -2,7 +2,10 @@
   <div v-if="localDialogVisible" class="process-modal-mask detail-mask" role="dialog" aria-modal="true" @click.self="handleClose">
     <div class="process-modal-card detail-card">
       <div class="detail-head">
-        <h4>报警详情</h4>
+        <div>
+          <h4>报警视频片段</h4>
+          <p>{{ props.item.eventName || '报警事件' }} · {{ props.item.department || '未标注区域' }}</p>
+        </div>
         <button class="detail-close" type="button" @click="handleClose" aria-label="关闭">×</button>
       </div>
       <div class="dialog-content">
@@ -12,32 +15,18 @@
             视频加载失败: {{ videoErrorMessage }}
           </div>
         </div>
-        <div class="detail-list">
-          <div class="detail-row" v-for="row in tableData" :key="row.key">
-            <span class="detail-key">{{ row.key }}</span>
-            <span class="detail-val">{{ row.val || '--' }}</span>
-          </div>
-        </div>
-      </div>
-      <div class="process-actions detail-actions">
-        <button class="btn footer-btn primary" type="button" @click="closeDialog">确定</button>
+        <p class="clip-summary">{{ clipSummary }}</p>
       </div>
     </div>
   </div>
 </template>
   
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import flvjs from 'flv.js';
 import { useUserStore } from '@/stores/user';
 import axios from 'axios';
 import { resolveDemoAlarmVideo } from '@/config/config';
-
-// 定义props类型
-interface TableItem {
-  key: string;
-  val: any;
-}
 
 interface DialogItem {
   eventName: string;
@@ -70,6 +59,15 @@ const videoElement = ref<HTMLVideoElement | null>(null);
 let video: any = null;
 let flvPlayer: any = null; // 添加全局flvPlayer引用用于销毁
 
+const clipSummary = computed(() => {
+  const item = props.item || {};
+  const eventName = item.eventName || '报警事件';
+  const department = item.department || '未标注区域';
+  const date = item.date || '--';
+  const deal = item.deal || '未处理';
+  return `${date}，${department} 发生 ${eventName}，当前状态：${deal}。`;
+});
+
 const withNoCache = (url: string): string => {
   if (!url) return url;
   const [base, hash = ''] = url.split('#');
@@ -81,40 +79,6 @@ const withNoCache = (url: string): string => {
 // 视频错误状态
 const videoLoadError = ref<boolean>(false);
 const videoErrorMessage = ref<string>('');
-
-// 初始化表格数据
-const tableData = ref<TableItem[]>([
-  {
-    key: '事件类型',
-    val: props.item.eventName,
-  }, 
-  {
-    key: '区域',
-    val: props.item.department,
-  },
-  {
-    key: '时间',
-    val: props.item.date,
-  }, 
-  {
-    key: '等级',
-    val: props.item.level,
-  },
-  {
-    key: '处理结果',
-    val: props.item.deal,
-  }
-]);
-
-const closeDialog = (): void => {
-  console.log('关闭了');
-  
-  // 关闭对话框前销毁播放器实例
-  destroyFlvPlayer();
-  
-  localDialogVisible.value = false; // 修改本地变量
-  emit('updateDialogVisible1', localDialogVisible.value); // 通知父组件更新
-};
 
 const handleVideoError = (event: Event): void => {
   console.error('视频加载错误:', event);
@@ -330,33 +294,9 @@ onUnmounted(() => {
 // 监听 dialogVisible1 的变化
 watch(
   () => props.item,
-  (newVal) => {
-    // 如果需要根据新值更新表格数据
-    // 先销毁旧的播放器实例
+  () => {
     destroyFlvPlayer();
-    
-    tableData.value = [
-      {
-        key: '事件类型',
-        val: newVal.eventName,
-      }, 
-      {
-        key: '区域',
-        val: newVal.department,
-      },
-      {
-        key: '时间',
-        val: newVal.date,
-      }, 
-      {
-        key: '等级',
-        val: newVal.level,
-      },
-      {
-        key: '处理结果',
-        val: newVal.deal,
-      }
-    ];
+    getVideoData();
   },
   { deep: true }
 );
@@ -384,19 +324,20 @@ watch(
 
 .dialog-content {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .detail-card {
-  width: min(900px, 90vw);
-  max-height: 88vh;
-  overflow: auto;
+  width: min(1080px, 92vw);
+  max-height: 92vh;
+  overflow: hidden;
 }
 
 .detail-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   margin-bottom: 10px;
 }
 
@@ -404,6 +345,12 @@ watch(
   margin: 0;
   font-size: 16px;
   color: #eaf5ff;
+}
+
+.detail-head p {
+  margin: 4px 0 0;
+  color: rgba(214, 230, 255, 0.68);
+  font-size: 12px;
 }
 
 .detail-close {
@@ -419,7 +366,8 @@ watch(
 }
 
 .video {
-  height: 18rem;
+  height: min(68vh, 38rem);
+  min-height: 28rem;
   position: relative;
   border-radius: 12px;
   overflow: hidden;
@@ -429,7 +377,8 @@ watch(
   video {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    background: #020913;
   }
 
   .video-error-message {
@@ -450,68 +399,27 @@ watch(
   }
 }
 
-.detail-list {
-  border: 1px solid rgba(126, 197, 255, 0.18);
-  border-radius: 10px;
-  overflow: hidden;
-  background: rgba(8, 27, 45, 0.36);
-}
-
-.detail-row {
-  display: grid;
-  grid-template-columns: 130px 1fr;
-  gap: 10px;
-  align-items: center;
-  padding: 11px 12px;
-  border-bottom: 1px solid rgba(126, 197, 255, 0.14);
-}
-
-.detail-row:nth-child(odd) {
-  background: rgba(24, 63, 98, 0.22);
-}
-
-.detail-row:last-child {
-  border-bottom: none;
-}
-
-.detail-key {
-  color: #b9daf8;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.detail-val {
-  color: #e3f2ff;
-  font-size: 13px;
-  word-break: break-all;
-}
-
-.detail-actions {
-  margin-top: 10px;
-}
-
-.footer-btn {
-  min-width: 72px;
-}
-
-.footer-btn.secondary {
+.clip-summary {
+  margin: 0;
   border: 1px solid rgba(126, 197, 255, 0.36);
   color: #d8ebff;
   background: rgba(15, 45, 74, 0.72);
-  border-radius: 7px;
-  padding: 5px 9px;
+  border-radius: 10px;
+  padding: 8px 10px;
   font-size: 12px;
-  cursor: pointer;
+  line-height: 1.5;
 }
 
-.footer-btn.primary {
-  border-color: rgba(99, 184, 255, 0.85);
-  background: rgba(126, 197, 255, 0.22);
-  color: #eaf6ff;
-  border-radius: 7px;
-  padding: 5px 10px;
-  font-size: 12px;
-  cursor: pointer;
+@media (max-width: 760px) {
+  .detail-card {
+    width: min(96vw, 1080px);
+    max-height: 90vh;
+  }
+
+  .video {
+    height: 58vh;
+    min-height: 16rem;
+  }
 }
 </style>
   

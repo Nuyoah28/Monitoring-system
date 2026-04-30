@@ -21,6 +21,8 @@ public class GetMonitorsPosRes {
             this.alarmCnt = monitor.getAlarmCnt();
             this.area = monitor.getArea();
             this.running = monitor.getRunning();
+            this.streamLink = monitor.getStreamLink();
+            this.streamUrl = monitor.getStreamLink();
         }
         private Integer id;
         private String name;
@@ -28,6 +30,8 @@ public class GetMonitorsPosRes {
         private String leader;
         private Integer alarmCnt;
         private Boolean running;
+        private String streamLink;
+        private String streamUrl;
     }
 
     public GetMonitorsPosRes(List<Monitor> monitorList){
@@ -35,7 +39,7 @@ public class GetMonitorsPosRes {
         this.running = 0;
         this.monitorPosList = new java.util.ArrayList<>();
         for(Monitor monitor:monitorList){
-            if(monitor.getRunning()){
+            if(Boolean.TRUE.equals(monitor.getRunning())){
                 this.running++;
             }
             this.monitorPosList.add(new MonitorPos(monitor));
