@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sipc.monitoringsystem.dao.AlarmDao;
 import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.GetHistoryCntRes;
+import com.sipc.monitoringsystem.model.dto.res.Alarm.GetTypeAreaHeatRes;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.RealTimeAlarmRes;
+import com.sipc.monitoringsystem.model.po.Alarm.AlarmTypeAreaCount;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
 import com.sipc.monitoringsystem.model.po.Alarm.Alarm;
 import com.sipc.monitoringsystem.model.po.Alarm.TimePeriod;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -38,15 +41,34 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
 
     @Override
     public SqlGetAlarm receiveAlarm(Integer cameraID, Integer caseType, String clipLink) {
+        return receiveAlarm(cameraID, caseType, clipLink, null);
+    }
+
+    @Override
+    public SqlGetAlarm receiveAlarm(Integer cameraID, Integer caseType, String clipLink, String occurredAt) {
         log.info("receive alarm from camera: " + cameraID + " caseType: " + caseType);
-        monitorServiceImpl.getBaseMapper().MonitorAlarmCntPlusOne(cameraID);
+        Alarm existedAlarm = this.baseMapper.selectOne(
+                new QueryWrapper<Alarm>()
+                        .eq("monitor_id", cameraID)
+                        .eq("case_type", caseType)
+                        .eq("clip_link", clipLink)
+                        .last("LIMIT 1"));
+        if (existedAlarm != null) {
+            return this.baseMapper.SqlGetAlarm(existedAlarm.getId());
+        }
+
         Alarm alarm = new Alarm();
         alarm.setClipLink(clipLink);
         alarm.setCaseType(caseType);
         alarm.setMonitorId(cameraID);
         alarm.setWarningLevel(1);
         alarm.setStatus(false);
+        Timestamp occurredTime = parseOccurredAt(occurredAt);
+        if (occurredTime != null) {
+            alarm.setCreateTime(occurredTime);
+        }
         this.save(alarm);
+        monitorServiceImpl.getBaseMapper().MonitorAlarmCntPlusOne(cameraID);
         // 获取数据库中的sqlalarm,找id最大且监控id对的上的
         Alarm latestAlarm = this.baseMapper.selectOne(
                 new QueryWrapper<Alarm>()
@@ -57,6 +79,18 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
             throw new RuntimeException("Failed to retrieve the saved alarm record");
         }
         return this.baseMapper.SqlGetAlarm(latestAlarm.getId());
+    }
+
+    private Timestamp parseOccurredAt(String occurredAt) {
+        if (occurredAt == null || occurredAt.isBlank()) {
+            return null;
+        }
+        try {
+            return Timestamp.valueOf(occurredAt.trim());
+        } catch (IllegalArgumentException e) {
+            log.warn("invalid alarm occurredAt: {}", occurredAt);
+            return null;
+        }
     }
 
     @Override
@@ -375,6 +409,103 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         } else {
             return null;
         }
+    }
+
+    @Override
+    public GetTypeAreaHeatRes getTypeAreaHeat(Integer defer) {
+        if (defer == null || !(defer == 1 || defer == 3 || defer == 7 || defer == 30)) {
+            return null;
+        }
+
+        LocalDateTime endDateTime = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0).plusDays(1);
+        LocalDateTime startDateTime = defer == 1
+                ? endDateTime.minusDays(1)
+                : endDateTime.minusDays(defer);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        List<AlarmTypeAreaCount> source = this.baseMapper.SqlGetTypeAreaHeat(
+                startDateTime.format(formatter),
+                endDateTime.format(formatter));
+
+        Map<String, Long> typeTotals = new HashMap<>();
+        Map<String, Long> areaTotals = new HashMap<>();
+        Map<String, Map<String, Long>> matrix = new HashMap<>();
+        Long total = 0L;
+        Long maxCount = 0L;
+
+        for (AlarmTypeAreaCount item : source) {
+            String area = normalizeHeatName(item.getArea(), "未标注区域");
+            String type = normalizeHeatName(item.getCaseTypeName(), "未知事件");
+            Long count = item.getCnt() == null ? 0L : item.getCnt();
+            total += count;
+            maxCount = Math.max(maxCount, count);
+            typeTotals.put(type, typeTotals.getOrDefault(type, 0L) + count);
+            areaTotals.put(area, areaTotals.getOrDefault(area, 0L) + count);
+            matrix.computeIfAbsent(area, key -> new HashMap<>()).put(type, count);
+        }
+
+        List<GetTypeAreaHeatRes.RankItem> byType = buildRankItems(typeTotals, 8);
+        List<GetTypeAreaHeatRes.RankItem> byArea = buildRankItems(areaTotals, 8);
+        List<String> topTypes = byType.stream().limit(4).map(GetTypeAreaHeatRes.RankItem::getName)
+                .collect(Collectors.toList());
+        List<String> topAreas = byArea.stream().limit(4).map(GetTypeAreaHeatRes.RankItem::getName)
+                .collect(Collectors.toList());
+
+        List<GetTypeAreaHeatRes.HeatRow> rows = new ArrayList<>();
+        for (String area : topAreas) {
+            Map<String, Long> values = new LinkedHashMap<>();
+            for (String type : topTypes) {
+                values.put(type, matrix.getOrDefault(area, Collections.emptyMap()).getOrDefault(type, 0L));
+            }
+            rows.add(new GetTypeAreaHeatRes.HeatRow(area, values));
+        }
+
+        GetTypeAreaHeatRes res = new GetTypeAreaHeatRes();
+        res.setDefer(defer);
+        res.setRangeLabel(buildHeatRangeLabel(defer));
+        res.setTotal(total);
+        res.setByType(byType);
+        res.setByArea(byArea);
+        res.setTypes(topTypes);
+        res.setRows(rows);
+        res.setMaxCount(maxCount);
+        return res;
+    }
+
+    private List<GetTypeAreaHeatRes.RankItem> buildRankItems(Map<String, Long> source, Integer limit) {
+        return source.entrySet().stream()
+                .sorted((a, b) -> {
+                    int countCompare = Long.compare(b.getValue(), a.getValue());
+                    if (countCompare != 0) {
+                        return countCompare;
+                    }
+                    return a.getKey().compareTo(b.getKey());
+                })
+                .limit(limit)
+                .map(entry -> new GetTypeAreaHeatRes.RankItem(entry.getKey(), entry.getValue()))
+                .collect(Collectors.toList());
+    }
+
+    private String normalizeHeatName(String value, String fallback) {
+        if (value == null || value.trim().isEmpty()) {
+            return fallback;
+        }
+        return value.trim();
+    }
+
+    private String buildHeatRangeLabel(Integer defer) {
+        if (defer == 1) {
+            return "今日";
+        }
+        if (defer == 3) {
+            return "近3天";
+        }
+        if (defer == 7) {
+            return "近7天";
+        }
+        if (defer == 30) {
+            return "近30天";
+        }
+        return "统计周期";
     }
 
     private List<TimePeriod> Alignment(List<String> allPeriods, List<TimePeriod> timePeriods) {

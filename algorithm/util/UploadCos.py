@@ -7,15 +7,26 @@ import queue
 import threading
 logger = Logger.setup_logger()
 
+SECRET_ID = ''#COS
+SECRET_KEY = ''
+REGION = 'ap-beijing'
+BUCKET = 'hospital-alarm-1318141347'
 
-def upload2Cos(list,uuid):
-    # 配置腾讯云COS服务 !!!!!!!!!!!!!!!!!!!!
-    secret_id = ''#COS
-    secret_key = ''
-    region = 'ap-beijing'
-    bucket = 'hospital-alarm-1318141347'
-    cos_config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
-    cos_client = CosS3Client(cos_config)
+
+def _cos_client():
+    cos_config = CosConfig(Region=REGION, SecretId=SECRET_ID, SecretKey=SECRET_KEY)
+    return CosS3Client(cos_config)
+
+
+def uploadFile2Cos(file_path, uuid):
+    object_key = uuid + '.flv'
+    cos_client = _cos_client()
+    with open(file_path, 'rb') as file_obj:
+        cos_client.put_object(Bucket=BUCKET, Key=object_key, Body=file_obj)
+    print("upload success" + str(uuid))
+
+
+def buildFlvBytes(list):
     cnt = 0
 
     # 创建一个缓存列表，用于存储每一帧的字节流
@@ -64,7 +75,20 @@ def upload2Cos(list,uuid):
     output_stream = b''
     while not output_queue.empty():
         output_stream += output_queue.get()
+    return output_stream
+
+
+def saveFrames2Flv(list, file_path):
+    output_stream = buildFlvBytes(list)
+    with open(file_path, 'wb') as file_obj:
+        file_obj.write(output_stream)
+
+
+def upload2Cos(list,uuid):
+    # 配置腾讯云COS服务 !!!!!!!!!!!!!!!!!!!!
+    cos_client = _cos_client()
+    output_stream = buildFlvBytes(list)
     # 上传字节流到腾讯云COS服务
     object_key = uuid + '.flv'  # 上传的对象键
-    cos_client.put_object(Bucket=bucket, Key=object_key, Body=output_stream)
+    cos_client.put_object(Bucket=BUCKET, Key=object_key, Body=output_stream)
     print("upload success"+str(uuid))

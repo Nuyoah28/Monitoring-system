@@ -2,6 +2,7 @@ package com.sipc.monitoringsystem.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.GetHistoryCntRes;
+import com.sipc.monitoringsystem.model.dto.res.Alarm.GetTypeAreaHeatRes;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.RealTimeAlarmRes;
 import com.sipc.monitoringsystem.model.po.Alarm.Alarm;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
@@ -12,6 +13,8 @@ import java.util.List;
 
 public interface AlarmService extends IService<Alarm> {
         SqlGetAlarm receiveAlarm(Integer cameraId, Integer caseType, String clipLink);
+
+        SqlGetAlarm receiveAlarm(Integer cameraId, Integer caseType, String clipLink, String occurredAt);
 
         List<SqlGetAlarm> queryAlarmList(Integer pageNum, Integer pageSize, Integer caseType, Integer status,
                         Integer warningLevel, String time1, String time2);
@@ -56,4 +59,6 @@ public interface AlarmService extends IService<Alarm> {
         RealTimeAlarmRes getRealTimeAlarmRes();
 
         GetHistoryCntRes ServiceGetHistoryCntRes(Integer defer);
+
+        GetTypeAreaHeatRes getTypeAreaHeat(Integer defer);
 }

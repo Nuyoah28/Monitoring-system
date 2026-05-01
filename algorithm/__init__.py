@@ -5,6 +5,7 @@ from config import config
 from algo import videoProcess
 import threading
 from util import Logger
+from service import AlarmService
 
 logger = Logger.setup_logger()
 
@@ -44,8 +45,8 @@ def create_app(config_name):
     # else:
     #     raise Exception("get monitor info failed")
     # 创建线程对象
+    AlarmService.startAlarmCacheSyncWorker()
     stream_thread = threading.Thread(target=videoProcess.stream_video, name="stream_thread")
     # 启动线程
     stream_thread.start()
     return app
-

@@ -1,6 +1,6 @@
 /**
- * 全局网络与演示配置中心。
- * 修改这里的主机、端口或演示资源地址后，移动端页面会自动复用。
+ * 全局网络与资源配置中心。
+ * 修改这里的主机、端口或资源地址后，移动端页面会自动复用。
  */
 
 export const NETWORK_CONFIG = {
@@ -28,9 +28,9 @@ export const DEMO_ALARM_VIDEO_MAP = {
 };
 
 const DEMO_ALARM_CLIP_VIDEO_MAP = {
-    SIM_BIKE_DEMO: DEMO_ALARM_VIDEO_MAP.bike,
-    SIM_FIRE_DEMO: DEMO_ALARM_VIDEO_MAP.fire,
-    SIM_GARBAGE_DEMO: DEMO_ALARM_VIDEO_MAP.garbage
+    SIM_BIKE: DEMO_ALARM_VIDEO_MAP.bike,
+    SIM_FIRE: DEMO_ALARM_VIDEO_MAP.fire,
+    SIM_GARBAGE: DEMO_ALARM_VIDEO_MAP.garbage
 };
 
 export const ALARM_DEFAULT_VIDEO = DEMO_ALARM_VIDEO_MAP.bike;
@@ -40,9 +40,9 @@ export const resolveDemoAlarmVideo = (clipIdOrUrl) => {
     const value = String(clipIdOrUrl);
 
     if (DEMO_ALARM_CLIP_VIDEO_MAP[value]) return DEMO_ALARM_CLIP_VIDEO_MAP[value];
-    if (value.includes('SIM_BIKE_DEMO')) return DEMO_ALARM_VIDEO_MAP.bike;
-    if (value.includes('SIM_FIRE_DEMO')) return DEMO_ALARM_VIDEO_MAP.fire;
-    if (value.includes('SIM_GARBAGE_DEMO')) return DEMO_ALARM_VIDEO_MAP.garbage;
+    if (value.includes('SIM_BIKE')) return DEMO_ALARM_VIDEO_MAP.bike;
+    if (value.includes('SIM_FIRE')) return DEMO_ALARM_VIDEO_MAP.fire;
+    if (value.includes('SIM_GARBAGE')) return DEMO_ALARM_VIDEO_MAP.garbage;
     if (value === 'bike') return DEMO_ALARM_VIDEO_MAP.bike;
     if (value === 'fire') return DEMO_ALARM_VIDEO_MAP.fire;
     if (value === 'garbage') return DEMO_ALARM_VIDEO_MAP.garbage;

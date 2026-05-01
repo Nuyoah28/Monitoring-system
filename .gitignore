@@ -97,3 +97,6 @@ backend/src/main/resources/application-dev-my.yml
 # Agent memory db
 ReAct_agent/data/db/*.db
 .claude/
+
+# Algorithm runtime cache
+algorithm/runtime/

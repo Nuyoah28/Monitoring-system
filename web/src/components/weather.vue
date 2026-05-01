@@ -132,15 +132,15 @@ const applyCurrentData = (data: WeatherData) => {
 const applyFallbackCurrent = () => {
   targetTemperature.value = randomDrift(targetTemperature.value, 15, 38)
   targetHumidity.value = randomDrift(targetHumidity.value, 20, 95)
-  weatherText.value = weatherText.value === '--' ? 'Sunny' : weatherText.value
-  regionText.value = regionText.value === '--' ? 'Local Mock' : regionText.value
-  updateLabel.value = `${new Date().toLocaleTimeString()} (local fallback)`
+  weatherText.value = weatherText.value === '--' ? '晴' : weatherText.value
+  regionText.value = regionText.value === '--' ? '本地缓存' : regionText.value
+  updateLabel.value = `${new Date().toLocaleTimeString()} (离线更新)`
   dataMode.value = 'fallback'
 }
 
 const buildFallbackForecast = () => {
   const base = new Date()
-  const fallbackWeather = weatherText.value === '--' ? 'Sunny' : weatherText.value
+  const fallbackWeather = weatherText.value === '--' ? '晴' : weatherText.value
   day.value = Array.from({ length: 3 }, (_, idx) => {
     const next = new Date(base)
     next.setDate(base.getDate() + idx)

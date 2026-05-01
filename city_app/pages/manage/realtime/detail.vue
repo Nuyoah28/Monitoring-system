@@ -94,12 +94,12 @@ export default {
       uni.navigateBack()
     },
     async loadDetail() {
-      // --- 模拟数据特殊逻辑 ---
+      // --- 本地备用数据逻辑 ---
       if (this.alarmId >= 999001 && this.alarmId <= 999003) {
         const mockMap = {
-          999001: { id: 999001, name: '北门摄像头(模拟)', eventName: '电动车进楼', department: '北门入口', level: 2, deal: '未处理', video: DEMO_ALARM_VIDEO_MAP.bike, date: '今日最新', phone: '13800138000', content: '演示模拟推送' },
-          999002: { id: 999002, name: '车库摄像头(模拟)', eventName: '明火', department: '车库入口', level: 3, deal: '未处理', video: DEMO_ALARM_VIDEO_MAP.fire, date: '今日最新', phone: '13800138000', content: '演示模拟推送' },
-          999003: { id: 999003, name: '东侧摄像头(模拟)', eventName: '垃圾', department: '东侧步道', level: 1, deal: '未处理', video: DEMO_ALARM_VIDEO_MAP.garbage, date: '今日最新', phone: '13811112222', content: '演示模拟推送' }
+          999001: { id: 999001, name: '北门摄像头', eventName: '电动车进楼', department: '北门入口', level: 2, deal: '未处理', video: DEMO_ALARM_VIDEO_MAP.bike, date: '今日最新', phone: '13800138000', content: '平台联动推送' },
+          999002: { id: 999002, name: '车库摄像头', eventName: '明火', department: '车库入口', level: 3, deal: '未处理', video: DEMO_ALARM_VIDEO_MAP.fire, date: '今日最新', phone: '13800138000', content: '平台联动推送' },
+          999003: { id: 999003, name: '东侧摄像头', eventName: '垃圾', department: '东侧步道', level: 1, deal: '未处理', video: DEMO_ALARM_VIDEO_MAP.garbage, date: '今日最新', phone: '13811112222', content: '平台联动推送' }
         };
         this.detail = mockMap[this.alarmId];
         this.loaded = true;
@@ -120,7 +120,7 @@ export default {
         }
         this.detail = res.data || {}
         
-        // --- 模拟演示视频重定向逻辑 ---
+        // --- 联动视频解析逻辑 ---
         this.detail.video = resolveDemoAlarmVideo(this.detail.video);
       } catch (e) {
         uni.$showMsg('网络异常，请稍后重试')

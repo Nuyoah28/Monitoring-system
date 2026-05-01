@@ -18,13 +18,14 @@ public class GetAlarmRes
 
     public GetAlarmRes(SqlGetAlarm sqlGetAlarm){
         OssUtil ossUtil = new OssUtil();
-        SimpleDateFormat sdf = new SimpleDateFormat("MM-dd hh:mm");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         this.setId(sqlGetAlarm.getId());
         this.setMonitorId(sqlGetAlarm.getMonitorId());
         this.setName(sqlGetAlarm.getName());
         this.setEventName(sqlGetAlarm.getCaseTypeName());
         this.setLevel(sqlGetAlarm.getWarningLevel());
         this.setDate(sdf.format(sqlGetAlarm.getCreateTime()));
+        this.setCreateTime(sdf.format(sqlGetAlarm.getCreateTime()));
         this.setDepartment(sqlGetAlarm.getArea());
         this.setDeal(sqlGetAlarm.getStatus() ? "已处理":"未处理");
         this.setContent(sqlGetAlarm.getProcessingContent());
@@ -42,6 +43,7 @@ public class GetAlarmRes
     private Integer level;
     @ExcelProperty("时间")
     private String date;
+    private String createTime;
     @ExcelProperty("地点")
     private String department;
     @ExcelProperty("是否处理")

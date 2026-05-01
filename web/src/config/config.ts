@@ -65,18 +65,18 @@ export const demoAlarmVideoMap = {
 } as const
 
 const demoAlarmClipVideoMap: Record<string, string> = {
-  SIM_BIKE_DEMO: demoAlarmVideoMap.bike,
-  SIM_FIRE_DEMO: demoAlarmVideoMap.fire,
-  SIM_GARBAGE_DEMO: demoAlarmVideoMap.garbage,
+  SIM_BIKE: demoAlarmVideoMap.bike,
+  SIM_FIRE: demoAlarmVideoMap.fire,
+  SIM_GARBAGE: demoAlarmVideoMap.garbage,
 }
 
 export const resolveDemoAlarmVideo = (clipIdOrType?: string) => {
   if (!clipIdOrType) return ''
   const value = String(clipIdOrType)
   if (demoAlarmClipVideoMap[value]) return demoAlarmClipVideoMap[value]
-  if (value.includes('SIM_BIKE_DEMO')) return demoAlarmVideoMap.bike
-  if (value.includes('SIM_FIRE_DEMO')) return demoAlarmVideoMap.fire
-  if (value.includes('SIM_GARBAGE_DEMO')) return demoAlarmVideoMap.garbage
+  if (value.includes('SIM_BIKE')) return demoAlarmVideoMap.bike
+  if (value.includes('SIM_FIRE')) return demoAlarmVideoMap.fire
+  if (value.includes('SIM_GARBAGE')) return demoAlarmVideoMap.garbage
   if (value === 'bike') return demoAlarmVideoMap.bike
   if (value === 'fire') return demoAlarmVideoMap.fire
   if (value === 'garbage') return demoAlarmVideoMap.garbage

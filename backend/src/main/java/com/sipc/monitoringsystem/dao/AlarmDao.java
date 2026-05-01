@@ -1,6 +1,7 @@
 package com.sipc.monitoringsystem.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sipc.monitoringsystem.model.po.Alarm.AlarmTypeAreaCount;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
 import com.sipc.monitoringsystem.model.po.Alarm.Alarm;
 import com.sipc.monitoringsystem.model.po.Alarm.AlarmCaseTypeTotal;
@@ -258,5 +259,21 @@ public interface AlarmDao extends BaseMapper<Alarm> {
                         "    INNER JOIN user_info ON monitor.leader = user_info.user_name " +
                         "ORDER BY alarm_info.create_time DESC, alarm_info.warning_level DESC, alarm_info.id DESC")
         List<SqlGetAlarm> selectAllTest();
+
+        @Select("""
+                        SELECT
+                            COALESCE(NULLIF(m.area, ''), '未标注区域') AS area,
+                            COALESCE(NULLIF(c.case_type_name, ''), '未知事件') AS case_type_name,
+                            COUNT(a.id) AS cnt
+                        FROM alarm_info a
+                        INNER JOIN monitor m ON a.monitor_id = m.id
+                        INNER JOIN case_type_info c ON a.case_type = c.id
+                        WHERE a.create_time >= #{startTime}
+                          AND a.create_time < #{endTime}
+                        GROUP BY COALESCE(NULLIF(m.area, ''), '未标注区域'),
+                                 COALESCE(NULLIF(c.case_type_name, ''), '未知事件')
+                        ORDER BY cnt DESC""")
+        List<AlarmTypeAreaCount> SqlGetTypeAreaHeat(@Param("startTime") String startTime,
+                        @Param("endTime") String endTime);
 
 }

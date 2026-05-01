@@ -153,8 +153,8 @@ const getVideoData = (): void => {
     // 优先播放传过来的报警录像短片，如果没有再使用后台默认配置的监控通道流
     video = props.item.video || response?.data?.chartData;
 
-    // --- 模拟演示视频重定向逻辑 ---
-    // 当后端收到 SIM_ 开头的 clipId 时，前端将其重定向到本地 8848 端口的演示视频
+    // --- 联动视频解析逻辑 ---
+    // 当后端收到 SIM_ 开头的 clipId 时，前端将其重定向到本地 8848 端口的联动视频
     if (video && typeof video === 'string') {
       video = resolveDemoAlarmVideo(video);
     }

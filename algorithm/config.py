@@ -5,11 +5,18 @@ class Config:
     STREAM_RAW_URL = ""# python后端拉原始流地址
     STREAM_PROCESSED_URL = ""# python后端推处理后流地址
     TOKEN = None
-    MONITOR_ID = -1
+    MONITOR_ID = 1  # 默认演示点位；接入新摄像头时改成 monitor 表里的真实 id
     LATITUDE = 0
     LONGITUDE = 0
     TYPE_LIST = []
     AREA_LIST = []
+    ALARM_CACHE_ENABLED = True
+    ALARM_CACHE_DIR = "runtime/alarm_cache"
+    ALARM_CACHE_DB = "alarm_cache.sqlite3"
+    ALARM_CACHE_CLIP_DIR = "clips"
+    ALARM_SYNC_INTERVAL_SECONDS = 10
+    ALARM_SYNC_BATCH_SIZE = 20
+    ALARM_REQUEST_TIMEOUT_SECONDS = 5
 
 
 class DevConfig(Config):
@@ -36,4 +43,3 @@ config = {
     "dev": DevConfig,
     "prod": ProdConfig
 }
-

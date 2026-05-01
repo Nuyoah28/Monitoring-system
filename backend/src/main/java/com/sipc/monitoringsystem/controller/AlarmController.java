@@ -9,6 +9,7 @@ import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.param.alarm.UpdateAlarmParam;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.*;
 import com.sipc.monitoringsystem.model.dto.res.BlankRes;
+import com.sipc.monitoringsystem.model.po.Alarm.Alarm;
 import com.sipc.monitoringsystem.model.po.Message.SystemMessage;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
 import com.sipc.monitoringsystem.model.po.User.User;
@@ -73,13 +74,24 @@ public class AlarmController {
     @Pass
     public CommonResult<BlankRes> receiveAlarm(@RequestParam(value = "cameraId", required = true) Integer cameraId,
             @RequestParam(value = "caseType", required = true) Integer caseType,
-            @RequestParam(value = "clipId", required = true) String clipId) {
+            @RequestParam(value = "clipId", required = true) String clipId,
+            @RequestParam(value = "occurredAt", required = false) String occurredAt) {
+
+        boolean duplicateAlarm = alarmService.getOne(new QueryWrapper<Alarm>()
+                .eq("monitor_id", cameraId)
+                .eq("case_type", caseType)
+                .eq("clip_link", clipId)
+                .last("LIMIT 1")) != null;
 
         // 1. 保存报警到数据库
-        SqlGetAlarm alarm = alarmService.receiveAlarm(cameraId, caseType, clipId);
+        SqlGetAlarm alarm = alarmService.receiveAlarm(cameraId, caseType, clipId, occurredAt);
 
         if (alarm == null) {
             return CommonResult.fail("接收失败");
+        }
+        if (duplicateAlarm) {
+            log.info("重复报警补传已忽略推送: cameraId={}, caseType={}, clipId={}", cameraId, caseType, clipId);
+            return CommonResult.success("重复报警已确认");
         }
 
         GetAlarmRes alarmRes = new GetAlarmRes(alarm);
@@ -200,6 +212,16 @@ public class AlarmController {
             return CommonResult.fail("查询失败");
         else
             return CommonResult.success(getHistoryCntRes);
+    }
+
+    @GetMapping("/query/cnt/type-area")
+    @Pass
+    public CommonResult<GetTypeAreaHeatRes> getTypeAreaHeat(@RequestParam(value = "defer") Integer defer) {
+        GetTypeAreaHeatRes heatRes = alarmService.getTypeAreaHeat(defer);
+        if (heatRes == null)
+            return CommonResult.fail("查询失败");
+        else
+            return CommonResult.success(heatRes);
     }
 
     @GetMapping("/query")

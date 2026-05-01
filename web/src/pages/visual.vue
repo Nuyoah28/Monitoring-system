@@ -16,7 +16,7 @@
         </div>
         <div class="nav-current" :class="{ 'video-current': activeTab === 'video' }">
           <template v-if="activeTab === 'video'">
-            <span class="nav-current-title">监控视频</span>
+            <span class="nav-current-title">视频巡检</span>
             <span class="nav-metric">总点位 <b>{{ monitors.length || cameraTiles.length }}</b></span>
             <span class="nav-metric ok">在线 <b>{{ monitors.length ? onlineCount : cameraTiles.length }}</b></span>
             <span class="nav-metric muted">离线 <b>{{ offlineCount }}</b></span>
@@ -68,9 +68,9 @@
                     :class="[severityClass(row.level), { selected: isSelectedAlarm(row), pending: !row.deal.includes('已') }]"
                     @click="selectAlarmRow(row)"
                   >
-                    <td>{{ row.eventName }}</td>
-                    <td>{{ row.department }}</td>
-                    <td>{{ row.date }}</td>
+                    <td :title="row.eventName">{{ row.eventName }}</td>
+                    <td :title="row.department">{{ row.department }}</td>
+                    <td :title="formatAlarmFullTime(row)">{{ formatAlarmListTime(row) }}</td>
                     <td><span class="level-chip" :class="severityClass(row.level)">{{ severityText(row.level) }}</span></td>
                     <td>
                       <span
@@ -106,7 +106,7 @@
                 <section class="alarm-kpi-strip">
                   <div v-for="k in alarmCommandKpis" :key="k.name" class="alarm-kpi" :class="k.tone">
                     <span>{{ k.name }}</span>
-                    <strong>{{ k.value }}</strong>
+                    <strong :title="`${k.name}：${k.value}`">{{ k.value }}</strong>
                   </div>
                 </section>
               </div>
@@ -216,7 +216,7 @@
           <article class="card analysis-hero-card">
             <div class="panel-headline analysis-headline">
               <div>
-                <h3>报警统计分析</h3>
+                <h3>告警态势分析</h3>
                 <p>复盘报警规律、时间分布和重复隐患点，辅助后续预防和治理。</p>
               </div>
               <div class="analysis-range-tabs">
@@ -247,18 +247,40 @@
               <span class="analysis-sub-label">全部类型 / 占比 / 高等级</span>
             </div>
             <div class="analysis-type-stage">
-              <div class="analysis-donut" :style="{ background: analysisTypeDonutStyle }">
+              <div class="analysis-donut-wrap" @mouseleave="activeAnalysisTypeIndex = null">
+                <svg class="analysis-donut-svg" viewBox="0 0 120 120" aria-label="报警类型占比图">
+                  <circle cx="60" cy="60" r="42" class="analysis-donut-track" />
+                  <circle
+                    v-for="(segment, idx) in analysisTypeSegments"
+                    :key="segment.eventType"
+                    cx="60"
+                    cy="60"
+                    r="42"
+                    class="analysis-donut-segment"
+                    :class="{ active: activeAnalysisTypeIndex === idx }"
+                    :stroke="segment.color"
+                    :stroke-dasharray="`${segment.length} ${segment.gap}`"
+                    :stroke-dashoffset="segment.offset"
+                    @mouseenter="activeAnalysisTypeIndex = idx"
+                    @click="activeAnalysisTypeIndex = idx"
+                  >
+                    <title>{{ segment.eventType }}：{{ segment.eventCount }} 次，占比 {{ segment.percent }}%</title>
+                  </circle>
+                </svg>
                 <div class="analysis-donut-core">
-                  <strong>{{ topAnalysisType }}</strong>
-                  <span>高频类型</span>
+                  <strong>{{ activeAnalysisTypeInfo.eventType }}</strong>
+                  <span>{{ activeAnalysisTypeInfo.percent }}% · {{ activeAnalysisTypeInfo.eventCount }} 次</span>
                 </div>
               </div>
               <div class="analysis-type-grid">
                 <div
-                  v-for="item in analysisTypeDistribution"
+                  v-for="(item, idx) in analysisTypeDistribution"
                   :key="item.eventType"
                   class="analysis-type-cardlet"
+                  :class="{ active: activeAnalysisTypeIndex === idx }"
                   :style="{ '--type-color': item.color }"
+                  @mouseenter="activeAnalysisTypeIndex = idx"
+                  @click="activeAnalysisTypeIndex = idx"
                 >
                   <div class="analysis-type-cardlet-head">
                     <span>{{ item.eventType }}</span>
@@ -487,7 +509,7 @@
           <article class="card env-overview-card">
             <div class="panel-headline env-overview-head">
               <div>
-                <h3>环境和车位总览</h3>
+                <h3>环境车位总览</h3>
                 <p>重点关注环境异常、车位余量和高占用区域。</p>
               </div>
               <div class="analysis-range-tabs">
@@ -503,11 +525,18 @@
                 </button>
               </div>
             </div>
-            <div class="env-kpi-grid">
-              <div v-for="item in envOverviewKpis" :key="item.name" class="env-kpi" :class="item.tone">
-                <span>{{ item.name }}</span>
-                <strong>{{ item.value }}</strong>
-                <em>{{ item.desc }}</em>
+            <div class="env-overview-body">
+              <div class="env-priority-card" :class="envPriorityState.tone">
+                <span>当前重点</span>
+                <strong>{{ envPriorityState.title }}</strong>
+                <p>{{ envPriorityState.desc }}</p>
+              </div>
+              <div class="env-kpi-grid">
+                <div v-for="item in envOverviewKpis" :key="item.name" class="env-kpi" :class="item.tone">
+                  <span>{{ item.name }}</span>
+                  <strong>{{ item.value }}</strong>
+                  <em>{{ item.desc }}</em>
+                </div>
               </div>
             </div>
           </article>
@@ -530,150 +559,163 @@
           </article>
 
           <article class="card env-trend-card">
-            <div class="panel-headline small">
-              <h3>环境趋势</h3>
-              <span>{{ envRangeLabel }}</span>
-            </div>
-            <div class="env-trend-grid">
-              <div v-for="chart in envTrendCards" :key="chart.key" class="env-trend-item main">
-                <div class="env-trend-title">
-                  <span>{{ chart.title }}</span>
-                  <em>{{ chart.desc }}</em>
-                </div>
-                <svg
-                  class="env-trend-svg"
-                  viewBox="0 0 360 168"
-                  preserveAspectRatio="none"
-                  :aria-label="`${chart.title} 趋势图`"
+            <div class="panel-headline small env-trend-head">
+              <div>
+                <h3>环境趋势</h3>
+                <span>{{ envTrendMetricConfig.desc }} · {{ envRangeLabel }}</span>
+              </div>
+              <div class="env-trend-switch">
+                <button
+                  v-for="metric in envTrendMetrics"
+                  :key="metric.key"
+                  class="env-trend-switch-btn"
+                  :class="{ active: envTrendMetricKey === metric.key }"
+                  type="button"
+                  @click="envTrendMetricKey = metric.key"
                 >
-                  <line x1="40" y1="136" x2="344" y2="136" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
-                  <line x1="40" y1="10" x2="40" y2="136" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
-                  <line
-                    v-for="tick in envTrendCharts[chart.key].yTicks"
-                    :key="`${chart.key}-y-${tick.value}`"
-                    x1="40"
-                    :y1="tick.y"
-                    x2="344"
-                    :y2="tick.y"
-                    stroke="rgba(168,198,232,0.16)"
-                    stroke-width="1"
-                  />
-                  <text
-                    v-for="tick in envTrendCharts[chart.key].yTicks"
-                    :key="`${chart.key}-yl-${tick.value}`"
-                    x="34"
-                    :y="tick.y + 4"
-                    text-anchor="end"
-                    fill="rgba(214, 230, 255, 0.86)"
-                    font-size="10"
-                  >
-                    {{ tick.value }}
-                  </text>
-                  <text
-                    v-for="tick in envTrendCharts[chart.key].xTicks"
-                    :key="`${chart.key}-x-${tick.label}`"
-                    :x="tick.x"
-                    y="156"
-                    text-anchor="middle"
-                    fill="rgba(214, 230, 255, 0.78)"
-                    font-size="10"
-                  >
-                    {{ tick.label }}
-                  </text>
-                  <path :d="envTrendCharts[chart.key].areaPath" :fill="chart.areaColor" />
-                  <polyline
-                    :points="envTrendCharts[chart.key].points"
-                    fill="none"
-                    :stroke="chart.color"
-                    stroke-width="2.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                  <circle
-                    v-for="(dot, idx) in envTrendCharts[chart.key].dots"
-                    :key="`${chart.key}-dot-${idx}`"
-                    :cx="dot.x"
-                    :cy="dot.y"
-                    r="2.6"
-                    :fill="chart.color"
-                    stroke="rgba(255,255,255,0.82)"
-                    stroke-width="0.8"
-                  />
-                </svg>
+                  {{ metric.label }}
+                </button>
+              </div>
+            </div>
+            <div class="env-inline-insight" :class="envPriorityState.tone">
+              <span>运行研判</span>
+              <strong>{{ comfortLabel }}</strong>
+              <p>{{ envParkingSummary }}</p>
+            </div>
+            <div class="env-trend-main">
+              <svg class="env-trend-svg single" viewBox="0 0 360 168" preserveAspectRatio="xMidYMid meet" :aria-label="`${envTrendMetricConfig.label} 趋势图`">
+                <line x1="40" y1="136" x2="344" y2="136" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
+                <line x1="40" y1="10" x2="40" y2="136" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
+                <line
+                  v-for="tick in envTrendSelectedRender.yTicks"
+                  :key="`${envTrendMetricKey}-y-${tick.value}`"
+                  x1="40"
+                  :y1="tick.y"
+                  x2="344"
+                  :y2="tick.y"
+                  stroke="rgba(168,198,232,0.16)"
+                  stroke-width="1"
+                />
+                <text
+                  v-for="tick in envTrendSelectedRender.yTicks"
+                  :key="`${envTrendMetricKey}-yl-${tick.value}`"
+                  x="34"
+                  :y="tick.y + 4"
+                  text-anchor="end"
+                  fill="rgba(214, 230, 255, 0.86)"
+                  font-size="10"
+                >
+                  {{ tick.value }}
+                </text>
+                <text
+                  v-for="tick in envTrendSelectedRender.xTicks"
+                  :key="`${envTrendMetricKey}-x-${tick.label}`"
+                  :x="tick.x"
+                  y="156"
+                  text-anchor="middle"
+                  fill="rgba(214, 230, 255, 0.78)"
+                  font-size="10"
+                >
+                  {{ tick.label }}
+                </text>
+                <path :d="envTrendSelectedRender.areaPath" :fill="envTrendMetricConfig.areaColor" />
+                <polyline
+                  :points="envTrendSelectedRender.points"
+                  fill="none"
+                  :stroke="envTrendMetricConfig.color"
+                  stroke-width="2.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle
+                  v-for="(dot, idx) in envTrendSelectedRender.dots"
+                  :key="`${envTrendMetricKey}-dot-${idx}`"
+                  :cx="dot.x"
+                  :cy="dot.y"
+                  r="2.6"
+                  :fill="envTrendMetricConfig.color"
+                  stroke="rgba(255,255,255,0.82)"
+                  stroke-width="0.8"
+                />
+              </svg>
+              <div class="env-trend-footer">
+                <div class="env-trend-mini">
+                  <span>当前</span>
+                  <strong>{{ envTrendSelectedValue }}</strong>
+                  <em>{{ envTrendMetricConfig.label }}</em>
+                </div>
+                <div class="env-trend-mini">
+                  <span>峰值</span>
+                  <strong>{{ envTrendSelectedPeak }}</strong>
+                  <em>本周期最高</em>
+                </div>
+                <div class="env-trend-mini">
+                  <span>变化</span>
+                  <strong :class="envTrendSelectedDeltaTone">{{ envTrendSelectedDeltaText }}</strong>
+                  <em>{{ envTrendSelectedDeltaDesc }}</em>
+                </div>
               </div>
             </div>
           </article>
 
           <article class="card env-parking-card">
             <div class="panel-headline small">
-              <h3>车位占用</h3>
-              <span>总车位 {{ parkingTotal }} · 空闲 {{ parkingFree }}</span>
-            </div>
-            <div class="parking-overview-layout">
-              <div class="parking-ring-wrap compact">
-                <svg class="parking-ring" viewBox="0 0 120 120">
-                  <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(126,197,255,0.12)" stroke-width="10" />
-                  <circle cx="60" cy="60" r="50" fill="none"
-                    :stroke="parkingOccupancyColor"
-                    stroke-width="10"
-                    stroke-linecap="round"
-                    :stroke-dasharray="`${parkingOccupancy * 3.14} 314`"
-                    transform="rotate(-90 60 60)"
-                    style="transition: stroke-dasharray 0.6s ease"
-                  />
-                  <text x="60" y="54" text-anchor="middle" fill="#eaf6ff" font-size="22" font-weight="700">{{ parkingOccupancy }}%</text>
-                  <text x="60" y="72" text-anchor="middle" fill="rgba(214,230,255,0.6)" font-size="10">占用率</text>
-                </svg>
-                <div class="parking-summary">
-                  <span>已用 <strong>{{ parkingUsed }}</strong></span>
-                  <span>空闲 <strong>{{ parkingFree }}</strong></span>
+              <h3>车位占用与高压区</h3>
+              <div class="parking-head-right">
+                <div class="traffic-flow-inline">
+                  <span>车流量检测</span>
+                  <em>{{ trafficFlowReserve.status }}</em>
+                  <strong>今日 {{ trafficFlowReserve.today }}</strong>
+                  <strong>入口 {{ trafficFlowReserve.inCount }}</strong>
+                  <strong>出口 {{ trafficFlowReserve.outCount }}</strong>
                 </div>
-              </div>
-              <div class="parking-zone-list">
-                <div v-for="zone in parkingZoneCards" :key="zone.name" class="parking-zone-row" :class="zone.tone">
-                  <div class="parking-zone-info">
-                    <span>{{ zone.name }}</span>
-                    <strong>{{ zone.used }}/{{ zone.capacity }}</strong>
-                  </div>
-                  <div class="parking-zone-bar"><i :style="{ width: `${zone.percent}%` }"></i></div>
-                </div>
+                <span>总车位 {{ parkingTotal }} · {{ parkingPressureLabel }}</span>
               </div>
             </div>
-          </article>
-
-          <article class="card env-parking-map-card">
-            <div class="panel-headline small">
-              <h3>车位区域分布</h3>
-              <span>红色表示已占用</span>
-            </div>
-            <div class="parking-zone-grid compact">
-              <div v-for="zone in parkingMapZones" :key="zone.name" class="parking-zone-card">
-                <div class="zone-top">
-                  <strong>{{ zone.name }}</strong>
-                  <span>{{ zone.used }}/{{ zone.capacity }}</span>
+            <div class="parking-pressure-card" :class="parkingPressureTone">
+              <div class="parking-pressure-main">
+                <span>{{ parkingPressureLabel }}</span>
+                <strong>{{ parkingOccupancy }}<small>%</small></strong>
+                <em>{{ parkingPressureDesc }}</em>
+              </div>
+              <div class="parking-pressure-track">
+                <div class="parking-pressure-meter" :style="{ '--parking-percent': `${parkingOccupancy}%` }">
+                  <i></i>
+                  <b></b>
                 </div>
-                <div class="zone-slots">
-                  <i v-for="slot in zone.sampleSlots" :key="slot.id" :class="{ busy: slot.busy }"></i>
+                <div class="parking-pressure-scale">
+                  <span>宽松</span>
+                  <span>繁忙</span>
+                  <span>紧张</span>
+                </div>
+              </div>
+              <div class="parking-pressure-stats">
+                <div>
+                  <span>已用</span>
+                  <strong>{{ parkingUsed }}</strong>
+                </div>
+                <div>
+                  <span>空闲</span>
+                  <strong>{{ parkingFree }}</strong>
+                </div>
+                <div class="hot">
+                  <span>高压区</span>
+                  <strong>{{ parkingTopZone?.name || '暂无' }}</strong>
+                  <em>{{ parkingTopZone?.percent || 0 }}%</em>
                 </div>
               </div>
             </div>
-          </article>
-
-          <article class="card env-insight-card">
-            <div class="comfort-head">
-              <h3>运行研判</h3>
-              <span class="comfort-label" :style="{ color: comfortColor }">{{ comfortLabel }}</span>
-            </div>
-            <div class="env-insight-body">
-              <div class="comfort-score compact" :style="{ '--score-color': comfortColor }">
-                <strong>{{ comfortScore }}</strong>
-                <span>/ 100</span>
-              </div>
-              <div class="env-insight-copy">
-                <p>{{ envParkingSummary }}</p>
-                <ul>
-                  <li v-for="item in envParkingAdviceList" :key="item">{{ item }}</li>
-                </ul>
+            <div class="parking-zone-list compact">
+              <div v-for="zone in parkingZoneCards" :key="zone.name" class="parking-zone-row" :class="zone.tone">
+                <div class="parking-zone-name">
+                  <span>{{ zone.name }}</span>
+                  <em>{{ zone.used }}/{{ zone.capacity }} 已用</em>
+                </div>
+                <div class="parking-zone-bar"><i :style="{ width: `${zone.percent}%` }"></i></div>
+                <div class="parking-zone-count">
+                  <strong>{{ zone.percent }}%</strong>
+                  <em>余 {{ zone.free }}</em>
+                </div>
               </div>
             </div>
           </article>
@@ -724,7 +766,16 @@
                 <span class="inline-tag">未处理优先</span>
               </div>
               <div class="task-list">
-                <div v-for="task in pendingTasks" :key="task" class="task-item">{{ task }}</div>
+                <button
+                  v-for="task in pendingTasks"
+                  :key="task.key"
+                  class="task-item"
+                  type="button"
+                  :disabled="!task.alarm"
+                  @click="goPendingTask(task)"
+                >
+                  {{ task.text }}
+                </button>
               </div>
             </article>
 
@@ -941,6 +992,8 @@ import flvjs from 'flv.js'
 import { demoAlarmVideoMap, rtmpAddressList, simulateChannelName } from '@/config/config'
 import { useAlarmStore } from '@/stores/alarm'
 import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
+import { AlarmSocketClient, type AlarmSocketMessage } from '@/utils/alarmSocket'
 
 type ModuleTab = 'alarm' | 'analysis' | 'video' | 'env' | 'agent'
 type AgentStageStatus = 'idle' | 'listening' | 'thinking' | 'speaking'
@@ -980,16 +1033,33 @@ interface RecentEventItem {
   timestamp: number
 }
 
+interface AnalysisHeatRow {
+  area: string
+  values: Record<string, number>
+}
+
+interface AnalysisHeatMatrix {
+  defer?: number
+  rangeLabel?: string
+  total?: number
+  byType?: Array<{ name: string; count: number }>
+  byArea?: Array<{ name: string; count: number }>
+  types: string[]
+  rows: AnalysisHeatRow[]
+  maxCount: number
+}
+
 const router = useRouter()
 const alarmStore = useAlarmStore()
 const appStore = useAppStore()
+const userStore = useUserStore()
 
 const tabs: Array<{ key: ModuleTab; label: string }> = [
-  { key: 'alarm', label: '报警消息' },
-  { key: 'analysis', label: '统计分析' },
-  { key: 'video', label: '监控视频' },
-  { key: 'env', label: '环境和车位' },
-  { key: 'agent', label: 'Agent' },
+  { key: 'alarm', label: '告警处置' },
+  { key: 'analysis', label: '态势分析' },
+  { key: 'video', label: '视频巡检' },
+  { key: 'env', label: '环境车位' },
+  { key: 'agent', label: '智能助手' },
 ]
 const activeTab = ref<ModuleTab>('video')
 const agentStageKey = ref(0)
@@ -1013,6 +1083,17 @@ const openAlarmDetail = (row: any) => {
 const selectAlarmRow = (row: any) => {
   if (!row || row.eventName === '暂无报警') return
   selectedAlarmRow.value = row
+}
+
+const scrollSelectedAlarmIntoView = () => {
+  nextTick(() => {
+    const wrap = alarmTableWrapRef.value
+    if (!wrap || !selectedAlarmRow.value) return
+    const selectedIndex = filteredAlarmRows.value.findIndex(row => alarmRowKey(row) === alarmRowKey(selectedAlarmRow.value))
+    if (selectedIndex < 0) return
+    const rowEl = wrap.querySelectorAll('tbody tr')[selectedIndex] as HTMLElement | undefined
+    rowEl?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
 }
 
 const openProcessDialog = (row: any) => {
@@ -1088,7 +1169,7 @@ const mapPoints = ref<MapPointItem[]>([
 ])
 
 const RECENT_EVENT_LIMIT = 6
-const RECENT_EVENT_POLL_MS = 8000
+const RECENT_EVENT_POLL_MS = 60000
 const PREVIEW_TILE_LIMIT = 6
 const recentEvents = ref<RecentEventItem[]>([])
 const recentEventInitialized = ref(false)
@@ -1111,8 +1192,12 @@ const parseAlarmTimestamp = (item: any): number => {
   if (mmddTimeMatch) {
     const [, month, day, hour, minute] = mmddTimeMatch
     const year = new Date().getFullYear()
-    const timestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`).getTime()
-    return Number.isNaN(timestamp) ? 0 : timestamp
+    const candidate = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`)
+    if (Number.isNaN(candidate.getTime())) return 0
+    if (candidate.getTime() > Date.now()) {
+      candidate.setFullYear(year - 1)
+    }
+    return candidate.getTime()
   }
   const value = new Date(normalized).getTime()
   if (!Number.isNaN(value)) return value
@@ -1132,6 +1217,32 @@ const toTimeLabel = (timestamp: number): string => {
   const d = new Date(timestamp)
   if (Number.isNaN(d.getTime())) return '--:--'
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+const toDateTimeParts = (timestamp: number) => {
+  const d = new Date(timestamp)
+  if (!timestamp || Number.isNaN(d.getTime())) return null
+  return {
+    year: d.getFullYear(),
+    month: String(d.getMonth() + 1).padStart(2, '0'),
+    day: String(d.getDate()).padStart(2, '0'),
+    hour: String(d.getHours()).padStart(2, '0'),
+    minute: String(d.getMinutes()).padStart(2, '0'),
+  }
+}
+
+const formatAlarmFullTime = (item: any): string => {
+  const timestamp = parseAlarmTimestamp(item)
+  const parts = toDateTimeParts(timestamp)
+  if (!parts) return item?.date || item?.time || item?.createTime || '--'
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
+}
+
+const formatAlarmListTime = (item: any): string => {
+  const timestamp = parseAlarmTimestamp(item)
+  const parts = toDateTimeParts(timestamp)
+  if (!parts) return item?.date || item?.time || item?.createTime || '--'
+  return `${parts.year}-${parts.month}-${parts.day}`
 }
 
 const isAlarmPending = (item: any): boolean => {
@@ -1202,9 +1313,60 @@ const fetchAlarmList = async () => {
       alarmStore.resetStatistics()
     }
   } catch (e) {
-    console.log('请求失败，使用模拟数据', e)
+    console.log('报警数据请求失败，启用备用数据', e)
     useMockData()
   }
+}
+
+let alarmSocketClient: AlarmSocketClient | null = null
+let alarmSocketRefreshTimer: number | null = null
+
+const resolveCurrentUserId = () => {
+  if (userStore.userId) return userStore.userId
+  const sessionUserId = Number(sessionStorage.getItem('userId') || 0)
+  return Number.isFinite(sessionUserId) ? sessionUserId : 0
+}
+
+const refreshAlarmDataFromSocket = () => {
+  if (alarmSocketRefreshTimer !== null) {
+    window.clearTimeout(alarmSocketRefreshTimer)
+  }
+  alarmSocketRefreshTimer = window.setTimeout(async () => {
+    alarmSocketRefreshTimer = null
+    await Promise.all([
+      fetchAlarmList(),
+      fetchAnalysisHeatMatrix(),
+    ])
+    await fetchRecentEventStream()
+    refreshSummaryNow()
+  }, 300)
+}
+
+const startAlarmSocket = () => {
+  const userId = resolveCurrentUserId()
+  if (!userId || alarmSocketClient) return
+  alarmSocketClient = new AlarmSocketClient({
+    userId,
+    onAlarm: async (message: AlarmSocketMessage) => {
+      console.log('[AlarmSocket] 收到新报警:', message)
+      refreshAlarmDataFromSocket()
+      const { ElMessage } = await import('element-plus')
+      ElMessage.warning(message.message || '收到新的报警信息')
+    },
+    onOpen: () => console.log('[AlarmSocket] 连接成功'),
+    onClose: () => console.log('[AlarmSocket] 连接关闭'),
+    onError: (event) => console.warn('[AlarmSocket] 连接异常:', event),
+  })
+  alarmSocketClient.connect()
+}
+
+const stopAlarmSocket = () => {
+  if (alarmSocketRefreshTimer !== null) {
+    window.clearTimeout(alarmSocketRefreshTimer)
+    alarmSocketRefreshTimer = null
+  }
+  alarmSocketClient?.close()
+  alarmSocketClient = null
 }
 
 const ALARM_AUTO_SCROLL_INTERVAL_MS = 45
@@ -1282,7 +1444,7 @@ const useMockData = () => {
   ]
   alarmStore.setAlarmList(mockAlarms)
   alarmStore.updateStatisticsFromAlarms()
-  console.log('使用模拟报警数据（演示模式）')
+  console.log('已启用备用报警数据')
 }
 
 const fetchRecentEventStream = async (): Promise<void> => {
@@ -1326,7 +1488,7 @@ const stopRecentEventPolling = (): void => {
   }
 }
 
-// 隐藏遥控器通信
+// 联动控制通道
 let simChannel: BroadcastChannel | null = null;
 onMounted(() => {
   if (window.BroadcastChannel) {
@@ -1364,7 +1526,7 @@ const _handleSimulate = (type: string) => {
       location: '北门',
       createTime: iso,
       video: demoAlarmVideoMap.bike,
-      id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
+      id: Date.now(), name: '联动事件', deal: '未处理', content: '平台联动触发', phone: '13800000000'
     };
   } else if (type === 'fire') {
     newAlarm = {
@@ -1375,7 +1537,7 @@ const _handleSimulate = (type: string) => {
       location: '车库',
       createTime: iso,
       video: demoAlarmVideoMap.fire,
-      id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
+      id: Date.now(), name: '联动事件', deal: '未处理', content: '平台联动触发', phone: '13800000000'
     };
   } else if (type === 'garbage') {
     newAlarm = {
@@ -1386,7 +1548,7 @@ const _handleSimulate = (type: string) => {
       location: '东侧',
       createTime: iso,
       video: demoAlarmVideoMap.garbage,
-      id: Date.now(), name: '模拟触发', deal: '未处理', content: '前端大屏测试触发', phone: '13800000000'
+      id: Date.now(), name: '联动事件', deal: '未处理', content: '平台联动触发', phone: '13800000000'
     };
   }
 
@@ -1403,7 +1565,7 @@ const _handleSimulate = (type: string) => {
     if (bus) bus.$emit('alarm');
     
     import('element-plus').then(({ ElMessage }) => {
-      ElMessage({ message: '收到大屏模拟指挥指令：' + newAlarm.eventName, type: 'warning' });
+      ElMessage({ message: '收到联动告警指令：' + newAlarm.eventName, type: 'warning' });
     });
   }
 };
@@ -1484,7 +1646,10 @@ const alarmTableRows = computed(() => {
 const alarmKeyword = ref('')
 const alarmDealFilter = ref<'all' | 'pending' | 'done'>('pending')
 const analysisRange = ref<'day' | 'week' | 'month'>('week')
+const analysisHeatMatrix = ref<AnalysisHeatMatrix | null>(null)
+const analysisHeatLoading = ref(false)
 const showAlarmTypeOther = ref(false)
+const activeAnalysisTypeIndex = ref<number | null>(null)
 const analysisRangeOptions: Array<{ value: 'day' | 'week' | 'month'; label: string }> = [
   { value: 'day', label: '今日' },
   { value: 'week', label: '近7天' },
@@ -1493,6 +1658,74 @@ const analysisRangeOptions: Array<{ value: 'day' | 'week' | 'month'; label: stri
 const analysisPalette = ['#7ee8ff', '#6ce2b2', '#f8cb71', '#ff8d8d', '#9ca7ff', '#52b7ff', '#ffb86b', '#d6f1ff']
 
 const analysisRangeLabel = computed(() => analysisRangeOptions.find(item => item.value === analysisRange.value)?.label || '近7天')
+const analysisRangeDefer = computed(() => {
+  if (analysisRange.value === 'day') return 1
+  if (analysisRange.value === 'month') return 30
+  return 7
+})
+
+const normalizeHeatMatrix = (raw: any): AnalysisHeatMatrix | null => {
+  if (!raw) return null
+  const typeSet = new Set<string>()
+  if (Array.isArray(raw.types)) {
+    raw.types.map((item: any) => String(item || '').trim()).filter(Boolean).forEach((item: string) => typeSet.add(item))
+  }
+  if (Array.isArray(raw.byType)) {
+    raw.byType.map((item: any) => String(item?.name || '').trim()).filter(Boolean).forEach((item: string) => typeSet.add(item))
+  }
+  if (Array.isArray(raw.rows)) {
+    raw.rows.forEach((row: any) => {
+      const sourceValues = row?.values && typeof row.values === 'object' ? row.values : {}
+      Object.keys(sourceValues).map(item => item.trim()).filter(Boolean).forEach(item => typeSet.add(item))
+    })
+  }
+  const types = Array.from(typeSet).slice(0, 4)
+  const rows = Array.isArray(raw.rows)
+    ? raw.rows.map((row: any) => {
+        const values: Record<string, number> = {}
+        const sourceValues = row?.values && typeof row.values === 'object' ? row.values : {}
+        types.forEach((type) => {
+          values[type] = Number(sourceValues[type] || 0)
+        })
+        return {
+          area: String(row?.area || '未标注区域'),
+          values,
+        }
+      }).filter((row: AnalysisHeatRow) => row.area)
+    : []
+  return {
+    defer: raw.defer,
+    rangeLabel: raw.rangeLabel,
+    total: Number(raw.total || 0),
+    byType: Array.isArray(raw.byType) ? raw.byType : [],
+    byArea: Array.isArray(raw.byArea) ? raw.byArea : [],
+    types,
+    rows,
+    maxCount: Number(raw.maxCount || 0),
+  }
+}
+
+const fetchAnalysisHeatMatrix = async () => {
+  analysisHeatLoading.value = true
+  try {
+    const { data } = await axios.get('/alarm/query/cnt/type-area', {
+      params: {
+        defer: analysisRangeDefer.value,
+      },
+    })
+    if (data?.code === '00000') {
+      analysisHeatMatrix.value = normalizeHeatMatrix(data.data)
+      return
+    }
+    analysisHeatMatrix.value = null
+  } catch (error) {
+    void error
+    analysisHeatMatrix.value = null
+  } finally {
+    analysisHeatLoading.value = false
+  }
+}
+
 
 const filteredAlarmRows = computed(() => {
   const keyword = alarmKeyword.value.toLowerCase()
@@ -1593,20 +1826,33 @@ const analysisTypeDistribution = computed(() => {
     }))
 })
 
-const analysisTypeDonutStyle = computed(() => {
-  const items = analysisTypeDistribution.value
-  if (!items.length) return 'conic-gradient(rgba(126, 197, 255, 0.12) 0deg 360deg)'
+const analysisTypeSegments = computed(() => {
+  const radius = 42
+  const circumference = 2 * Math.PI * radius
+  const total = analysisTypeDistribution.value.reduce((sum, item) => sum + item.eventCount, 0) || 1
   let cursor = 0
-  const total = items.reduce((sum, item) => sum + item.eventCount, 0) || 1
-  const stops = items.map((item) => {
-    const start = cursor
-    const end = cursor + (item.eventCount / total) * 360
-    cursor = end
-    return `${item.color} ${start.toFixed(1)}deg ${end.toFixed(1)}deg`
+  return analysisTypeDistribution.value.map((item) => {
+    const rawLength = (item.eventCount / total) * circumference
+    const gapSize = analysisTypeDistribution.value.length > 1 ? 1.6 : 0
+    const length = Math.max(rawLength - gapSize, 0)
+    const segment = {
+      ...item,
+      length: Number(length.toFixed(2)),
+      gap: Number((circumference - length).toFixed(2)),
+      offset: Number((-cursor + circumference * 0.25).toFixed(2)),
+    }
+    cursor += rawLength
+    return segment
   })
-  return `conic-gradient(${stops.join(', ')})`
 })
-
+const activeAnalysisTypeInfo = computed(() => {
+  const list = analysisTypeDistribution.value
+  if (!list.length) {
+    return { eventType: '暂无', eventCount: 0, percent: 0, highCount: 0, areaCount: 0, color: '#7ee8ff' }
+  }
+  const index = activeAnalysisTypeIndex.value ?? 0
+  return list[index] || list[0]
+})
 const analysisAreaChartData = computed(() => {
   const counts: Record<string, number> = {}
   analysisAlarmRows.value.forEach((row) => {
@@ -1745,13 +1991,13 @@ const analysisRepeatPointData = computed(() => {
 
 const analysisRepeatPointVisible = computed(() => analysisRepeatPointData.value.slice(0, 2))
 
-const analysisCrossTypes = computed(() => analysisTypeChartData.value.slice(0, 4).map(item => item.eventType))
+const fallbackAnalysisCrossTypes = computed(() => analysisTypeChartData.value.slice(0, 4).map(item => item.eventType))
 
-const analysisCrossRows = computed(() => {
+const fallbackAnalysisCrossRows = computed(() => {
   const topAreas = analysisAreaChartData.value.slice(0, 4).map(item => item.eventType)
   return topAreas.map((area) => {
     const values: Record<string, number> = {}
-    analysisCrossTypes.value.forEach((type) => {
+    fallbackAnalysisCrossTypes.value.forEach((type) => {
       values[type] = analysisAlarmRows.value.filter((row) => {
         const rowArea = row.department || row.location || '未标注区域'
         const rowType = row.eventName || '未知事件'
@@ -1762,12 +2008,49 @@ const analysisCrossRows = computed(() => {
   })
 })
 
-const analysisCrossMax = computed(() => (
-  Math.max(
+const uniqueTopItems = (items: string[], limit = 4) => (
+  Array.from(new Set(items.map(item => item.trim()).filter(Boolean))).slice(0, limit)
+)
+
+const analysisCrossTypes = computed(() => uniqueTopItems([
+  ...(analysisHeatMatrix.value?.types || []),
+  ...fallbackAnalysisCrossTypes.value,
+]))
+
+const analysisCrossRows = computed(() => {
+  const types = analysisCrossTypes.value
+  const rowMap = new Map<string, AnalysisHeatRow>()
+
+  const addRow = (row: AnalysisHeatRow) => {
+    const area = String(row.area || '').trim()
+    if (!area) return
+    const current = rowMap.get(area) || { area, values: {} }
+    types.forEach((type) => {
+      const nextValue = Number(row.values?.[type] || 0)
+      current.values[type] = Math.max(Number(current.values[type] || 0), nextValue)
+    })
+    rowMap.set(area, current)
+  }
+
+  ;(analysisHeatMatrix.value?.rows || []).forEach(addRow)
+  fallbackAnalysisCrossRows.value.forEach(addRow)
+
+  return Array.from(rowMap.values()).slice(0, 4).map(row => ({
+    area: row.area,
+    values: types.reduce<Record<string, number>>((values, type) => {
+      values[type] = Number(row.values[type] || 0)
+      return values
+    }, {}),
+  }))
+})
+
+const analysisCrossMax = computed(() => {
+  if (analysisHeatMatrix.value?.maxCount) return analysisHeatMatrix.value.maxCount
+  return Math.max(
     ...analysisCrossRows.value.flatMap(row => Object.values(row.values)),
     0,
   )
-))
+})
 
 const getCrossHeat = (value: number, max: number) => {
   if (!value || !max) return 'rgba(126, 197, 255, 0.08)'
@@ -2083,7 +2366,7 @@ const severityText = (level: number) => {
 const ENV_PARKING_DATA_MODE: 'mock' | 'api' = 'api'
 const ENV_PARKING_REFRESH_MS = 6000
 const envParkingRefreshSeconds = Math.round(ENV_PARKING_REFRESH_MS / 1000)
-const envParkingDataModeLabel = computed(() => (ENV_PARKING_DATA_MODE === 'mock' ? '模拟数据' : '实时接口'))
+const envParkingDataModeLabel = computed(() => (ENV_PARKING_DATA_MODE === 'mock' ? '备用数据' : '实时接口'))
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const randDelta = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
@@ -2120,13 +2403,14 @@ const envRangeOptions: Array<{ value: 'day' | 'week' | 'month'; label: string }>
 const envRangeLabel = computed(() => envRangeOptions.find(item => item.value === envTrendRange.value)?.label || '近7天')
 
 const envTrendMetrics = [
-  { key: 'aqi', label: 'AQI', unit: '指数', color: '#63b8ff', areaColor: 'rgba(99,184,255,0.22)' },
-  { key: 'humidity', label: '湿度', unit: '%', color: '#53d5a5', areaColor: 'rgba(83,213,165,0.20)' },
-  { key: 'pm25', label: 'PM2.5', unit: 'ug/m3', color: '#f8cb71', areaColor: 'rgba(248,203,113,0.18)' },
-  { key: 'combustibleGas', label: '可燃气体', unit: 'ppm', color: '#ff8d8d', areaColor: 'rgba(255,141,141,0.18)' },
+  { key: 'aqi', label: 'AQI', desc: '空气质量指数', unit: '指数', color: '#63b8ff', areaColor: 'rgba(99,184,255,0.22)' },
+  { key: 'humidity', label: '湿度', desc: '空气湿度变化', unit: '%', color: '#53d5a5', areaColor: 'rgba(83,213,165,0.20)' },
+  { key: 'pm25', label: 'PM2.5', desc: '细颗粒物变化', unit: 'ug/m3', color: '#f8cb71', areaColor: 'rgba(248,203,113,0.18)' },
+  { key: 'combustibleGas', label: '可燃气体', desc: '可燃气体浓度', unit: 'ppm', color: '#ff8d8d', areaColor: 'rgba(255,141,141,0.18)' },
 ] as const
 
 type EnvMetricKey = typeof envTrendMetrics[number]['key']
+const envTrendMetricKey = ref<EnvMetricKey>('aqi')
 
 interface EnvPoint {
   label: string
@@ -2208,18 +2492,9 @@ interface TrendRenderData {
   xTicks: TrendXTick[]
 }
 
-interface TrendCardConfig {
-  key: EnvMetricKey
-  title: string
-  desc: string
-  color: string
-  areaColor: string
-}
-
-const envTrendCards: TrendCardConfig[] = [
-  { key: 'aqi', title: 'AQI 趋势', desc: '空气质量指数', color: '#63b8ff', areaColor: 'rgba(99,184,255,0.22)' },
-  { key: 'pm25', title: 'PM2.5 趋势', desc: '细颗粒物变化', color: '#f8cb71', areaColor: 'rgba(248,203,113,0.2)' },
-]
+const envTrendMetricConfig = computed(() => (
+  envTrendMetrics.find(item => item.key === envTrendMetricKey.value) || envTrendMetrics[0]
+))
 
 const buildTrendRender = (metric: EnvMetricKey): TrendRenderData => {
   const series = envTrendSeries.value
@@ -2257,7 +2532,10 @@ const buildTrendRender = (metric: EnvMetricKey): TrendRenderData => {
     const value = Math.round(yMax - ratio * yDiff)
     return { value, y: top + ratio * height }
   })
-  const xTicks = series.map((item, idx) => ({ label: item.label, x: left + idx * stepX }))
+  const xTicks = series.length > 5
+    ? series.filter((_, idx) => idx === 0 || idx === Math.floor((series.length - 1) / 2) || idx === series.length - 1)
+        .map(item => ({ label: item.label, x: left + series.findIndex(source => source.label === item.label) * stepX }))
+    : series.map((item, idx) => ({ label: item.label, x: left + idx * stepX }))
 
   return { points, areaPath: `M ${areaPath} Z`, dots, yTicks, xTicks }
 }
@@ -2268,6 +2546,34 @@ const envTrendCharts = computed<Record<EnvMetricKey, TrendRenderData>>(() => ({
   pm25: buildTrendRender('pm25'),
   combustibleGas: buildTrendRender('combustibleGas'),
 }))
+
+const envTrendSelectedRender = computed(() => envTrendCharts.value[envTrendMetricKey.value])
+
+const envTrendSelectedSeries = computed(() => envTrendSeries.value.map(item => item[envTrendMetricKey.value]))
+const envTrendSelectedValue = computed(() => envTrendSelectedSeries.value.at(-1) ?? 0)
+const envTrendSelectedPeak = computed(() => Math.max(...envTrendSelectedSeries.value, 0))
+const envTrendSelectedDelta = computed(() => {
+  const values = envTrendSelectedSeries.value
+  if (values.length < 2) return 0
+  return values[values.length - 1] - values[values.length - 2]
+})
+const envTrendSelectedDeltaText = computed(() => {
+  const delta = envTrendSelectedDelta.value
+  if (delta > 0) return `+${delta}`
+  if (delta < 0) return String(delta)
+  return '持平'
+})
+const envTrendSelectedDeltaTone = computed(() => {
+  if (envTrendSelectedDelta.value > 0) return 'up'
+  if (envTrendSelectedDelta.value < 0) return 'down'
+  return 'flat'
+})
+const envTrendSelectedDeltaDesc = computed(() => {
+  const delta = envTrendSelectedDelta.value
+  if (delta > 0) return '较上一时刻上升'
+  if (delta < 0) return '较上一时刻下降'
+  return '较上一时刻持平'
+})
 
 const parkingZoneState = ref<ParkingZone[]>([
   { name: '地库A区', capacity: 62, used: 38 },
@@ -2285,19 +2591,6 @@ const parkingDayTrend = ref<ParkingDayPoint[]>([
   { label: '20:00', occupancy: 61, used: 98 },
   { label: '24:00', occupancy: 48, used: 77 },
 ])
-const parkingMapZones = computed(() => parkingZoneState.value.map((zone) => {
-  const sampleCount = Math.min(zone.capacity, 24)
-  const ratio = zone.capacity > 0 ? zone.used / zone.capacity : 0
-  const busyCount = Math.round(ratio * sampleCount)
-  return {
-    ...zone,
-    sampleSlots: Array.from({ length: sampleCount }, (_, idx) => ({
-      id: `${zone.name}-${idx}`,
-      busy: idx < busyCount,
-    })),
-  }
-}))
-
 const syncEnvParkingFromApi = async (): Promise<boolean> => {
   if (ENV_PARKING_DATA_MODE !== 'api') return false
   try {
@@ -2718,7 +3011,7 @@ const mapAlarmCounts = computed(() => {
   ]
 })
 
-const ALARM_REFRESH_INTERVAL_MS = 10000
+const ALARM_REFRESH_INTERVAL_MS = 60000
 let alarmCountRefreshTimer: number | null = null
 
 const startAlarmCountRefresh = () => {
@@ -2751,6 +3044,7 @@ const parkingZoneCards = computed(() => parkingZoneState.value.map((zone) => {
   const percent = Math.round((zone.used / Math.max(zone.capacity, 1)) * 100)
   return {
     ...zone,
+    free: Math.max(zone.capacity - zone.used, 0),
     percent,
     tone: percent >= 85 ? 'danger' : percent >= 65 ? 'warn' : 'ok',
   }
@@ -2759,15 +3053,15 @@ const parkingZoneCards = computed(() => parkingZoneState.value.map((zone) => {
 const envStatusCards = computed(() => {
   const values = envCurrentValues.value
   const rows = [
-    { key: 'aqi', label: '空气质量', value: values.aqi, unit: 'AQI', limit: 100, color: '#63b8ff', good: values.aqi <= 80 },
-    { key: 'humidity', label: '湿度', value: values.humidity, unit: '%', limit: 100, color: '#53d5a5', good: values.humidity >= 40 && values.humidity <= 70 },
-    { key: 'pm25', label: 'PM2.5', value: values.pm25, unit: 'ug/m³', limit: 100, color: '#f8cb71', good: values.pm25 <= 55 },
-    { key: 'combustibleGas', label: '可燃气体', value: values.combustibleGas, unit: 'ppm', limit: 40, color: '#ff8d8d', good: values.combustibleGas <= 20 },
+    { key: 'aqi', label: '空气质量', value: values.aqi, unit: 'AQI', limit: 100, color: '#63b8ff', good: values.aqi <= 80, warnLabel: '偏高' },
+    { key: 'humidity', label: '湿度', value: values.humidity, unit: '%', limit: 100, color: '#53d5a5', good: values.humidity >= 40 && values.humidity <= 70, warnLabel: '需复核' },
+    { key: 'pm25', label: 'PM2.5', value: values.pm25, unit: 'μg/m³', limit: 100, color: '#f8cb71', good: values.pm25 <= 55, warnLabel: '偏高' },
+    { key: 'combustibleGas', label: '可燃气体', value: values.combustibleGas, unit: 'ppm', limit: 40, color: '#ff8d8d', good: values.combustibleGas <= 20, warnLabel: '需复核' },
   ]
   return rows.map(item => ({
     ...item,
     percent: clamp(Math.round((item.value / item.limit) * 100), 4, 100),
-    status: item.good ? '正常' : '关注',
+    status: item.good ? '正常' : item.warnLabel,
     tone: item.good ? 'ok' : 'warn',
   }))
 })
@@ -2775,13 +3069,56 @@ const envStatusCards = computed(() => {
 const envWarningCount = computed(() => envStatusCards.value.filter(item => item.tone !== 'ok').length)
 const parkingTenseZones = computed(() => parkingZoneCards.value.filter(item => item.percent >= 85).length)
 const parkingTopZone = computed(() => [...parkingZoneCards.value].sort((a, b) => b.percent - a.percent)[0])
+const parkingPressureTone = computed(() => {
+  if (parkingOccupancy.value >= 85) return 'danger'
+  if (parkingOccupancy.value >= 65) return 'warn'
+  return 'ok'
+})
+const parkingPressureLabel = computed(() => {
+  if (parkingOccupancy.value >= 85) return '车位紧张'
+  if (parkingOccupancy.value >= 65) return '车位繁忙'
+  return '车位充足'
+})
+const parkingPressureDesc = computed(() => {
+  const zone = parkingTopZone.value
+  if (!zone) return '暂无高压区域'
+  return `${zone.name} · ${zone.percent}%占用`
+})
+
+const envPriorityState = computed(() => {
+  if (envWarningCount.value > 0 && parkingOccupancy.value >= 85) {
+    return {
+      title: '环境与车位双重关注',
+      desc: `${envWarningCount.value} 项环境指标异常，车位占用率 ${parkingOccupancy.value}%`,
+      tone: 'danger',
+    }
+  }
+  if (envWarningCount.value > 0) {
+    return {
+      title: '环境指标需复核',
+      desc: `当前有 ${envWarningCount.value} 项环境指标异常，优先复核空气质量与设备点位。`,
+      tone: 'warn',
+    }
+  }
+  if (parkingOccupancy.value >= 85) {
+    return {
+      title: '车位压力偏高',
+      desc: `当前占用率 ${parkingOccupancy.value}%，${parkingTopZone.value?.name || '高占用区域'} 需要加强引导。`,
+      tone: 'warn',
+    }
+  }
+  return {
+    title: '当前运行平稳',
+    desc: '环境指标正常，车位余量充足，可保持常规巡检。',
+    tone: 'ok',
+  }
+})
 
 const envOverviewKpis = computed(() => [
   { name: '舒适度', value: comfortScore.value, desc: comfortLabel.value, tone: comfortScore.value >= 80 ? 'ok' : comfortScore.value >= 60 ? 'warn' : 'danger' },
   { name: '异常指标', value: envWarningCount.value, desc: envWarningCount.value ? '需要关注' : '全部正常', tone: envWarningCount.value ? 'warn' : 'ok' },
   { name: '空闲车位', value: parkingFree.value, desc: `总车位 ${parkingTotal.value}`, tone: parkingFree.value < 20 ? 'danger' : 'ok' },
   { name: '占用率', value: `${parkingOccupancy.value}%`, desc: parkingOccupancy.value >= 85 ? '车位紧张' : '余量可用', tone: parkingOccupancy.value >= 85 ? 'danger' : parkingOccupancy.value >= 65 ? 'warn' : 'ok' },
-  { name: '高占用区', value: parkingTenseZones.value, desc: parkingTopZone.value?.name || '暂无', tone: parkingTenseZones.value ? 'warn' : 'ok' },
 ])
 
 const envParkingSummary = computed(() => {
@@ -2799,6 +3136,15 @@ const envParkingAdviceList = computed(() => {
   return list
 })
 
+// 预留给后续车流量检测接口：接入算法后替换这里的数据来源即可。
+const trafficFlowReserve = computed(() => ({
+  status: '未启用',
+  today: '--',
+  inCount: '--',
+  outCount: '--',
+  peak: '--',
+}))
+
 // ====== 车位仪表盘 ======
 const parkingTotal = computed(() => parkingZoneState.value.reduce((sum, item) => sum + item.capacity, 0))
 const parkingUsed = computed(() => parkingZoneState.value.reduce((sum, item) => sum + item.used, 0))
@@ -2807,13 +3153,6 @@ const parkingOccupancy = computed(() => {
   if (!parkingTotal.value) return 0
   return Math.round((parkingUsed.value / parkingTotal.value) * 100)
 })
-const parkingOccupancyColor = computed(() => {
-  const pct = parkingOccupancy.value
-  if (pct > 80) return '#ff8d8d'
-  if (pct > 50) return '#f8cb71'
-  return '#53d5a5'
-})
-
 // ====== 环境舒适度评分 ======
 const comfortScore = computed(() => {
   const { aqi, humidity, pm25, combustibleGas } = envCurrentValues.value
@@ -2866,24 +3205,9 @@ const buildSummary = (label: string, days: number): AgentSummary => {
   const now = new Date().getTime()
   const threshold = now - days * 24 * 60 * 60 * 1000
 
-  const parseTime = (item: any) => {
-    // 优先使用带有年份的 createTime
-    const raw = item.createTime || item.date || item.time
-    if (!raw) return 0
-    
-    // 如果日期字符串明显缺少年份（如 04-07 12:00），尝试补全
-    let dateStr = String(raw)
-    if (/^\d{2}-\d{2}/.test(dateStr) && !dateStr.includes(String(new Date().getFullYear()))) {
-       dateStr = `${new Date().getFullYear()}-${dateStr}`
-    }
-
-    const date = new Date(dateStr).getTime()
-    return Number.isNaN(date) ? 0 : date
-  }
-
   const scoped = list.filter((item: any) => {
-    const t = parseTime(item)
-    return t > 0 && t >= threshold
+    const t = parseAlarmTimestamp(item)
+    return t > 0 && t >= threshold && t <= now
   })
 
   const total = scoped.length
@@ -2907,7 +3231,7 @@ const buildSummary = (label: string, days: number): AgentSummary => {
 
   const trendBucket = new Map<string, number>()
   scoped.forEach((item: any) => {
-    const t = parseTime(item)
+    const t = parseAlarmTimestamp(item)
     if (!t) return
     const d = new Date(t)
     const key = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -2958,12 +3282,38 @@ const summaryUpdatedLabel = ref('--:--')
 const summarySectionsOpen = ref({ trend: true, focus: false, advice: true })
 
 const pendingTasks = computed(() => {
-  const rows = alarmTableRows.value.filter(item => !item.deal.includes('已')).slice(0, 4)
+  const rows = alarmTableRows.value
+    .filter(item => item.eventName !== '暂无报警' && !item.deal.includes('已'))
+    .sort((a, b) => {
+      const levelDiff = Number(b.level || 0) - Number(a.level || 0)
+      if (levelDiff !== 0) return levelDiff
+      return parseAlarmTimestamp(b) - parseAlarmTimestamp(a)
+    })
+    .slice(0, 4)
   if (!rows.length) {
-    return ['当前无待处理报警，建议继续关注实时对话与巡检联动。']
+    return [{
+      key: 'empty',
+      text: '当前无待处理报警，建议继续关注实时对话与巡检联动。',
+      alarm: null,
+    }]
   }
-  return rows.map(item => `${item.department} 存在 ${item.eventName} 报警，请尽快复核。`)
+  return rows.map((item, idx) => ({
+    key: alarmRowKey(item, idx),
+    text: `${item.department} 存在 ${item.eventName} 报警，请尽快复核。`,
+    alarm: item,
+  }))
 })
+
+const goPendingTask = (task: { alarm: any | null }) => {
+  if (!task.alarm) return
+  alarmKeyword.value = ''
+  alarmDealFilter.value = 'pending'
+  selectedAlarmRow.value = task.alarm
+  activeTab.value = 'alarm'
+  stopAlarmAutoScroll()
+  alarmAutoScrollPaused.value = true
+  scrollSelectedAlarmIntoView()
+}
 
 const getTrendWidth = (value: number, max: number) => (max ? Math.max((value / max) * 100, value > 0 ? 12 : 0) : 0)
 
@@ -3432,7 +3782,9 @@ watch(
 
 onMounted(() => {
   fetchAlarmList()
+  fetchAnalysisHeatMatrix()
   fetchMonitors()
+  startAlarmSocket()
   startRecentEventPolling()
   startAlarmCountRefresh()
   startEnvParkingRefresh()
@@ -3450,6 +3802,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearStatusTimer()
+  stopAlarmSocket()
   stopRecentEventPolling()
   stopAlarmCountRefresh()
   stopEnvParkingRefresh()
@@ -3481,6 +3834,10 @@ watch(
   { deep: true },
 )
 
+watch(analysisRange, () => {
+  void fetchAnalysisHeatMatrix()
+})
+
 watch(envTrendRange, () => {
   if (ENV_PARKING_DATA_MODE === 'api') {
     void refreshEnvParkingData()
@@ -3490,6 +3847,9 @@ watch(envTrendRange, () => {
 watch(activeTab, (tab) => {
   if (tab === 'alarm' || tab === 'analysis') {
     void fetchAlarmList()
+    if (tab === 'analysis') {
+      void fetchAnalysisHeatMatrix()
+    }
     window.dispatchEvent(new Event('resize'))
   }
 
@@ -4124,7 +4484,7 @@ watch(activeTab, (tab) => {
 
 .alarm-kpi-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(130px, 1.18fr);
   gap: 7px;
   min-height: 0;
 }
@@ -4168,6 +4528,16 @@ watch(activeTab, (tab) => {
 
 .alarm-kpi.info strong {
   color: #7ee8ff;
+}
+
+.alarm-kpi.area strong {
+  color: #eef8ff;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.18;
 }
 
 .alarm-bottom-row {
@@ -4575,30 +4945,58 @@ watch(activeTab, (tab) => {
   align-items: center;
 }
 
-.analysis-donut {
+.analysis-donut-wrap {
   position: relative;
+  width: min(210px, 100%);
+  justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.analysis-donut-svg {
   width: min(190px, 100%);
   aspect-ratio: 1;
-  justify-self: center;
+  overflow: visible;
   border-radius: 50%;
   box-shadow:
     0 0 28px rgba(126, 232, 255, 0.12),
     inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transform: rotate(-90deg);
 }
 
-.analysis-donut::after {
-  content: '';
-  position: absolute;
-  inset: 9px;
-  border-radius: inherit;
-  border: 1px solid rgba(126, 197, 255, 0.14);
-  background: rgba(5, 19, 34, 0.48);
+.analysis-donut-track,
+.analysis-donut-segment {
+  fill: none;
+  stroke-width: 15;
+}
+
+.analysis-donut-track {
+  stroke: rgba(126, 197, 255, 0.1);
+}
+
+.analysis-donut-segment {
+  cursor: pointer;
+  transition:
+    stroke-width 0.2s ease,
+    opacity 0.2s ease,
+    filter 0.2s ease;
+}
+
+.analysis-donut-segment:hover,
+.analysis-donut-segment.active {
+  stroke-width: 18;
+  filter: drop-shadow(0 0 8px currentColor);
 }
 
 .analysis-donut-core {
   position: absolute;
-  inset: 30px;
+  top: 95px;
+  left: 50%;
   z-index: 1;
+  width: 112px;
+  height: 112px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4609,6 +5007,8 @@ watch(activeTab, (tab) => {
     rgba(8, 30, 54, 0.92);
   text-align: center;
   padding: 14px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .analysis-donut-core strong,
@@ -4632,11 +5032,28 @@ watch(activeTab, (tab) => {
 
 .analysis-type-grid {
   min-height: 0;
+  max-height: 100%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(72px, auto);
+  align-content: start;
   gap: 8px;
-  overflow: auto;
-  padding-right: 2px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.analysis-type-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.analysis-type-grid::-webkit-scrollbar-track {
+  background: rgba(126, 197, 255, 0.07);
+  border-radius: 999px;
+}
+
+.analysis-type-grid::-webkit-scrollbar-thumb {
+  background: rgba(126, 197, 255, 0.4);
+  border-radius: 999px;
 }
 
 .analysis-type-cardlet {
@@ -4649,6 +5066,15 @@ watch(activeTab, (tab) => {
     linear-gradient(135deg, rgba(126, 232, 255, 0.08), transparent 62%),
     rgba(17, 47, 75, 0.36);
   padding: 9px 10px;
+  cursor: pointer;
+}
+
+.analysis-type-cardlet.active,
+.analysis-type-cardlet:hover {
+  border-color: rgba(126, 232, 255, 0.34);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 232, 255, 0.08),
+    0 0 14px rgba(126, 232, 255, 0.08);
 }
 
 .analysis-type-cardlet-head {
@@ -5360,18 +5786,25 @@ watch(activeTab, (tab) => {
 
 .env-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr) minmax(320px, 0.9fr);
-  grid-template-rows: auto minmax(220px, 1fr) minmax(210px, 0.95fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 0.55fr) minmax(0, 0.45fr);
+  grid-template-rows: auto minmax(124px, 0.3fr) minmax(0, 1fr);
+  grid-template-areas:
+    "overview overview"
+    "status trend"
+    "parking trend";
+  gap: 12px;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .env-overview-card {
+  grid-area: overview;
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 0.68fr) minmax(0, 1.32fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
   gap: 12px;
+  align-items: stretch;
   min-height: 0;
 }
 
@@ -5392,10 +5825,61 @@ watch(activeTab, (tab) => {
   font-size: 12px;
 }
 
+.env-overview-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.68fr) minmax(0, 1.32fr);
+  gap: 10px;
+  min-height: 0;
+}
+
+.env-priority-card {
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(17, 47, 75, 0.52), rgba(10, 30, 52, 0.66));
+  padding: 12px 14px;
+  min-height: 0;
+}
+
+.env-priority-card span,
+.env-priority-card p {
+  display: block;
+}
+
+.env-priority-card span {
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+}
+
+.env-priority-card strong {
+  display: block;
+  margin-top: 6px;
+  color: #eef8ff;
+  font-size: 18px;
+}
+
+.env-priority-card p {
+  margin: 8px 0 0;
+  color: rgba(233, 246, 255, 0.78);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.env-priority-card.ok strong {
+  color: #6ce2b2;
+}
+
+.env-priority-card.warn strong {
+  color: #f8cb71;
+}
+
+.env-priority-card.danger strong {
+  color: #ff8d8d;
+}
+
 .env-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .env-kpi {
@@ -5439,33 +5923,48 @@ watch(activeTab, (tab) => {
 
 .env-status-card,
 .env-trend-card,
-.env-parking-card,
-.env-parking-map-card,
-.env-insight-card {
+.env-parking-card {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
 
+.env-status-card {
+  grid-area: status;
+  min-height: 0;
+  overflow: visible;
+}
+
 .env-trend-card {
-  grid-column: span 2;
+  grid-area: trend;
+  min-height: 0;
+}
+
+.env-parking-card {
+  grid-area: parking;
+  min-height: 0;
 }
 
 .env-status-grid {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  align-items: stretch;
 }
 
 .env-status-item {
   border: 1px solid rgba(126, 197, 255, 0.14);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(17, 47, 75, 0.42);
-  padding: 10px;
+  padding: 7px 8px;
   min-width: 0;
+  min-height: 64px;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 5px;
 }
 
 .env-status-item.warn {
@@ -5473,20 +5972,17 @@ watch(activeTab, (tab) => {
   background: rgba(80, 58, 24, 0.28);
 }
 
-.env-status-top,
-.parking-zone-info {
+.env-status-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
+  gap: 6px;
 }
 
-.env-status-top span,
-.parking-zone-info span {
+.env-status-top span {
   min-width: 0;
   color: rgba(214, 230, 255, 0.66);
-  font-size: 12px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5495,7 +5991,7 @@ watch(activeTab, (tab) => {
 .env-status-top em {
   flex: 0 0 auto;
   color: #6ce2b2;
-  font-size: 11px;
+  font-size: 10px;
   font-style: normal;
 }
 
@@ -5505,11 +6001,12 @@ watch(activeTab, (tab) => {
 
 .env-status-item strong {
   display: block;
-  margin: 8px 0 7px;
+  margin: 0;
   color: #eef8ff;
-  font-size: 24px;
+  font-size: 17px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .env-status-item small {
@@ -5519,7 +6016,426 @@ watch(activeTab, (tab) => {
   font-weight: 500;
 }
 
-.env-status-bar,
+.env-status-bar {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(126, 197, 255, 0.1);
+  overflow: hidden;
+}
+
+.env-status-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.env-trend-head {
+  margin-bottom: 7px;
+}
+
+.env-trend-head > div {
+  min-width: 0;
+}
+
+.env-trend-head h3 {
+  margin: 0;
+  color: #eef8ff;
+  font-size: 16px;
+}
+
+.env-trend-head span {
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+}
+
+.env-trend-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(126, 197, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(8, 30, 54, 0.46);
+  padding: 4px;
+  flex-wrap: wrap;
+}
+
+.env-trend-switch-btn {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(214, 230, 255, 0.7);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.env-trend-switch-btn.active {
+  background: rgba(126, 197, 255, 0.18);
+  color: #eef8ff;
+}
+
+.env-inline-insight {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(17, 47, 75, 0.34);
+  padding: 7px 10px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.env-inline-insight span {
+  color: rgba(214, 230, 255, 0.6);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.env-inline-insight strong {
+  color: #6ce2b2;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.env-inline-insight.warn strong {
+  color: #f8cb71;
+}
+
+.env-inline-insight.danger strong {
+  color: #ff8d8d;
+}
+
+.env-inline-insight p {
+  margin: 0;
+  min-width: 0;
+  color: rgba(233, 246, 255, 0.74);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-trend-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.env-trend-svg.single {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.env-trend-footer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.env-trend-mini {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(17, 47, 75, 0.34);
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.env-trend-mini span,
+.env-trend-mini em {
+  display: block;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.env-trend-mini strong {
+  display: block;
+  margin: 3px 0 1px;
+  color: #eef8ff;
+  font-size: 18px;
+}
+
+.env-trend-mini strong.up {
+  color: #ff8d8d;
+}
+
+.env-trend-mini strong.down {
+  color: #6ce2b2;
+}
+
+.env-trend-mini strong.flat {
+  color: #7ee8ff;
+}
+
+.parking-head-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.traffic-flow-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px dashed rgba(126, 232, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(126, 232, 255, 0.08);
+  padding: 4px 9px;
+}
+
+.traffic-flow-inline span {
+  color: rgba(214, 230, 255, 0.78);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.traffic-flow-inline em {
+  color: #7ee8ff;
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.traffic-flow-inline strong {
+  color: rgba(233, 246, 255, 0.82);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.parking-pressure-card {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.28fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+  min-height: 0;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 8% 40%, rgba(126, 232, 255, 0.11), transparent 32%),
+    rgba(17, 47, 75, 0.3);
+  padding: 9px 12px;
+}
+
+.parking-pressure-main,
+.parking-pressure-track,
+.parking-pressure-stats {
+  min-width: 0;
+}
+
+.parking-pressure-main {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  column-gap: 7px;
+  row-gap: 2px;
+}
+
+.parking-pressure-main span {
+  color: rgba(214, 230, 255, 0.66);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.parking-pressure-main strong {
+  color: #eef8ff;
+  font-size: 34px;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.parking-pressure-main small {
+  margin-left: 2px;
+  font-size: 17px;
+}
+
+.parking-pressure-main em {
+  grid-column: 1 / -1;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parking-pressure-card.ok .parking-pressure-main strong {
+  color: #6ce2b2;
+}
+
+.parking-pressure-card.warn .parking-pressure-main strong {
+  color: #f8cb71;
+}
+
+.parking-pressure-card.danger .parking-pressure-main strong {
+  color: #ff8d8d;
+}
+
+.parking-pressure-track {
+  display: grid;
+  gap: 6px;
+}
+
+.parking-pressure-meter {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(83, 213, 165, 0.78), rgba(248, 203, 113, 0.82) 62%, rgba(255, 141, 141, 0.88));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.parking-pressure-meter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(8, 25, 43, 0.48);
+  clip-path: inset(0 0 0 var(--parking-percent));
+}
+
+.parking-pressure-meter i {
+  position: absolute;
+  left: var(--parking-percent);
+  top: 50%;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #eef8ff;
+  border-radius: 50%;
+  background: rgba(8, 25, 43, 0.92);
+  box-shadow: 0 0 12px rgba(126, 232, 255, 0.32);
+  transform: translate(-50%, -50%);
+}
+
+.parking-pressure-meter b {
+  position: absolute;
+  left: 65%;
+  top: -4px;
+  bottom: -4px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.parking-pressure-scale {
+  display: flex;
+  justify-content: space-between;
+  color: rgba(214, 230, 255, 0.5);
+  font-size: 10px;
+}
+
+.parking-pressure-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(64px, auto));
+  gap: 8px;
+}
+
+.parking-pressure-stats div {
+  border-left: 1px solid rgba(126, 197, 255, 0.14);
+  padding-left: 10px;
+}
+
+.parking-pressure-stats span,
+.parking-pressure-stats em {
+  display: block;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.parking-pressure-stats strong {
+  display: block;
+  margin-top: 3px;
+  color: #eef8ff;
+  font-size: 20px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.parking-pressure-stats .hot strong {
+  max-width: 92px;
+  color: #f8cb71;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.parking-zone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.parking-zone-list.compact {
+  flex: 1;
+  gap: 6px;
+}
+
+.parking-zone-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.parking-zone-list::-webkit-scrollbar-track {
+  background: rgba(126, 197, 255, 0.06);
+  border-radius: 999px;
+}
+
+.parking-zone-list::-webkit-scrollbar-thumb {
+  background: rgba(126, 197, 255, 0.34);
+  border-radius: 999px;
+}
+
+.parking-zone-row {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(17, 47, 75, 0.34);
+  padding: 7px 10px;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(92px, 0.22fr) minmax(0, 1fr) minmax(44px, auto);
+  align-items: center;
+  gap: 10px;
+}
+
+.parking-zone-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.parking-zone-name span {
+  min-width: 0;
+  color: #d9edff;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parking-zone-name em {
+  color: rgba(214, 230, 255, 0.52);
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
 .parking-zone-bar {
   height: 7px;
   border-radius: 999px;
@@ -5527,49 +6443,31 @@ watch(activeTab, (tab) => {
   overflow: hidden;
 }
 
-.env-status-bar i,
 .parking-zone-bar i {
   display: block;
   height: 100%;
   border-radius: inherit;
 }
 
-.parking-overview-layout {
-  flex: 1;
-  min-height: 0;
+.parking-zone-count {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
+  justify-items: end;
+  gap: 2px;
+  min-width: 0;
 }
 
-.parking-ring-wrap.compact .parking-ring {
-  width: 104px;
-  height: 104px;
-}
-
-.parking-zone-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 0;
-}
-
-.parking-zone-row {
-  border: 1px solid rgba(126, 197, 255, 0.14);
-  border-radius: 10px;
-  background: rgba(17, 47, 75, 0.34);
-  padding: 8px;
-}
-
-.parking-zone-info strong {
-  flex: 0 0 auto;
+.parking-zone-count strong {
   color: #d9edff;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
-.parking-zone-bar {
-  margin-top: 7px;
+.parking-zone-count em {
+  color: rgba(214, 230, 255, 0.52);
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
 }
 
 .parking-zone-row.ok .parking-zone-bar i {
@@ -5582,93 +6480,6 @@ watch(activeTab, (tab) => {
 
 .parking-zone-row.danger .parking-zone-bar i {
   background: linear-gradient(90deg, rgba(255, 141, 141, 0.92), rgba(255, 78, 102, 0.68));
-}
-
-.parking-zone-grid.compact {
-  flex: 1;
-  min-height: 0;
-}
-
-.env-insight-body {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-}
-
-.comfort-score.compact strong {
-  font-size: 40px;
-}
-
-.env-insight-copy {
-  min-width: 0;
-}
-
-.env-insight-copy p {
-  margin: 0;
-  color: rgba(233, 246, 255, 0.8);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.env-insight-copy ul {
-  margin: 10px 0 0;
-  padding-left: 18px;
-  color: rgba(233, 246, 255, 0.72);
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-
-
-.env-trend-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.env-trend-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
-}
-
-.env-trend-title span {
-  color: #eef8ff;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.env-trend-title em {
-  color: rgba(214, 230, 255, 0.58);
-  font-size: 11px;
-  font-style: normal;
-}
-
-.env-trend-item {
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(12, 40, 68, 0.48);
-  padding: 8px 8px 4px;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-height: 0;
-}
-
-.env-trend-item.single {
-  height: 100%;
-}
-
-.env-trend-svg {
-  width: 100%;
-  height: 100%;
-  min-height: 72px;
 }
 
 /* ====== 1. 视频卡片状态边框 ====== */
@@ -6083,104 +6894,6 @@ watch(activeTab, (tab) => {
   opacity: 0.7;
 }
 
-.parking-ring-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.parking-ring {
-  width: 110px;
-  height: 110px;
-}
-
-.parking-summary {
-  display: flex;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--sub);
-}
-
-.parking-summary strong {
-  color: #eaf6ff;
-  margin-left: 2px;
-}
-
-.parking-zone-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.parking-zone-card {
-  border: 1px solid rgba(126, 197, 255, 0.18);
-  border-radius: 8px;
-  padding: 6px;
-  background: rgba(12, 40, 68, 0.52);
-}
-
-.zone-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  color: rgba(214, 230, 255, 0.84);
-  margin-bottom: 5px;
-}
-
-.zone-top strong {
-  font-size: 12px;
-}
-
-.zone-slots {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 3px;
-}
-
-.zone-slots i {
-  height: 6px;
-  border-radius: 2px;
-  background: rgba(83, 213, 165, 0.25);
-  border: 1px solid rgba(83, 213, 165, 0.3);
-}
-
-.zone-slots i.busy {
-  background: rgba(255, 128, 146, 0.35);
-  border-color: rgba(255, 128, 146, 0.45);
-}
-
-.comfort-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.comfort-label {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.comfort-score {
-  text-align: center;
-}
-
-.comfort-score strong {
-  font-size: 36px;
-  font-weight: 800;
-  color: var(--score-color);
-  font-variant-numeric: tabular-nums;
-}
-
-.comfort-score span {
-  font-size: 14px;
-  color: rgba(214, 230, 255, 0.45);
-  margin-left: 2px;
-}
-
-
 .agent-panel {
   display: grid;
   grid-template-columns: minmax(0, 2.1fr) minmax(20rem, 0.78fr);
@@ -6524,12 +7237,30 @@ watch(activeTab, (tab) => {
 }
 
 .task-item {
+  width: 100%;
+  text-align: left;
+  color: #eef8ff;
   border-left: 3px solid var(--warn);
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
   border-radius: 8px;
   background: rgba(248, 203, 113, 0.12);
   padding: 8px 9px;
   font-size: 12px;
   line-height: 1.5;
+  cursor: pointer;
+}
+
+.task-item:hover:not(:disabled) {
+  background: rgba(248, 203, 113, 0.2);
+  transform: translateX(2px);
+}
+
+.task-item:disabled {
+  color: rgba(214, 230, 255, 0.62);
+  cursor: default;
+  opacity: 0.82;
 }
 
 .summary-card {
@@ -6683,17 +7414,17 @@ watch(activeTab, (tab) => {
 
 .info-table th:nth-child(1),
 .info-table td:nth-child(1) {
-  width: 18%;
+  width: 20%;
 }
 
 .info-table th:nth-child(2),
 .info-table td:nth-child(2) {
-  width: 30%;
+  width: 27%;
 }
 
 .info-table th:nth-child(3),
 .info-table td:nth-child(3) {
-  width: 24%;
+  width: 23%;
 }
 
 .info-table th:nth-child(4),
@@ -6703,7 +7434,7 @@ watch(activeTab, (tab) => {
 
 .info-table th:nth-child(5),
 .info-table td:nth-child(5) {
-  width: 16%;
+  width: 18%;
 }
 
 .info-table tbody tr {
@@ -7209,12 +7940,16 @@ watch(activeTab, (tab) => {
     grid-template-columns: minmax(160px, 0.36fr) minmax(0, 1fr);
   }
 
+  .analysis-type-grid {
+    max-height: 220px;
+  }
+
   .analysis-insight-body {
     grid-template-columns: minmax(120px, 0.3fr) minmax(0, 1fr);
   }
 
   .alarm-kpi-strip {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(120px, 1.18fr);
   }
 
   .alarm-type-overview {
@@ -7241,27 +7976,31 @@ watch(activeTab, (tab) => {
   }
 
   .env-panel {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: none;
-    grid-auto-rows: auto;
-    align-content: start;
+    grid-template-columns: minmax(0, 0.55fr) minmax(0, 0.45fr);
+    grid-template-rows: auto minmax(124px, 0.3fr) minmax(0, 1fr);
+    grid-template-areas:
+      "overview overview"
+      "status trend"
+      "parking trend";
+    gap: 10px;
   }
 
-  .env-overview-card,
+  .env-overview-card {
+    grid-template-columns: 1fr;
+  }
+
+  .env-overview-body {
+    grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.38fr);
+  }
+
   .env-status-card,
-  .env-parking-card,
-  .env-parking-map-card,
-  .env-insight-card {
-    min-height: 220px;
+  .env-trend-card,
+  .env-parking-card {
+    min-height: 0;
   }
 
-  .env-trend-card {
-    grid-column: auto;
-    min-height: 260px;
-  }
-
-  .env-parking-map-card {
-    grid-column: auto;
+  .env-trend-svg.single {
+    min-height: 0;
   }
 
   .main-col,
@@ -7309,39 +8048,69 @@ watch(activeTab, (tab) => {
   .env-panel {
     grid-template-columns: 1fr;
     grid-template-rows: none;
+    grid-template-areas: none;
     grid-auto-rows: auto;
     align-content: start;
   }
 
   .env-overview-card,
   .env-status-card,
-  .env-parking-card,
-  .env-parking-map-card,
-  .env-insight-card {
+  .env-parking-card {
     min-height: 220px;
   }
 
   .env-trend-card {
-    min-height: 270px;
-  }
-
-  .env-trend-grid {
-    grid-template-columns: 1fr;
+    min-height: 290px;
   }
 
   .env-overview-card {
     grid-template-columns: 1fr;
   }
 
+  .env-overview-body,
   .env-kpi-grid,
-  .env-status-grid,
-  .parking-overview-layout,
-  .env-insight-body {
+  .env-trend-footer {
     grid-template-columns: 1fr;
   }
 
-  .env-trend-item.single {
-    min-height: 12rem;
+  .env-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .parking-pressure-card {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .parking-head-right {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .parking-pressure-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .parking-pressure-stats div {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .env-trend-head {
+    gap: 8px;
+  }
+
+  .env-trend-switch {
+    flex-wrap: wrap;
+  }
+
+  .env-inline-insight {
+    grid-template-columns: auto auto;
+  }
+
+  .env-inline-insight p {
+    grid-column: 1 / -1;
+    white-space: normal;
   }
 
   .nav-current {
@@ -7370,9 +8139,6 @@ watch(activeTab, (tab) => {
     grid-template-columns: 1fr;
   }
 
-  .parking-zone-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 760px) {
@@ -7410,9 +8176,16 @@ watch(activeTab, (tab) => {
     grid-template-columns: 1fr;
   }
 
-  .analysis-donut,
+  .analysis-donut-svg,
   .analysis-time-orbit {
     width: 132px;
+  }
+
+  .analysis-donut-core {
+    top: 66px;
+    width: 78px;
+    height: 78px;
+    padding: 10px;
   }
 
   .selected-alarm-main {

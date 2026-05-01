@@ -282,7 +282,7 @@ export default {
 
         const calc = (done, tot, fallback) => tot > 0 ? Math.round((done / tot) * 100) : fallback;
         
-        // 如果后端没返回处理字段，则暂时保留那个演示用的 fallback，但此时统计数值已经准了
+        // 如果后端没返回处理字段，则暂时保留那个备用 fallback，但此时统计数值已经准了
         return {
           overall: (u_tot + s_tot + n_tot) > 0 ? Math.round(((u_done + s_done + n_done) / (u_tot + s_tot + n_tot)) * 100) || 76 : 76,
           urgent: calc(u_done, u_tot, 96),

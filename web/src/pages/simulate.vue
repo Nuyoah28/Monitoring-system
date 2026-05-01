@@ -2,9 +2,9 @@
   <div class="simulate-app">
     <div class="simulate-shell">
       <div class="simulate-hero">
-        <span class="simulate-badge">演示控制台</span>
-        <h1>大屏演示遥控器</h1>
-        <p>在单独窗口或副屏中打开此页面，点击下方指令卡即可向大屏发送实时报警推送，用于答辩演示与联动效果展示。</p>
+        <span class="simulate-badge">联动控制台</span>
+        <h1>事件联动控制台</h1>
+        <p>用于联动报警场景触发与跨端消息同步，支持值守人员快速校验平台联动链路。</p>
       </div>
 
       <div class="btn-group">
@@ -52,13 +52,13 @@ const sendAlarm = async (type: string) => {
 
   if (type === 'bike') {
     caseType = 10
-    clipId = 'SIM_BIKE_DEMO'
+    clipId = 'SIM_BIKE'
   } else if (type === 'fire') {
     caseType = 5
-    clipId = 'SIM_FIRE_DEMO'
+    clipId = 'SIM_FIRE'
   } else if (type === 'garbage') {
     caseType = 8
-    clipId = 'SIM_GARBAGE_DEMO'
+    clipId = 'SIM_GARBAGE'
   }
 
   try {
@@ -69,7 +69,7 @@ const sendAlarm = async (type: string) => {
         clipId: clipId
       }
     })
-    ElMessage({ message: '演示指令已通过云端同步到所有设备', type: 'success' })
+    ElMessage({ message: '联动指令已同步到所有设备', type: 'success' })
   } catch (err) {
     console.error('指令中转失败:', err)
     ElMessage({ message: '本地指令已发送，但云端转发失败，请检查后端服务', type: 'warning' })

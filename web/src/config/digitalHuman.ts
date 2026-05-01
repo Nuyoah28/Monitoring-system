@@ -39,7 +39,7 @@ const envMode = normalizeMode(process.env.VUE_APP_DIGITAL_HUMAN_MODE);
 export const digitalHumanConfig: DigitalHumanSettings = {
   mode: envMode,
   live2d: {
-    // Default demo model from the pixi-live2d-display sample assets.
+    // Default Live2D model provider configuration.
     // Replace these URLs with your licensed local model before final delivery if needed.
     modelUrl:
       process.env.VUE_APP_LIVE2D_MODEL_URL ||
@@ -56,7 +56,7 @@ export const digitalHumanConfig: DigitalHumanSettings = {
     listeningMotionGroup: process.env.VUE_APP_LIVE2D_LISTENING_MOTION || 'Idle',
     speakingMotionGroup: process.env.VUE_APP_LIVE2D_SPEAKING_MOTION || 'Idle',
     tapMotionGroup: process.env.VUE_APP_LIVE2D_TAP_MOTION || 'Idle',
-    attribution: 'Live2D demo model: Haru (Live2D Free Material License).',
+    attribution: 'Live2D model provider: Haru (Live2D Free Material License).',
   },
   video: {
     idleSrc: process.env.VUE_APP_DIGITAL_HUMAN_VIDEO_IDLE || '',
