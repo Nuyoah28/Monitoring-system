@@ -4,7 +4,7 @@ set -euo pipefail
 
 PRIMARY_SSID="iqoo"
 PRIMARY_PASSWORD="12345678"
-SECONDARY_SSID=$'\u65af\u662f\u964b\u5ba4 \u4e3a\u543e\u5fb7\u99a8'
+SECONDARY_SSID=$'\u65af\u662f\u964b\u5ba4 \u60df\u543e\u5fb7\u99a8'
 SECONDARY_PASSWORD="fxbfbxjyczbw327"
 
 PRIMARY_CONN_NAME="wifi-iqoo"
