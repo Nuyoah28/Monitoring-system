@@ -33,7 +33,7 @@
             <div class="alarm-list-head">
               <div>
                 <h3>报警处置队列</h3>
-                <p>未处理与高等级报警优先</p>
+                <p>未处理与高风险报警优先</p>
               </div>
               <span class="queue-count">{{ filteredAlarmRows.length }} 条</span>
             </div>
@@ -93,7 +93,7 @@
               <div class="panel-headline small overview-head">
                 <div>
                   <h3>当前风险态势</h3>
-                  <p>未处理、高等级和重点类型汇总</p>
+                  <p>未处理、高风险和重点类型汇总</p>
                 </div>
                 <span class="alarm-situation-pill">{{ alarmSituationStatus }}</span>
               </div>
@@ -244,7 +244,7 @@
           <article class="card analysis-type-card">
             <div class="panel-headline small">
               <h3>报警类型分布</h3>
-              <span class="analysis-sub-label">全部类型 / 占比 / 高等级</span>
+              <span class="analysis-sub-label">全部类型 / 占比 / 高风险</span>
             </div>
             <div class="analysis-type-stage">
               <div class="analysis-donut-wrap" @mouseleave="activeAnalysisTypeIndex = null">
@@ -808,7 +808,7 @@
                 <div class="summary-kpi"><span>总数</span><strong>{{ selectedSummaryView.total }}</strong></div>
                 <div class="summary-kpi"><span>已处理</span><strong>{{ selectedSummaryView.handled }}</strong></div>
                 <div class="summary-kpi"><span>未处理</span><strong>{{ selectedSummaryView.pending }}</strong></div>
-                <div class="summary-kpi"><span>高等级</span><strong>{{ selectedSummaryView.highLevel }}</strong></div>
+                <div class="summary-kpi"><span>高</span><strong>{{ selectedSummaryView.highLevel }}</strong></div>
               </div>
 
               <p class="summary-overview">{{ selectedSummaryView.overview }}</p>
@@ -1245,6 +1245,8 @@ const formatAlarmListTime = (item: any): string => {
   return `${parts.year}-${parts.month}-${parts.day}`
 }
 
+const isVisibleAlarmType = (item: any): boolean => ![6, 9, 13].includes(Number(item?.caseType))
+
 const isAlarmPending = (item: any): boolean => {
   const dealText = String(item?.deal || item?.statusText || '')
   const hasDoneText = dealText.includes('已') || dealText.includes('完成')
@@ -1258,7 +1260,7 @@ const syncRecentEvents = (rawList: any[]): void => {
   const seenIds = new Set<string>()
 
   const normalized = rawList
-    .filter(item => item && item.caseType !== 13 && isAlarmPending(item))
+    .filter(item => item && isVisibleAlarmType(item) && isAlarmPending(item))
     .map((item, idx) => {
       const timestamp = parseAlarmTimestamp(item)
       const fallbackId = `${item?.eventName || '事件'}-${timestamp}-${idx}`
@@ -1305,8 +1307,9 @@ const fetchAlarmList = async () => {
     })
     console.log('报警API返回:', data)
     const list = data?.data?.alarmList || data?.data?.list || []
+    const visibleList = Array.isArray(list) ? list.filter(isVisibleAlarmType) : []
     if (Array.isArray(list)) {
-      alarmStore.setAlarmList(list)
+      alarmStore.setAlarmList(visibleList)
       alarmStore.updateStatisticsFromAlarms()
     } else {
       alarmStore.setAlarmList([])
@@ -1457,14 +1460,14 @@ const fetchRecentEventStream = async (): Promise<void> => {
     })
     const list = data?.data?.alarmList || data?.data?.list || []
     if (Array.isArray(list)) {
-      syncRecentEvents(list)
+      syncRecentEvents(list.filter(isVisibleAlarmType))
       recentEventInitialized.value = true
     }
   } catch (e) {
     if (!recentEventInitialized.value) {
       const fallbackList = alarmStore.getAlarmList || []
       if (Array.isArray(fallbackList)) {
-        syncRecentEvents(fallbackList)
+        syncRecentEvents(fallbackList.filter(isVisibleAlarmType))
         recentEventInitialized.value = true
       }
     }
@@ -2112,7 +2115,7 @@ const analysisTimeConicStyle = computed(() => {
 const analysisKpis = computed(() => [
   { name: '样本总量', value: analysisAlarmRows.value.length, desc: analysisRangeLabel.value, tone: 'info' },
   { name: '环比变化', value: analysisDeltaText.value, desc: '较上一周期', tone: analysisDeltaTone.value },
-  { name: '高等级占比', value: `${analysisHighRatio.value}%`, desc: `${analysisHighCount.value} 条高等级`, tone: analysisHighRatio.value >= 50 ? 'warn' : 'ok' },
+  { name: '高风险占比', value: `${analysisHighRatio.value}%`, desc: `${analysisHighCount.value} 条高风险`, tone: analysisHighRatio.value >= 50 ? 'warn' : 'ok' },
   { name: '覆盖区域', value: analysisAreaCoverage.value, desc: '涉及报警区域', tone: 'area' },
   { name: '重复点位', value: analysisRepeatPointData.value.length, desc: '多次触发区域', tone: analysisRepeatPointData.value.length ? 'danger' : 'ok' },
 ])
@@ -2124,7 +2127,7 @@ const analysisSummary = computed(() => {
     return `${analysisRangeLabel.value}报警主要集中在 ${topAnalysisArea.value}，重复触发点位 ${analysisRepeatPointData.value.length} 个，高频类型为 ${topAnalysisType.value}，高发时段为 ${peakBucket?.label || '暂无'}。`
   }
   if (analysisHighRatio.value >= 40) {
-    return `${analysisRangeLabel.value}高等级报警占比 ${analysisHighRatio.value}%，建议复盘 ${topAnalysisType.value} 的触发条件和现场处置流程。`
+    return `${analysisRangeLabel.value}高风险报警占比 ${analysisHighRatio.value}%，建议复盘 ${topAnalysisType.value} 的触发条件和现场处置流程。`
   }
   return `${analysisRangeLabel.value}报警分布相对分散，可重点观察 ${topAnalysisArea.value} 与 ${topAnalysisType.value} 是否继续上升。`
 })
@@ -2140,9 +2143,9 @@ const alarmCompletionRate = computed(() => {
 const alarmSeverityStats = computed(() => {
   const list = alarmStore.getAlarmList || []
   const groups = [
-    { label: '高等级', check: (n: number) => n >= 3 },
-    { label: '中等级', check: (n: number) => n === 2 },
-    { label: '低等级', check: (n: number) => n <= 1 },
+    { label: '高', check: (n: number) => n >= 3 },
+    { label: '中', check: (n: number) => n === 2 },
+    { label: '低', check: (n: number) => n <= 1 },
   ]
   const max = Math.max(list.length, 1)
   return groups.map(group => {
@@ -2193,7 +2196,7 @@ const selectedAlarmHint = computed(() => {
   const alarm = selectedAlarmView.value
   if (alarm.eventName === '暂无报警') return '当前无可处置报警，系统处于观察状态。'
   if (!selectedAlarmIsPending.value) return '该报警已完成处理，可继续复核其他未处理事项。'
-  if (Number(alarm.level || 1) >= 3) return '高等级未处理报警，建议立即查看报警视频片段并形成处置闭环。'
+  if (Number(alarm.level || 1) >= 3) return '高风险未处理报警，建议立即查看报警视频片段并形成处置闭环。'
   return '建议先查看报警视频片段，再根据现场情况完成处理记录。'
 })
 
@@ -2237,7 +2240,7 @@ const topAlarmArea = computed(() => {
 
 const alarmCommandKpis = computed(() => [
   { name: '未处理', value: pendingAlarmCount.value, tone: 'danger' },
-  { name: '高等级', value: highPendingAlarmCount.value, tone: 'warn' },
+  { name: '高', value: highPendingAlarmCount.value, tone: 'warn' },
   { name: '今日新增', value: todayAlarmCount.value, tone: 'info' },
   { name: '处理率', value: `${alarmCompletionRate.value}%`, tone: 'ok' },
   { name: '重点区域', value: topAlarmArea.value, tone: 'area' },
@@ -2323,7 +2326,7 @@ const alarmSituationStatus = computed(() => {
 })
 
 const alarmSituationTitle = computed(() => {
-  if (highPendingAlarmCount.value > 0) return `${highPendingAlarmCount.value} 条高等级未处理报警`
+  if (highPendingAlarmCount.value > 0) return `${highPendingAlarmCount.value} 条高风险未处理报警`
   if (pendingAlarmCount.value > 0) return `${pendingAlarmCount.value} 条未处理报警`
   if (todayAlarmCount.value > 0) return `今日新增 ${todayAlarmCount.value} 条报警`
   return '当前暂无未处理报警'
@@ -2341,11 +2344,11 @@ const alarmSituationDesc = computed(() => {
 })
 
 const alarmSuggestions = computed(() => {
-  const high = alarmSeverityStats.value.find(item => item.label === '高等级')?.count || 0
+  const high = alarmSeverityStats.value.find(item => item.label === '高')?.count || 0
   const pending = filteredAlarmRows.value.filter(item => !item.deal.includes('已')).length
   const topArea = filteredAlarmRows.value[0]?.department || '重点区域'
   const result: string[] = []
-  if (high > 0) result.push(`当前有 ${high} 条高等级报警，建议优先复核并完成闭环。`)
+  if (high > 0) result.push(`当前有 ${high} 条高风险报警，建议优先复核并完成闭环。`)
   if (pending > 0) result.push(`仍有 ${pending} 条未处理报警，建议按时间顺序分批处置。`)
   result.push(`今日重点关注 ${topArea}，建议联动该区域视频进行二次确认。`)
   return result
@@ -3249,8 +3252,8 @@ const buildSummary = (label: string, days: number): AgentSummary => {
   if (!total) {
     suggestions.push(`${label}暂无报警，建议持续巡检。`)
   } else {
-    if (pending > handled) suggestions.push('未处理报警偏多，建议优先处置高等级与积压事件。')
-    if (highLevel > 0) suggestions.push(`存在 ${highLevel} 条高等级报警，请安排人工复核。`)
+    if (pending > handled) suggestions.push('未处理报警偏多，建议优先处置高风险与积压事件。')
+    if (highLevel > 0) suggestions.push(`存在 ${highLevel} 条高风险报警，请安排人工复核。`)
     suggestions.push(`高发类型为“${topType}”，重点区域集中在 ${topArea}。`)
   }
 

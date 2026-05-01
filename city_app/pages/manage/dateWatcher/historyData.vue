@@ -36,7 +36,7 @@
             <view class="card">
                 <view class="card-header">
                     <view class="decorator"></view>
-                    <text class="card-title">各类报警数量排行 (雷达图)</text>
+                    <text class="card-title">报警类型分布 (雷达图)</text>
                 </view>
                 <view class="chart-box">
                     <bar-chart :range="currentFilterValue"></bar-chart>

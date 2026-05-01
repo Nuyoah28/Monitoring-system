@@ -13,6 +13,13 @@
           <text class="dt-month">{{ currentMonth }}月</text>
           <text class="dt-label">汇总</text>
         </view>
+        <view
+          v-if="!dayTabs.length"
+          class="date-tab date-tab--empty"
+        >
+          <text class="dt-day">暂无</text>
+          <text class="dt-week">日期</text>
+        </view>
         <!-- 每日 -->
         <view
           v-for="d in dayTabs"
@@ -21,7 +28,7 @@
           :class="{ 'is-active': selectedDate === d.date }"
           @tap="selectDate(d.date)"
         >
-          <text class="dt-day">{{ d.mmdd }}</text>
+          <text class="dt-day">{{ d.label }}</text>
           <text class="dt-week">{{ d.week }}</text>
         </view>
       </view>
@@ -42,17 +49,17 @@
         <view class="count-item">
           <view class="count-dot dot-urgent"></view>
           <text class="count-num count-num--urgent">{{ stats.urgent }}</text>
-          <text class="count-label">紧急</text>
+          <text class="count-label">高等级</text>
         </view>
         <view class="count-item">
           <view class="count-dot dot-serious"></view>
           <text class="count-num count-num--serious">{{ stats.serious }}</text>
-          <text class="count-label">严重</text>
+          <text class="count-label">中等级</text>
         </view>
         <view class="count-item">
           <view class="count-dot dot-normal"></view>
           <text class="count-num count-num--normal">{{ stats.normal }}</text>
-          <text class="count-label">一般</text>
+          <text class="count-label">低等级</text>
         </view>
       </view>
     </view>
@@ -104,7 +111,7 @@
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
               </svg>
             </view>
-            <text class="rate-lbl">紧急</text>
+            <text class="rate-lbl">高等级</text>
             <text class="rate-val">{{ rates.urgent }}%</text>
           </view>
           <view class="rate-line">
@@ -114,7 +121,7 @@
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
             </view>
-            <text class="rate-lbl">严重</text>
+            <text class="rate-lbl">中等级</text>
             <text class="rate-val">{{ rates.serious }}%</text>
           </view>
           <view class="rate-line">
@@ -124,7 +131,7 @@
                 <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
               </svg>
             </view>
-            <text class="rate-lbl">一般</text>
+            <text class="rate-lbl">低等级</text>
             <text class="rate-val">{{ rates.normal }}%</text>
           </view>
         </view>
@@ -178,10 +185,12 @@ export default {
   data() {
     return {
       selectedDate: "month",
-      currentMonth: new Date().getMonth() + 1,
+      currentMonth: this.month,
       monthTotal: { total: 0, todayNew: 0, dayChange: 0 },
       monthCaseList: [],
+      monthAlarms: [],
       dayAlarms: [],
+      allAlarms: [],
     };
   },
   watch: {
@@ -196,7 +205,8 @@ export default {
       const daysInMonth = new Date(year, month, 0).getDate();
       const now = new Date();
       const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1);
-      const maxDay = isCurrentMonth ? now.getDate() : daysInMonth;
+      const isFutureMonth = year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1);
+      const maxDay = isFutureMonth ? 0 : (isCurrentMonth ? now.getDate() : daysInMonth);
       const tabs = [];
       const weeks = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
       for (let d = 1; d <= maxDay; d++) {
@@ -205,6 +215,7 @@ export default {
         const dd = String(d).padStart(2, "0");
         tabs.push({
           date: `${year}-${mm}-${dd}`,
+          label: `${month}月${d}日`,
           mmdd: `${mm}.${dd}`,
           week: weeks[date.getDay()],
         });
@@ -214,84 +225,36 @@ export default {
 
     // ── 统计数字 ──
     stats() {
-      if (this.selectedDate === "month") {
-        // 月汇总：尝试多种字段名，如果都取不到，则从分类列表累加
-        const m = this.monthTotal || {};
-        let urgent = m.urgentCount || m.urgentTotal || m.level1Count || m.alarmLevel1Count || 0;
-        let serious = m.seriousCount || m.seriousTotal || m.level2Count || m.alarmLevel2Count || 0;
-        let normal = m.normalCount || m.normalTotal || m.level3Count || m.alarmLevel3Count || 0;
-
-        // 如果分项全是 0 但总数不为 0，说明后端没直接给分项聚合，尝试根据名称映射等级进行统计
-        if (urgent === 0 && serious === 0 && normal === 0 && (m.total || 0) > 0) {
-          // 建立名称 -> 等级的映射关系（1:紧急, 2:严重, 3:一般）
-          const levelMap = {
-            '火灾': 1, '烟雾': 1, '紧急': 1, '求救': 1, '摔倒': 1, '打架': 1,
-            '电动车': 2, '违停': 2, '明火': 1, '垃圾': 3, '积水': 3, '溢出': 3,
-            '检测': 3, '进入': 2, '危险': 1
-          };
-
-          this.monthCaseList.forEach(item => {
-            const name = item.caseTypeName || "";
-            // 优先用数据里的等级，没有则从映射表找，最后默认一般
-            let lv = Number(item.level || item.warningLevel) || 0;
-            if (!lv) {
-              for (let key in levelMap) {
-                if (name.includes(key)) { lv = levelMap[key]; break; }
-              }
-            }
-            if (!lv) lv = 3;
-
-            const count = Number(item.total || item.count) || 0;
-            if (lv <= 1) urgent += count;
-            else if (lv === 2) serious += count;
-            else normal += count;
-          });
-        }
-
-        return {
-          total: m.total || 0,
-          urgent: urgent,
-          serious: serious,
-          normal: normal,
-        };
-      }
-      // 按日：从 dayAlarms 统计
+      const source = this.selectedDate === "month" ? this.monthAlarms : this.dayAlarms;
       let urgent = 0, serious = 0, normal = 0;
-      this.dayAlarms.forEach(item => {
-        const lv = Number(item.level) || 3;
-        if (lv <= 1) urgent++;
+      source.forEach(item => {
+        const lv = Number(item.level || item.warningLevel) || 1;
+        if (lv >= 3) urgent++;
         else if (lv === 2) serious++;
         else normal++;
       });
-      return { total: this.dayAlarms.length, urgent, serious, normal };
+      return { total: source.length, urgent, serious, normal };
     },
 
     // ── 各等级处理率 ──
     rates() {
       if (this.selectedDate === "month") {
-        // 月汇总处理率：如果 monthCaseList 里有已处理数，则计算真实的，否则显示基于总计的加权
-        let u_tot = 0, u_done = 0, s_tot = 0, s_done = 0, n_tot = 0, n_done = 0;
-        this.monthCaseList.forEach(item => {
-          const lv = Number(item.level || item.warningLevel) || 3;
-          const tot = Number(item.total || item.count) || 0;
-          const done = Number(item.processedCount || item.handledTotal || 0); // 尝试探测处理字段
-          if (lv <= 1) { u_tot += tot; u_done += done; }
-          else if (lv === 2) { s_tot += tot; s_done += done; }
-          else { n_tot += tot; n_done += done; }
-        });
-
-        const calc = (done, tot, fallback) => tot > 0 ? Math.round((done / tot) * 100) : fallback;
-        
-        // 如果后端没返回处理字段，则暂时保留那个备用 fallback，但此时统计数值已经准了
+        const source = this.monthAlarms;
+        const doneCount = source.filter(item => Number(item.status) === 1).length;
+        const calc = (group) => {
+          const list = source.filter(group);
+          if (!list.length) return 0;
+          const done = list.filter(item => Number(item.status) === 1).length;
+          return Math.round((done / list.length) * 100);
+        };
         return {
-          overall: (u_tot + s_tot + n_tot) > 0 ? Math.round(((u_done + s_done + n_done) / (u_tot + s_tot + n_tot)) * 100) || 76 : 76,
-          urgent: calc(u_done, u_tot, 96),
-          serious: calc(s_done, s_tot, 76),
-          normal: calc(n_done, n_tot, 48),
+          overall: source.length ? Math.round((doneCount / source.length) * 100) : 0,
+          urgent: calc(item => Number(item.level || item.warningLevel) >= 3),
+          serious: calc(item => Number(item.level || item.warningLevel) === 2),
+          normal: calc(item => Number(item.level || item.warningLevel) <= 1),
         };
       }
 
-      // 按日：从 dayAlarms 实时计算
       const alarms = this.dayAlarms;
       const calc = (filterFn) => {
         const group = alarms.filter(filterFn);
@@ -301,9 +264,9 @@ export default {
       };
       return {
         overall: alarms.length ? Math.round((alarms.filter(i => Number(i.status) === 1).length / alarms.length) * 100) : 0,
-        urgent: calc(i => Number(i.level) <= 1),
-        serious: calc(i => Number(i.level) === 2),
-        normal: calc(i => Number(i.level) >= 3),
+        urgent: calc(i => Number(i.level || i.warningLevel) >= 3),
+        serious: calc(i => Number(i.level || i.warningLevel) === 2),
+        normal: calc(i => Number(i.level || i.warningLevel) <= 1),
       };
     },
 
@@ -318,10 +281,12 @@ export default {
     topTypes() {
       let list = [];
       if (this.selectedDate === "month") {
-        list = this.monthCaseList.map(i => ({
-          name: i.caseTypeName,
-          count: i.total || 0,
-        }));
+        const map = {};
+        this.monthAlarms.forEach(item => {
+          const name = item.eventName || item.name || item.caseTypeName || "未知";
+          map[name] = (map[name] || 0) + 1;
+        });
+        list = Object.entries(map).map(([name, count]) => ({ name, count }));
       } else {
         // 按日：从 dayAlarms 中聚合 eventName
         const map = {};
@@ -337,9 +302,88 @@ export default {
     },
   },
   methods: {
+    async fetchAlarmList(time1 = null, time2 = null) {
+      const { data } = await uni.$http.get("/api/v1/alarm/query", {
+        pageNum: 1,
+        pageSize: 5000,
+        time1,
+        time2,
+      });
+      if (data?.code === "D0400") {
+        uni.showToast({ title: "登录失效，请重新登录！", icon: "none" });
+        uni.removeStorageSync("token");
+        uni.removeStorageSync("userId");
+        uni.removeStorageSync("appType");
+        uni.reLaunch({ url: "/pages/shared/select/index" });
+        return [];
+      }
+      const list = (data?.data?.alarmList || []).filter(item => ![6, 9, 13].includes(Number(item.caseType)));
+      if (!time1 || !time2) return list;
+      const startDate = String(time1).slice(0, 10);
+      const endDate = String(time2).slice(0, 10);
+      return list.filter(item => {
+        const raw = item.createTime || item.date || item.time;
+        const day = raw ? String(raw).slice(0, 10) : '';
+        return day >= startDate && day <= endDate;
+      });
+    },
+
+    isSameMonth(item) {
+      const raw = item.createTime || item.date || item.time;
+      if (!raw) return false;
+      const alarmDate = new Date(String(raw).replace(/-/g, "/"));
+      return !Number.isNaN(alarmDate.getTime()) &&
+        alarmDate.getFullYear() === this.year &&
+        alarmDate.getMonth() + 1 === this.month;
+    },
+
+    isSameDay(item, dateStr) {
+      const raw = item.createTime || item.date || item.time;
+      return raw ? String(raw).slice(0, 10) === dateStr : false;
+    },
+
+    buildVisibleMonthRange() {
+      const now = new Date();
+      const isFutureMonth = this.year > now.getFullYear() || (this.year === now.getFullYear() && this.month > now.getMonth() + 1);
+      if (isFutureMonth) return null;
+      const monthEndDate = new Date(this.year, this.month, 0).getDate();
+      const isCurrentMonth = this.year === now.getFullYear() && this.month === now.getMonth() + 1;
+      const endDay = isCurrentMonth ? Math.min(now.getDate(), monthEndDate) : monthEndDate;
+      const mm = String(this.month).padStart(2, "0");
+      return {
+        start: `${this.year}-${mm}-01 00:00:00`,
+        end: `${this.year}-${mm}-${String(endDay).padStart(2, "0")} 23:59:59`,
+      };
+    },
+
+    async refreshAlarms() {
+      const visibleRange = this.buildVisibleMonthRange();
+      if (!visibleRange) {
+        this.allAlarms = [];
+        this.monthAlarms = [];
+        this.dayAlarms = [];
+        return;
+      }
+      const list = await this.fetchAlarmList(visibleRange.start, visibleRange.end);
+      this.allAlarms = list;
+      this.monthAlarms = list.filter(item => this.isSameMonth(item));
+      if (this.selectedDate !== "month") {
+        this.dayAlarms = list.filter(item => this.isSameDay(item, this.selectedDate));
+      }
+    },
+
     // 月汇总接口
     async fetchMonthTotal() {
       try {
+        const visibleRange = this.buildVisibleMonthRange();
+        if (!visibleRange) {
+          this.monthTotal = { total: 0, todayNew: 0, dayChange: 0 };
+          this.monthCaseList = [];
+          this.allAlarms = [];
+          this.monthAlarms = [];
+          this.dayAlarms = [];
+          return;
+        }
         const res = await uni.$http.get("/api/v1/alarm/realtime");
         if (res.data.code === "D0400") {
           uni.showToast({ title: "登录失效，请重新登录！", icon: "none" });
@@ -353,25 +397,20 @@ export default {
           this.monthTotal = res.data.data.alarmTotal || {};
           this.monthCaseList = res.data.data.alarmCaseTypeTotalList || [];
         }
+        await this.refreshAlarms();
       } catch (e) { console.error(e); }
     },
-
-    // 按日查询接口（前端统计等级 / 处理率 / 类型分布）
     async fetchDayAlarms(dateStr) {
       try {
-        const { data } = await uni.$http.get("/api/v1/alarm/query", {
-          pageNum: 1,
-          pageSize: 500,
-          startTime: `${dateStr} 00:00:00`,
-          endTime:   `${dateStr} 23:59:59`,
-        });
-        this.dayAlarms = (data?.data?.alarmList) || [];
+        const list = await this.fetchAlarmList(`${dateStr} 00:00:00`, `${dateStr} 23:59:59`);
+        this.dayAlarms = list.filter(item => this.isSameDay(item, dateStr));
       } catch (e) { console.error(e); }
     },
 
     // 月份切换时重置
     onMonthChange() {
       this.selectedDate = "month";
+      this.currentMonth = this.month;
       this.dayAlarms = [];
       this.fetchMonthTotal();
     },
@@ -440,6 +479,10 @@ export default {
 
 .date-tab--month {
   min-width: 110rpx;
+}
+
+.date-tab--empty {
+  opacity: 0.65;
 }
 
 .dt-month {

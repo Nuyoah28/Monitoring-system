@@ -12,111 +12,57 @@ SQL 脚本统一放在 [sql](./sql) 目录下。使用前先确认：
 
 ## 推荐执行方式
 
-不要在 Windows PowerShell 里使用：
-
-```powershell
-Get-Content .\backend\sql\quick_create.sql | mysql -u root -p Sweatpear
-```
+不要在 Windows PowerShell 里使用 `Get-Content ... | mysql` 执行包含中文的 SQL 文件。
 
 原因是 `Get-Content` 会先把 SQL 文件读成 PowerShell 字符串，再通过管道发送给 `mysql`，中文内容很容易在这个过程中被转成乱码或 `?`，最终导致语法错误。
 
-
-先进入 MySQL：
+建议使用 Navicat 查询窗口直接打开并执行 SQL，或先进入 MySQL：
 
 ```bash
 mysql --default-character-set=utf8mb4 -u root -p
 ```
 
-然后执行：
-
-```sql
-CREATE DATABASE IF NOT EXISTS Sweatpear DEFAULT CHARSET utf8mb4;
-USE Sweatpear;
-SOURCE sql/quick_create.sql;
-SOURCE sql/iot_env_parking.sql;
-SOURCE sql/env_weather_flow.sql;
-SOURCE sql/migrate_nearby_push.sql;
-```
-
-
 ## 各脚本用途
 
-### 1. `quick_create.sql`
+### 1. `final_schema.sql`
 
-适合“快速初始化整库”。
-它是一个较完整的数据库导出脚本，包含建表和大量初始数据。
+唯一完整建库脚本，适合新环境初始化。
 
-适用场景：
+包含：
 
-- 本地第一次搭环境
-- 需要快速拿到一套可运行的测试数据库
+- 主业务表结构
+- 告警类型、默认等级和启用状态
+- IoT 环境、车位、天气、推送相关表
+- 基础演示数据
 
 注意：
 
 - 脚本里包含 `DROP TABLE`
-- 脚本里自带 `USE Sweatpear;`
-- 执行前先确认数据库名是否与你当前环境一致
+- 脚本里自带 `CREATE DATABASE` 和 `USE SweatPear`
+- 已有数据库不要直接执行这个文件
 
-### 2. `table.sql`
+### 2. `migrate_case_type_warning_level.sql`
 
-适合“只创建基础表结构”。
-如果你只想先把主业务表建出来，不立即导入整套演示数据，可以优先执行它。
+适合已有数据库升级到“告警等级由 `case_type_info` 配置”的版本。
 
-适用场景：
+主要用于：
 
-- 新库建表
-- 需要自己控制初始化数据
+- 给 `case_type_info` 增加 `warning_level`、`enabled`
+- 写入 12 类告警类型的默认等级
+- 将吸烟、冰面设为隐藏/停用
+- 同步历史 `alarm_info.warning_level`
 
-### 3. `insert_data.sql`
-
-适合“补充演示/测试数据”。
-会向部分表插入示例数据，便于联调。
-
-注意：
-
-- 里面有些表会先 `DELETE` 再 `INSERT`
-- 不建议直接在生产库执行
-
-### 4. `migrate_nearby_push.sql`
+### 3. `migrate_nearby_push.sql`
 
 这是“邻近居民告警推送”相关的增量迁移脚本。
-主要用于补充：
 
-- `user_info` 新字段
-- `system_message` 接收人字段
-- `alarm_push_record` 推送记录表
+### 4. `iot_env_parking.sql`
 
-适用场景：
+这是 IoT 环境与车位数据相关表的建表脚本，历史环境可按需参考；新环境已合并进 `final_schema.sql`。
 
-- 老库升级到支持附近居民推送的版本
+### 5. `env_weather_flow.sql`
 
-### 5. `iot_env_parking.sql`
-
-这是 IoT 环境与车位数据相关表的建表脚本，主要新增：
-
-- `environment_sensor_record`
-- `parking_area_status`
-- `parking_area_record`
-
-适用场景：
-
-- 接入环境传感器数据
-- 接入车位状态和车位历史数据
-
-### 6. `env_weather_flow.sql`
-
-这是环境与天气流程的增量脚本，主要补充：
-
-- `environment_sensor_record` 的可燃气体字段
-- `weather_region_config`
-- `weather_info`
-
-同时包含对老表的 `ALTER TABLE` 兼容处理。
-
-适用场景：
-
-- 已有环境表，需要继续接入天气能力
-- 老库升级到“环境 + 天气”新流程
+这是环境与天气流程的增量脚本，历史环境可按需参考；新环境已合并进 `final_schema.sql`。
 
 ## 服务器部署补充
 

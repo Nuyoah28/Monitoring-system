@@ -23,12 +23,12 @@ VIDEO_CACHE_SIZE = 50
 #   [2]     3      区域停留          暂未实现
 #   [3]     4      摔倒              ST-GCN++ 动作识别
 #   [4]     5      明火              Mamba-YOLO (class_id=0, fire)
-#   [5]     6      吸烟              暂未实现
+#   [5]     6      吸烟              已停用
 #   [6]     7      打架              ST-GCN++ 动作识别
 #   [7]     8      垃圾乱放          Mamba-YOLO (extra_prompt)
-#   [8]     9      冰面              Mamba-YOLO (extra_prompt)
+#   [8]     9      冰面              已停用（Mamba 权重未针对冰面微调）
 #   [9]    10      电动车进楼         Mamba-YOLO (extra_prompt)
-#  [10]    11      载具占用车道       Mamba-YOLO (extra_prompt)
+#  [10]    11      载具占用车道       暂交由后续算法实现
 #  [11]    12      挥手呼救          ST-GCN++ 动作识别
 # -----------------------------------------------------------------------
 TYPE_LIST = [False, False, False, True, False, False, True, False, False, False, False, True]
@@ -51,10 +51,11 @@ preList = [None, None, None]
 # 这个列表会在 Flask 进程里修改，在 video stream 进程里被读取。
 # -----------------------------------------------------------------------
 CUSTOM_DETECTION_PROMPTS = [
-    "garbage on ground",
-    "ice on road",
-    "electric scooter",
-    "vehicle on sidewalk",
+    "overflow",
+    "garbage",
+    "garbage bin",
+    "bicycle",
+    "motorcycle",
 ]
 
 # 标志位：提示词是否发生更改

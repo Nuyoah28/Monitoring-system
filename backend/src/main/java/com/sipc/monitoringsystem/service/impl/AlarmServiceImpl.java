@@ -8,6 +8,7 @@ import com.sipc.monitoringsystem.model.dto.res.Alarm.GetHistoryCntRes;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.GetTypeAreaHeatRes;
 import com.sipc.monitoringsystem.model.dto.res.Alarm.RealTimeAlarmRes;
 import com.sipc.monitoringsystem.model.po.Alarm.AlarmTypeAreaCount;
+import com.sipc.monitoringsystem.model.po.Alarm.CaseTypeInfo;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
 import com.sipc.monitoringsystem.model.po.Alarm.Alarm;
 import com.sipc.monitoringsystem.model.po.Alarm.TimePeriod;
@@ -57,11 +58,17 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
             return this.baseMapper.SqlGetAlarm(existedAlarm.getId());
         }
 
+        CaseTypeInfo caseTypeInfo = this.baseMapper.selectCaseTypeInfoById(caseType);
+        if (caseTypeInfo == null) {
+            log.info("skip disabled or unknown alarm caseType: {}", caseType);
+            return null;
+        }
+
         Alarm alarm = new Alarm();
         alarm.setClipLink(clipLink);
         alarm.setCaseType(caseType);
         alarm.setMonitorId(cameraID);
-        alarm.setWarningLevel(1);
+        alarm.setWarningLevel(caseTypeInfo.getWarningLevel());
         alarm.setStatus(false);
         Timestamp occurredTime = parseOccurredAt(occurredAt);
         if (occurredTime != null) {
@@ -96,6 +103,9 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
     @Override
     public SqlGetAlarm getAlarm(Integer alarmId) {
         SqlGetAlarm sqlGetAlarm = this.baseMapper.SqlGetAlarm(alarmId);
+        if (sqlGetAlarm == null) {
+            return null;
+        }
         sqlGetAlarm.setClipLink(ossUtil.getClipLinkByUuid(sqlGetAlarm.getClipLink()));
         return sqlGetAlarm;
     }

@@ -20,7 +20,7 @@
             :class="{ active: choosen === 2 }"
             @click="chooseTwo()"
           >
-            <text class="tab-text">历史数据</text>
+            <text class="tab-text">趋势分析</text>
             <view class="indicator" v-if="choosen === 2"></view>
           </view>
         </view>

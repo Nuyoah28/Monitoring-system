@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="SqlDialectMappings">
-    <file url="file://$PROJECT_DIR$/sql/quick_create.sql" dialect="MySQL" />
-    <file url="file://$PROJECT_DIR$/sql/table.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/sql/final_schema.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/sql/migrate_case_type_warning_level.sql" dialect="MySQL" />
   </component>
 </project>

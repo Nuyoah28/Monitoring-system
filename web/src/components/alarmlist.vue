@@ -46,7 +46,7 @@ const { getAlarmList } = storeToRefs(alarmStore);
 
 const dialogVisible1 = ref<boolean>(false);
 const item = ref<any>(null);
-const alarmlist = computed(() => getAlarmList.value);
+const alarmlist = computed(() => getAlarmList.value.filter((item: any) => ![6, 9, 13].includes(Number(item?.caseType))));
 
 // 备用报警数据
 const mockAlarms = ref([
@@ -239,7 +239,7 @@ const fetchAlarmList = (): void => {
     .get('/alarm/query', { params: data })
     .then((response: any) => {
       const res = response.data
-      const newAlarmList = res?.data?.alarmList || res?.data?.list || []
+      const newAlarmList = (res?.data?.alarmList || res?.data?.list || []).filter((item: any) => ![6, 9, 13].includes(Number(item?.caseType)))
       if (newAlarmList.length > 0) {
         alarmStore.setAlarmList(newAlarmList)
         alarmStore.updateStatisticsFromAlarms()

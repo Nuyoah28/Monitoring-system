@@ -264,7 +264,11 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
                 pass
 
         # ---------------------------------------------------------#
-        #   Mamba-YOLO-World detection (fire/smoke/garbage/ice/ebike/vehicle)
+        #   Mamba-YOLO-World detection
+        #   Conservative prompt order:
+        #   0 fire, 1 smoke, 2 overflow, 3 garbage, 4 garbage bin,
+        #   5 bicycle, 6 motorcycle.
+        #   garbage bin is context only and must not trigger garbage alarm.
         # ---------------------------------------------------------#
         list1 = False   # smoke
         list4 = False   # fire
@@ -275,40 +279,35 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
         idxs1 = np.empty((0,), dtype=np.int32)
         fire_indices = []
         smoke_indices = []
+        overflow_indices = []
         garbage_indices = []
-        ice_indices = []
+        garbage_bin_indices = []
         ebike_indices = []
         vehicle_indices = []
-        if TYPE_LIST[4] or TYPE_LIST[1] or TYPE_LIST[7] or TYPE_LIST[8] or TYPE_LIST[9] or TYPE_LIST[10]:
+        if TYPE_LIST[4] or TYPE_LIST[1] or TYPE_LIST[7] or TYPE_LIST[9] or TYPE_LIST[10]:
             boxes1, scores1, idxs1 = infer1(np_img)
             boxes1  = np.asarray(boxes1,  dtype=np.float32)
             scores1 = np.asarray(scores1, dtype=np.float32)
             idxs1   = np.asarray(idxs1,   dtype=np.int32)
-            fire_indices  = np.where(idxs1 == 0)[0]
-            smoke_indices = np.where(idxs1 == 1)[0]
-            garbage_indices = np.where(idxs1 == 2)[0]
-            ice_indices     = np.where(idxs1 == 3)[0]
-            ebike_indices   = np.where(idxs1 == 4)[0]
-            # vehicle_indices = np.where(idxs1 == 5)[0] # Old naive capture
+            group_label_ids = getattr(infer1, 'business_label_groups', None)
+            if group_label_ids and len(group_label_ids) >= 7:
+                fire_indices = np.where(np.isin(idxs1, group_label_ids[0]))[0]
+                smoke_indices = np.where(np.isin(idxs1, group_label_ids[1]))[0]
+                overflow_indices = np.where(np.isin(idxs1, group_label_ids[2]))[0]
+                garbage_indices = np.where(np.isin(idxs1, group_label_ids[3]))[0]
+                garbage_bin_indices = np.where(np.isin(idxs1, group_label_ids[4]))[0]
+                ebike_indices = np.where(np.isin(idxs1, group_label_ids[5] + group_label_ids[6]))[0]
+            else:
+                fire_indices = np.where(idxs1 == 0)[0]
+                smoke_indices = np.where(idxs1 == 1)[0]
+                overflow_indices = np.where(idxs1 == 2)[0]
+                garbage_indices = np.where(idxs1 == 3)[0]
+                garbage_bin_indices = np.where(idxs1 == 4)[0]
+                ebike_indices = np.where(np.isin(idxs1, [5, 6]))[0]
+            # vehicle detection is intentionally left for a future dedicated algorithm.
 
-            # 【新增】区域级载具过滤：只捕捉“跌入”用户设置的 AREA_LIST 禁区的车辆
-            raw_vehicle_indices = np.where(idxs1 == 5)[0]
-            valid_vehicle_indices = []
-            if len(raw_vehicle_indices) > 0:
-                bound_x_left = AREA_LIST[0][0]
-                bound_x_right = AREA_LIST[1][0]
-                bound_y_up = AREA_LIST[0][1]
-                bound_y_down = AREA_LIST[1][1]
-                
-                # Check each vehicle's center point against the ROI boundaries
-                for v_idx in raw_vehicle_indices:
-                    v_box = boxes1[v_idx]
-                    v_center_x = (v_box[0] + v_box[2]) / 2
-                    v_center_y = (v_box[1] + v_box[3]) / 2
-                    if (bound_x_left < v_center_x < bound_x_right) and (bound_y_up < v_center_y < bound_y_down):
-                        valid_vehicle_indices.append(v_idx)
-            
-            vehicle_indices = np.array(valid_vehicle_indices, dtype=np.int32)
+            # Vehicle/road-occupation detection is intentionally left for a future dedicated algorithm.
+            vehicle_indices = np.empty((0,), dtype=np.int32)
         if len(fire_indices) > 0 and TYPE_LIST[4]:
             list4 = True
         if len(smoke_indices) > 0 and TYPE_LIST[1]:
@@ -318,10 +317,12 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             draw_on_src(np_img, boxes1[fire_indices], idxs1[fire_indices])
         if TYPE_LIST[1]:
             draw_on_src(np_img, boxes1[smoke_indices], idxs1[smoke_indices])
-        if TYPE_LIST[7] and len(garbage_indices) > 0:
-            draw_on_src(np_img, boxes1[garbage_indices], idxs1[garbage_indices])
-        if TYPE_LIST[8] and len(ice_indices) > 0:
-            draw_on_src(np_img, boxes1[ice_indices], idxs1[ice_indices])
+        if TYPE_LIST[7] and (len(overflow_indices) > 0 or len(garbage_indices) > 0):
+            garbage_alarm_indices = np.concatenate((overflow_indices, garbage_indices)).astype(np.int32)
+            draw_on_src(np_img, boxes1[garbage_alarm_indices], idxs1[garbage_alarm_indices])
+        # garbage bin is context only: draw it for visibility, but do not trigger RES_LIST[7].
+        if TYPE_LIST[7] and len(garbage_bin_indices) > 0:
+            draw_on_src(np_img, boxes1[garbage_bin_indices], idxs1[garbage_bin_indices])
         if TYPE_LIST[9] and len(ebike_indices) > 0:
             draw_on_src(np_img, boxes1[ebike_indices], idxs1[ebike_indices])
         if TYPE_LIST[10] and len(vehicle_indices) > 0:
@@ -329,11 +330,17 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             
         # ========================================================
         # 【新增逻辑】：让前端动态传进来的自定义词汇也能被画上红框
-        # 在 idxs1 中，0-5 是预设目标，>= 6 都是用户临时加进来的提示词
+        # 固定业务目标顺序为 fire/smoke/overflow/garbage/garbage bin/bicycle/motorcycle，
+        # 临时 prompt 的起始 label 从前 7 个业务组之后开始。
         # ========================================================
-        custom_indices = np.where(idxs1 >= 6)[0]
+        group_label_ids = getattr(infer1, 'business_label_groups', None)
+        if group_label_ids and len(group_label_ids) > 7:
+            custom_label_ids = [label_id for group in group_label_ids[7:] for label_id in group]
+            custom_indices = np.where(np.isin(idxs1, custom_label_ids))[0]
+        else:
+            custom_indices = np.where(idxs1 >= 7)[0]
         if len(custom_indices) > 0:
-            # 这些临时加进来的目标我们不管 TYPE_LIST 开关，霸道地强制画出来供人观看效果！
+            # 这些临时加进来的目标我们不管 TYPE_LIST 开关，强制画出来供人观看效果。
             draw_on_src(np_img, boxes1[custom_indices], idxs1[custom_indices])
 
         # Resize output
@@ -348,8 +355,8 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             list4,   # [4]  caseType=5  fire
             False,   # [5]  caseType=6  smoking (not implemented)
             list6,   # [6]  caseType=7  punch/fight (ST-GCN++)
-            bool(len(garbage_indices) > 0 and TYPE_LIST[7]),   # [7]  caseType=8  garbage
-            bool(len(ice_indices) > 0 and TYPE_LIST[8]),       # [8]  caseType=9  ice
+            bool((len(overflow_indices) > 0 or len(garbage_indices) > 0) and TYPE_LIST[7]),   # [7]  caseType=8  garbage; garbage bin is context only
+            False,   # [8]  caseType=9  ice (disabled: Mamba model was not finetuned for ice)
             bool(len(ebike_indices) > 0 and TYPE_LIST[9]),     # [9]  caseType=10 ebike
             bool(len(vehicle_indices) > 0 and TYPE_LIST[10]),  # [10] caseType=11 vehicle
             list11,  # [11] caseType=12 wave (ST-GCN++)

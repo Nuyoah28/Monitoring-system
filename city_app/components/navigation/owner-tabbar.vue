@@ -54,9 +54,9 @@ export default {
   bottom: calc(20rpx + env(safe-area-inset-bottom));
   height: 96rpx;
   border-radius: 48rpx;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(0, 122, 255, 0.12);
-  box-shadow: 0 10rpx 26rpx rgba(24, 72, 143, 0.16);
+  background: #FFFFFF;
+  border: 1rpx solid #E2E8F0;
+  box-shadow: 0 12rpx 30rpx rgba(15, 23, 42, 0.12);
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -76,17 +76,17 @@ export default {
 .tab-icon {
   width: 32rpx;
   height: 32rpx;
-  opacity: 0.58;
+  opacity: 0.5;
 }
 
 .tab-text {
   margin-top: 4rpx;
   font-size: 20rpx;
-  color: #6a7990;
+  color: #94A3B8;
 }
 
 .tab-item.active {
-  background: rgba(0, 122, 255, 0.12);
+  background: #EAF2FF;
 }
 
 .tab-item.active .tab-icon {
@@ -94,7 +94,7 @@ export default {
 }
 
 .tab-item.active .tab-text {
-  color: #007aff;
-  font-weight: 700;
+  color: #2563EB;
+  font-weight: 800;
 }
 </style>

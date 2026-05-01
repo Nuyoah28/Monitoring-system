@@ -1,23 +1,42 @@
 <template>
   <view class="home-page" :style="{ paddingTop: statusBarHeight + 'px' }">
 
-    <!-- ───── Hero ───── -->
-    <view class="hero-card">
-      <view class="hero-left">
-        <view class="hero-title">社区智眼</view>
-        <view class="hero-sub">管理端控制台</view>
-        <view class="hero-switch" @tap="jumpSetting">
-          <image class="hero-switch-icon" src="/static/settings.png" mode="aspectFit"></image>
-          <text>切换身份</text>
-        </view>
+    <view class="top-bar">
+      <view>
+        <view class="eyebrow">管理工作台</view>
+        <view class="page-title">社区智眼</view>
+        <view class="page-sub">{{ operationSummary }}</view>
       </view>
-      <view class="hero-deco">
-        <image class="hero-deco-icon" src="/static/logo.png" mode="aspectFit"></image>
+      <view class="identity-btn" @tap="jumpSetting">
+        <image class="identity-icon" src="/static/settings.png" mode="aspectFit"></image>
+        <text>身份</text>
+      </view>
+    </view>
+
+    <view class="overview-card">
+      <view class="overview-item overview-item--danger" :class="{ 'is-breathing': pendingTotal > 0 }" @tap="goPage('/pages/manage/realtime/realtime?scope=todayPending')">
+        <view class="overview-num">{{ pendingTotal }}</view>
+        <view class="overview-label">今日待处理</view>
+      </view>
+      <view class="overview-item overview-item--warning">
+        <view class="overview-num">{{ levelCount.urgent + levelCount.serious }}</view>
+        <view class="overview-label">重点警情</view>
+      </view>
+      <view class="overview-item overview-item--success" @tap="goPage('/pages/manage/monitor/index')">
+        <view class="overview-num">{{ monitorList.length }}</view>
+        <view class="overview-label">在线监控</view>
       </view>
     </view>
 
     <!-- ───── Quick Grid ───── -->
-    <view class="quick-grid">
+    <view class="section-card action-card">
+      <view class="section-head">
+        <view>
+          <text class="section-title">常用操作</text>
+          <view class="section-subtitle">快速进入高频处理流程</view>
+        </view>
+      </view>
+      <view class="quick-grid">
       <view class="quick-item" @tap="goPage('/pages/manage/statistics/index')">
         <view class="quick-icon quick-icon--red">
           <image class="quick-icon-image" src="/static/chosenTabBar/realtime.png" mode="aspectFit"></image>
@@ -41,6 +60,7 @@
           <image class="quick-icon-image" src="/static/chosenTabBar/chart.png" mode="aspectFit"></image>
         </view>
         <text>环境检测</text>
+      </view>
       </view>
     </view>
 
@@ -66,8 +86,11 @@
     <!-- ───── Alert Card ───── -->
     <view class="section-card alert-card">
       <view class="section-head">
-        <text class="section-title">待处理警情</text>
-        <view class="all-link" @tap="goPage('/pages/manage/realtime/realtime')">全部警情 ›</view>
+        <view>
+          <text class="section-title">待处理警情</text>
+          <view class="section-subtitle">优先处理高等级和中等级事件</view>
+        </view>
+        <view class="all-link" @tap="goPage('/pages/manage/realtime/realtime')">查看全部 ›</view>
       </view>
 
       <!-- Level Tabs -->
@@ -78,7 +101,7 @@
           @tap="activeLevel = 'urgent'"
         >
           <view class="level-tab__inner">
-            <text class="level-tab__label">紧急</text>
+            <text class="level-tab__label">高等级</text>
             <view class="level-tab__badge level-tab__badge--urgent" :class="levelCount.urgent > 0 ? 'is-pulse' : ''">
               {{ levelCount.urgent }}
             </view>
@@ -91,7 +114,7 @@
           @tap="activeLevel = 'serious'"
         >
           <view class="level-tab__inner">
-            <text class="level-tab__label">严重</text>
+            <text class="level-tab__label">中等级</text>
             <view class="level-tab__badge level-tab__badge--serious">{{ levelCount.serious }}</view>
           </view>
           <view class="level-tab__bar level-tab__bar--serious"></view>
@@ -102,7 +125,7 @@
           @tap="activeLevel = 'normal'"
         >
           <view class="level-tab__inner">
-            <text class="level-tab__label">一般</text>
+            <text class="level-tab__label">低等级</text>
             <view class="level-tab__badge level-tab__badge--normal">{{ levelCount.normal }}</view>
           </view>
           <view class="level-tab__bar level-tab__bar--normal"></view>
@@ -152,6 +175,7 @@ export default {
       statusBarHeight: 0,
       monitorList: [],
       alarms: [],
+      todayPendingAlarms: [],
       activeLevel: 'urgent',
       mapPulseTick: 0,
       alarmRefreshTimer: null,
@@ -164,20 +188,27 @@ export default {
     levelCount() {
       const data = { urgent: 0, serious: 0, normal: 0 };
       this.alarms.forEach((item) => {
-        const level = Number(item.level) || 3;
-        if (level <= 1) data.urgent += 1;
+        const level = Number(item.level) || 1;
+        if (level >= 3) data.urgent += 1;
         else if (level === 2) data.serious += 1;
         else data.normal += 1;
       });
       return data;
     },
+    pendingTotal() {
+      return this.todayPendingAlarms.length;
+    },
+    operationSummary() {
+      if (!this.pendingTotal) return '今日暂无待处理警情，社区运行平稳';
+      return `今日有 ${this.pendingTotal} 条待处理警情，请及时跟进`;
+    },
     displayAlerts() {
       return this.alarms
         .filter((item) => {
-          const level = Number(item.level) || 3;
-          if (this.activeLevel === 'urgent') return level <= 1;
+          const level = Number(item.level) || 1;
+          if (this.activeLevel === 'urgent') return level >= 3;
           if (this.activeLevel === 'serious') return level === 2;
-          return level >= 3;
+          return level <= 1;
         })
         .slice(0, 10);
     },
@@ -233,9 +264,12 @@ export default {
         this.pendingRefreshTimer = null;
       }
     },
+    isVisibleAlarm(item) {
+      return ![6, 9, 13].includes(Number(item && item.caseType));
+    },
     handleNewAlarm(payload) {
       const alarm = payload && payload.data ? payload.data : payload;
-      if (alarm && alarm.caseType !== 13) {
+      if (alarm && this.isVisibleAlarm(alarm)) {
         this.prependRealtimeAlarm(alarm);
       }
       this.schedulePendingAlertRefresh(260);
@@ -260,14 +294,21 @@ export default {
         level: alarm.level || alarm.warningLevel || 1,
         eventName: alarm.eventName || alarm.caseTypeName || alarm.message || '新的警情',
         date: alarm.date || this.formatNowTime(),
+        createTime: alarm.createTime || this.formatNowFullTime(),
         status: alarm.status === undefined ? 0 : alarm.status,
       };
-      this.alarms = [normalized, ...this.alarms].filter((item) => item.caseType !== 13).slice(0, 50);
+      this.alarms = [normalized, ...this.alarms].filter(this.isPendingAlarmVisible).slice(0, 50);
+      this.todayPendingAlarms = [normalized, ...this.todayPendingAlarms].filter(this.isTodayPendingAlarm).slice(0, 50);
     },
     formatNowTime() {
       const now = new Date();
       const pad = (num) => String(num).padStart(2, '0');
       return `${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    },
+    formatNowFullTime() {
+      const now = new Date();
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     },
     mergeMonitorPosition(monitorList, monitorPosList) {
       const monitors = Array.isArray(monitorList) ? monitorList : [];
@@ -296,10 +337,32 @@ export default {
       const y = now.getFullYear();
       const m = String(now.getMonth() + 1).padStart(2, "0");
       const d = String(now.getDate()).padStart(2, "0");
+      const date = `${y}-${m}-${d}`;
       return {
-        startTime: `${y}-${m}-${d} 00:00:00`,
-        endTime: `${y}-${m}-${d} 23:59:59`,
+        date,
+        time1: `${date} 00:00:00`,
+        time2: `${date} 23:59:59`,
       };
+    },
+    getAlarmDateText(item) {
+      const raw = item && (item.createTime || item.date || item.time);
+      const text = raw ? String(raw) : '';
+      if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+      return '';
+    },
+    isPendingAlarm(item) {
+      if (!item) return false;
+      const status = Number(item.status);
+      return status === 0 || item.deal === '未处理';
+    },
+    isTodayAlarm(item) {
+      return this.getAlarmDateText(item) === this.buildTodayRange().date;
+    },
+    isPendingAlarmVisible(item) {
+      return this.isVisibleAlarm(item) && this.isPendingAlarm(item);
+    },
+    isTodayPendingAlarm(item) {
+      return this.isPendingAlarmVisible(item) && this.isTodayAlarm(item);
     },
     async getMonitor(silent = false) {
       try {
@@ -323,29 +386,39 @@ export default {
     async getPendingAlerts(silent = false) {
       try {
         const range = this.buildTodayRange();
-        const query = {
+        const todayQuery = {
           pageNum: 1,
-          pageSize: 50,
+          pageSize: 100,
           status: 0,
-          startTime: range.startTime,
-          endTime: range.endTime,
+          time1: range.time1,
+          time2: range.time2,
         };
-        const { data } = await uni.$http.get("/api/v1/alarm/query", query, { silent });
-        const list = (data && data.data && data.data.alarmList) || [];
-        this.alarms = list.filter((item) => item.caseType !== 13);
+        const allQuery = {
+          pageNum: 1,
+          pageSize: 100,
+          status: 0,
+        };
+        const [{ data: todayData }, { data: allData }] = await Promise.all([
+          uni.$http.get("/api/v1/alarm/query", todayQuery, { silent }),
+          uni.$http.get("/api/v1/alarm/query", allQuery, { silent }),
+        ]);
+        const todayList = (todayData && todayData.data && todayData.data.alarmList) || [];
+        const allList = (allData && allData.data && allData.data.alarmList) || [];
+        this.todayPendingAlarms = todayList.filter(this.isTodayPendingAlarm);
+        this.alarms = allList.filter(this.isPendingAlarmVisible);
       } catch (error) {
         console.warn("[controls] 获取实时警情失败：", error);
       }
     },
     levelText(item) {
-      const level = Number(item.level) || 3;
-      if (level <= 1) return "紧急";
-      if (level === 2) return "严重";
-      return "一般";
+      const level = Number(item.level) || 1;
+      if (level >= 3) return "高";
+      if (level === 2) return "中";
+      return "低";
     },
     levelClass(item) {
-      const level = Number(item.level) || 3;
-      if (level <= 1) return "urgent";
+      const level = Number(item.level) || 1;
+      if (level >= 3) return "urgent";
       if (level === 2) return "serious";
       return "normal";
     },
@@ -368,189 +441,147 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-// ─── 全局背景 ───
 .home-page {
   min-height: 100vh;
   box-sizing: border-box;
   padding: 0 24rpx 140rpx;
-  background: linear-gradient(170deg, #e8f4ff 0%, #f0f8ff 50%, #f7fbff 100%);
+  background: #F5F7FB;
 }
 
-// ─── Hero Card ───
-.hero-card {
-  margin-top: 10rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(130deg, #ffffff 0%, #d6ecff 60%, #c2dfff 100%);
-  padding: 28rpx 28rpx 24rpx;
+.top-bar {
+  padding: 18rpx 2rpx 22rpx;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  box-shadow: 0 8rpx 32rpx rgba(20, 112, 216, 0.13), 0 2rpx 8rpx rgba(20, 112, 216, 0.06);
-  border: 1rpx solid rgba(255, 255, 255, 0.8);
-  overflow: hidden;
-  position: relative;
-
-  // 顶部装饰光晕
-  &::before {
-    content: '';
-    position: absolute;
-    top: -30rpx;
-    right: 80rpx;
-    width: 200rpx;
-    height: 200rpx;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(20, 112, 216, 0.08) 0%, transparent 70%);
-  }
+  justify-content: space-between;
 }
 
-.hero-left {
-  flex: 1;
-  z-index: 1;
+.eyebrow {
+  font-size: 23rpx;
+  font-weight: 700;
+  color: #2563EB;
 }
 
-.hero-title {
-  font-size: 56rpx;
-  font-weight: 900;
-  line-height: 1.1;
-  // 渐变文字
-  background: linear-gradient(120deg, #0e5fc8 0%, #38a4ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.hero-sub {
+.page-title {
   margin-top: 6rpx;
-  color: #4a7da8;
-  font-size: 25rpx;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-size: 48rpx;
+  line-height: 1.1;
+  font-weight: 900;
+  color: #0F172A;
 }
 
-.hero-switch {
-  margin-top: 18rpx;
-  display: flex;
-  align-self: flex-start;
-  align-items: center;
-  background: rgba(20, 112, 216, 0.1);
-  border: 1rpx solid rgba(20, 112, 216, 0.2);
-  border-radius: 999rpx;
-  padding: 8rpx 20rpx;
-  color: #1470d8;
-
-  text {
-    font-size: 24rpx;
-    font-weight: 700;
-    color: #1470d8;
-    margin-left: 8rpx;
-  }
+.page-sub {
+  margin-top: 10rpx;
+  max-width: 520rpx;
+  font-size: 24rpx;
+  line-height: 1.45;
+  color: #64748B;
 }
 
-.hero-switch-icon {
-  width: 24rpx;
-  height: 24rpx;
-}
-
-.hero-deco {
-  width: 90rpx;
-  height: 90rpx;
-  flex-shrink: 0;
-  z-index: 1;
-  border-radius: 22rpx;
-  background: rgba(20, 112, 216, 0.08);
+.identity-btn {
+  height: 64rpx;
+  padding: 0 18rpx;
+  border-radius: 32rpx;
+  background: #FFFFFF;
+  border: 1rpx solid #E2E8F0;
+  box-shadow: 0 8rpx 22rpx rgba(15, 23, 42, 0.06);
   display: flex;
   align-items: center;
-  justify-content: center;
+  color: #475569;
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
-.hero-deco-icon {
-  width: 56rpx;
-  height: 56rpx;
+.identity-icon {
+  width: 26rpx;
+  height: 26rpx;
+  margin-right: 8rpx;
 }
 
-// ─── Quick Grid ───
-.quick-grid {
-  margin-top: 20rpx;
-  background: linear-gradient(145deg, rgba(241, 248, 255, 0.95), rgba(232, 242, 255, 0.9));
+.overview-card {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14rpx;
+  margin-bottom: 18rpx;
+}
+
+.overview-item {
+  min-height: 146rpx;
   border-radius: 24rpx;
-  padding: 16rpx 14rpx;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  border: 1rpx solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 6rpx 18rpx rgba(40, 91, 150, 0.07);
+  padding: 22rpx 18rpx;
+  background: #FFFFFF;
+  border: 1rpx solid #E2E8F0;
+  box-shadow: 0 10rpx 28rpx rgba(15, 23, 42, 0.06);
 }
 
-.quick-item {
-  background: #ffffff;
-  border-radius: 18rpx;
-  height: 154rpx;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 6rpx 14rpx rgba(52, 117, 185, 0.08);
-  border: 1rpx solid rgba(200, 225, 248, 0.7);
-  transition: all 0.15s;
-  width: calc(25% - 9rpx);
-
-  &:active {
-    transform: scale(0.96);
-    box-shadow: 0 2rpx 8rpx rgba(52, 117, 185, 0.06);
-  }
-
-  text {
-    margin-top: 11rpx;
-    color: #2c4a68;
-    font-size: 25rpx;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: 0.2px;
-  }
+.overview-num {
+  font-size: 46rpx;
+  line-height: 1;
+  font-weight: 900;
+  color: #0F172A;
 }
 
-.quick-icon {
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: 20rpx;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.85), 0 5rpx 12rpx rgba(58, 113, 177, 0.12);
-  border: 1rpx solid transparent;
+.overview-label {
+  margin-top: 14rpx;
+  font-size: 23rpx;
+  color: #64748B;
+  font-weight: 700;
+}
 
-  &--red {
-    background: linear-gradient(140deg, #fff4f5 0%, #ffe8eb 100%);
-    border-color: #fecdd3;
+.overview-item--danger .overview-num { color: #DC2626; }
+.overview-item--warning .overview-num { color: #F59E0B; }
+.overview-item--success .overview-num { color: #16A34A; }
+
+.overview-item.is-breathing {
+  animation: card-breathe 1.25s ease-in-out infinite;
+  position: relative;
+  border-color: #FCA5A5;
+}
+
+.overview-item.is-breathing::after {
+  content: '';
+  position: absolute;
+  inset: -10rpx;
+  border-radius: 30rpx;
+  border: 2rpx solid rgba(220, 38, 38, 0.28);
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.18);
+  animation: card-halo 1.25s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes card-breathe {
+  0%, 100% {
+    box-shadow:
+      0 10rpx 28rpx rgba(15, 23, 42, 0.06),
+      0 0 0 0 rgba(220, 38, 38, 0.12);
+    transform: translateY(0) scale(1);
   }
-  &--purple {
-    background: linear-gradient(140deg, #f6f3ff 0%, #ede9fe 100%);
-    border-color: #ddd6fe;
-  }
-  &--blue {
-    background: linear-gradient(140deg, #eef6ff 0%, #e2eeff 100%);
-    border-color: #bfdbfe;
-  }
-  &--green {
-    background: linear-gradient(140deg, #f0fdf4 0%, #e3f9eb 100%);
-    border-color: #bbf7d0;
+  50% {
+    box-shadow:
+      0 18rpx 38rpx rgba(220, 38, 38, 0.22),
+      0 0 0 14rpx rgba(220, 38, 38, 0.08);
+    transform: translateY(-4rpx) scale(1.03);
   }
 }
 
-.quick-icon-image {
-  width: 38rpx;
-  height: 38rpx;
-  opacity: 0.96;
+@keyframes card-halo {
+  0%, 100% {
+    opacity: 0.18;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scale(1.03);
+  }
 }
 
-// ─── Section Card ───
+
 .section-card {
   margin-top: 18rpx;
-  border-radius: 24rpx;
-  background: #ffffff;
-  box-shadow: 0 6rpx 24rpx rgba(40, 91, 150, 0.08);
-  padding: 22rpx;
-  border: 1rpx solid rgba(210, 230, 248, 0.5);
+  border-radius: 28rpx;
+  background: #FFFFFF;
+  box-shadow: 0 10rpx 28rpx rgba(15, 23, 42, 0.06);
+  padding: 24rpx;
+  border: 1rpx solid #E2E8F0;
 }
 
 .section-head {
@@ -560,17 +591,79 @@ export default {
 }
 
 .section-title {
-  color: #1a2d42;
-  font-size: 34rpx;
+  color: #0F172A;
+  font-size: 32rpx;
   font-weight: 800;
 }
 
-// ─── Map Card ───
+.section-subtitle {
+  margin-top: 6rpx;
+  color: #94A3B8;
+  font-size: 22rpx;
+}
+
+.action-card {
+  background: linear-gradient(180deg, #F8FBFF 0%, #EEF6FF 100%);
+  border-color: #CFE0F6;
+}
+
+.quick-grid {
+  margin-top: 20rpx;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14rpx;
+}
+
+.quick-item {
+  min-height: 146rpx;
+  border-radius: 22rpx;
+  background: #FFFFFF;
+  border: 1rpx solid #CFE0F6;
+  box-shadow: 0 8rpx 20rpx rgba(37, 99, 235, 0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  text {
+    margin-top: 12rpx;
+    color: #1E3A5F;
+    font-size: 23rpx;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+}
+
+.quick-icon {
+  width: 66rpx;
+  height: 66rpx;
+  border-radius: 21rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.quick-icon--red { background: linear-gradient(135deg, #FEE2E2, #FECACA); }
+.quick-icon--purple { background: linear-gradient(135deg, #EDE9FE, #DDD6FE); }
+.quick-icon--blue { background: linear-gradient(135deg, #DBEAFE, #BFDBFE); }
+.quick-icon--green { background: linear-gradient(135deg, #DCFCE7, #BBF7D0); }
+
+.quick-icon-image {
+  width: 38rpx;
+  height: 38rpx;
+  opacity: 1;
+}
+
 .map-wrap {
-  margin-top: 14rpx;
+  margin-top: 18rpx;
   height: 330rpx;
-  border-radius: 16rpx;
+  border-radius: 22rpx;
   overflow: hidden;
+  background: #F8FAFC;
 }
 
 .map-link-row {
@@ -582,34 +675,34 @@ export default {
   width: 14rpx;
   height: 14rpx;
   border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  background: #16A34A;
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.38);
   animation: live-pulse 1.8s ease-in-out infinite;
 }
 
 @keyframes live-pulse {
-  0%   { box-shadow: 0 0 0 0    rgba(34, 197, 94, 0.45); }
-  70%  { box-shadow: 0 0 0 8rpx rgba(34, 197, 94, 0); }
-  100% { box-shadow: 0 0 0 0    rgba(34, 197, 94, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.38); }
+  70% { box-shadow: 0 0 0 8rpx rgba(22, 163, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
 }
 
 .map-link {
-  color: #22c55e;
-  font-size: 24rpx;
+  color: #16A34A;
+  font-size: 23rpx;
   font-weight: 700;
   margin-left: 8rpx;
 }
 
 .all-link {
-  color: #1470d8;
-  font-size: 26rpx;
-  font-weight: 700;
+  color: #2563EB;
+  font-size: 25rpx;
+  font-weight: 800;
 }
 
-// ─── Level Tabs ───
 .level-tabs {
-  margin-top: 18rpx;
+  margin-top: 20rpx;
   display: flex;
+  gap: 14rpx;
 }
 
 .level-tab {
@@ -617,23 +710,12 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 14rpx 8rpx 10rpx;
-  border-radius: 16rpx;
-  border: 1.5rpx solid transparent;
-  background: #f4f8fd;
-  transition: all 0.2s;
-  margin-right: 14rpx;
+  padding: 16rpx 8rpx 12rpx;
+  border-radius: 20rpx;
+  border: 1.5rpx solid #E2E8F0;
+  background: #F8FAFC;
 
   &:active { transform: scale(0.97); }
-
-  &:last-child {
-    margin-right: 0;
-  }
-}
-
-.level-tab__inner text,
-.level-tab__inner view {
-  flex-shrink: 0;
 }
 
 .level-tab__inner {
@@ -641,14 +723,10 @@ export default {
   align-items: center;
 }
 
-.level-tab__badge {
-  margin-left: 8rpx;
-}
-
 .level-tab__label {
-  font-size: 27rpx;
-  font-weight: 700;
-  color: #7a8da3;
+  font-size: 25rpx;
+  font-weight: 800;
+  color: #64748B;
 }
 
 .level-tab__badge {
@@ -656,18 +734,18 @@ export default {
   height: 36rpx;
   border-radius: 999rpx;
   padding: 0 10rpx;
-  font-size: 22rpx;
-  font-weight: 800;
+  margin-left: 8rpx;
+  font-size: 21rpx;
+  font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
 
-  &--urgent  { background: #ef4444; }
-  &--serious { background: #f59e0b; }
-  &--normal  { background: #22c55e; }
+  &--urgent  { background: #DC2626; }
+  &--serious { background: #F59E0B; }
+  &--normal  { background: #16A34A; }
 
-  // 有警情时的脉冲
   &.is-pulse {
     animation: badge-pulse 1.5s ease-in-out infinite;
   }
@@ -675,83 +753,79 @@ export default {
 
 @keyframes badge-pulse {
   0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.15); }
+  50% { transform: scale(1.12); }
 }
 
 .level-tab__bar {
-  width: 56rpx;
+  margin-top: 10rpx;
+  width: 52rpx;
   height: 5rpx;
   border-radius: 999rpx;
-  opacity: 0.3;
+  opacity: 0;
   transition: opacity 0.2s;
-  &--urgent  { background: #ef4444; }
-  &--serious { background: #f59e0b; }
-  &--normal  { background: #22c55e; }
+
+  &--urgent  { background: #DC2626; }
+  &--serious { background: #F59E0B; }
+  &--normal  { background: #16A34A; }
 }
 
-// Active state
 .level-tab--urgent.is-active {
-  border-color: rgba(239, 68, 68, 0.25);
-  background: #fff5f5;
-  .level-tab__label { color: #ef4444; }
+  border-color: rgba(220, 38, 38, 0.22);
+  background: #FEF2F2;
+  .level-tab__label { color: #DC2626; }
   .level-tab__bar--urgent { opacity: 1; }
 }
 .level-tab--serious.is-active {
-  border-color: rgba(245, 158, 11, 0.25);
-  background: #fffbf0;
-  .level-tab__label { color: #d97706; }
+  border-color: rgba(245, 158, 11, 0.24);
+  background: #FFFBEB;
+  .level-tab__label { color: #D97706; }
   .level-tab__bar--serious { opacity: 1; }
 }
 .level-tab--normal.is-active {
-  border-color: rgba(34, 197, 94, 0.25);
-  background: #f0fff4;
-  .level-tab__label { color: #16a34a; }
+  border-color: rgba(22, 163, 74, 0.22);
+  background: #F0FDF4;
+  .level-tab__label { color: #16A34A; }
   .level-tab__bar--normal { opacity: 1; }
 }
 
-// ─── Alert List ───
 .alert-list {
-  margin-top: 14rpx;
+  margin-top: 16rpx;
   display: flex;
   flex-direction: column;
 }
 
 .alert-item + .alert-item {
-  margin-top: 10rpx;
+  margin-top: 12rpx;
 }
 
 .alert-item {
   display: flex;
   align-items: stretch;
-  border-radius: 14rpx;
+  border-radius: 20rpx;
   overflow: hidden;
-  background: #f8fbff;
-  border: 1rpx solid #e8edf8;
-  box-shadow: 0 2rpx 8rpx rgba(40, 91, 150, 0.05);
-  transition: all 0.15s;
+  background: #F8FAFC;
+  border: 1rpx solid #E2E8F0;
 
   &:active {
-    transform: scale(0.985);
-    box-shadow: 0 1rpx 4rpx rgba(40, 91, 150, 0.04);
+    transform: scale(0.99);
   }
 
-  &--urgent  { background: #fff8f8; border-color: rgba(239, 68, 68, 0.12); }
-  &--serious { background: #fffcf5; border-color: rgba(245, 158, 11, 0.12); }
-  &--normal  { background: #f8fff9; border-color: rgba(34, 197, 94, 0.12); }
+  &--urgent  { background: #FEF2F2; border-color: rgba(220, 38, 38, 0.14); }
+  &--serious { background: #FFFBEB; border-color: rgba(245, 158, 11, 0.16); }
+  &--normal  { background: #F0FDF4; border-color: rgba(22, 163, 74, 0.14); }
 }
 
 .alert-stripe {
-  width: 6rpx;
+  width: 7rpx;
   flex-shrink: 0;
-  border-radius: 0;
-  &--urgent  { background: #ef4444; }
-  &--serious { background: #f59e0b; }
-  &--normal  { background: #22c55e; }
+  &--urgent  { background: #DC2626; }
+  &--serious { background: #F59E0B; }
+  &--normal  { background: #16A34A; }
 }
 
 .alert-main {
   flex: 1;
-  padding: 16rpx 14rpx;
+  padding: 18rpx 16rpx;
 }
 
 .alert-title-row {
@@ -761,55 +835,57 @@ export default {
 }
 
 .alert-title {
-  color: #1a2d42;
+  color: #0F172A;
   font-size: 28rpx;
-  font-weight: 700;
+  font-weight: 800;
   flex: 1;
   padding-right: 10rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .level-tag {
   font-size: 20rpx;
-  font-weight: 800;
+  font-weight: 900;
   border-radius: 999rpx;
-  padding: 4rpx 14rpx;
+  padding: 5rpx 14rpx;
   flex-shrink: 0;
 
-  &--urgent  { background: rgba(239, 68, 68,  0.1); color: #ef4444; }
-  &--serious { background: rgba(245, 158, 11, 0.1); color: #d97706; }
-  &--normal  { background: rgba(34, 197, 94,  0.1); color: #16a34a; }
+  &--urgent  { background: rgba(220, 38, 38, 0.1); color: #DC2626; }
+  &--serious { background: rgba(245, 158, 11, 0.12); color: #D97706; }
+  &--normal  { background: rgba(22, 163, 74, 0.1); color: #16A34A; }
 }
 
 .alert-meta {
-  margin-top: 6rpx;
+  margin-top: 8rpx;
   display: flex;
   align-items: center;
-  color: #8a9db8;
+  color: #64748B;
   font-size: 22rpx;
 }
 
 .meta-dot {
-  color: #b8c8d8;
-  margin: 0 6rpx;
+  color: #CBD5E1;
+  margin: 0 8rpx;
 }
 
 .alert-arrow {
   display: flex;
   align-items: center;
-  padding: 0 16rpx 0 4rpx;
-  color: #b8c8d8;
-  font-size: 32rpx;
+  padding: 0 18rpx 0 4rpx;
+  color: #94A3B8;
+  font-size: 34rpx;
 }
 
-// ─── Empty ───
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40rpx 0;
+  padding: 42rpx 0;
 
   text {
-    color: #a0b0c4;
+    color: #94A3B8;
     font-size: 26rpx;
     margin-top: 14rpx;
   }

@@ -59,7 +59,7 @@ def _build_type_list(enable_all: bool) -> list[bool]:
         return disable_pose_related(list(monitorCommon.TYPE_LIST))
 
     result = [False] * 12
-    for idx in (1, 4, 7, 8, 9, 10):
+    for idx in (1, 4, 7, 9, 10):
         result[idx] = True
     return result
 
@@ -173,7 +173,7 @@ def _process_one_video(
                 smoke_id = name_to_id.get("smoke", -1)
                 garbage_ids = [
                     i for n, i in name_to_id.items()
-                    if n in ("garbage", "overflow", "garbage bin")
+                    if n in ("garbage", "overflow")
                 ]
                 ebike_ids = [
                     i for n, i in name_to_id.items()

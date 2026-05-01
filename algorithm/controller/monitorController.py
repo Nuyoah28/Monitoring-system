@@ -80,6 +80,11 @@ def get_image():
             "code": 'A0401',
             "msg": "Unauthorized"
         })
+    if monitorCommon.cacheQueue.empty():
+        return jsonify({
+            "code": 'A0404',
+            "msg": "No image available"
+        }), 404
     _, jpeg_frame = cv2.imencode('.jpg', monitorCommon.cacheQueue.queue[0])
     image_bytes = jpeg_frame.tobytes()
     # 将字节流转换为BytesIO对象
@@ -90,12 +95,12 @@ def get_image():
 
 @monitor.route('/type', methods=['POST'])
 def modifyMonitorType():
-    monitorCommon.TYPE_LIST = request.get_json()['typeList']
     if request.headers.get('Authorization') != 'sipc115':
         return jsonify({
             "code": 'A0401',
             "msg": "Unauthorized"
         })
+    monitorCommon.TYPE_LIST = request.get_json()['typeList']
     res = {
         "code": "00000",
         "msg": "success"
@@ -120,14 +125,14 @@ def getMonitorType():
 
 @monitor.route('/area', methods=['POST'])
 def modifyMonitorArea():
-    print(request.get_json())
-    monitorCommon.AREA_LIST[0] = (request.get_json()['areaList'][0], request.get_json()['areaList'][1])
-    monitorCommon.AREA_LIST[1] = (request.get_json()['areaList'][2], request.get_json()['areaList'][3])
     if request.headers.get('Authorization') != 'sipc115':
         return jsonify({
             "code": 'A0401',
             "msg": "Unauthorized"
         })
+    print(request.get_json())
+    monitorCommon.AREA_LIST[0] = (request.get_json()['areaList'][0], request.get_json()['areaList'][1])
+    monitorCommon.AREA_LIST[1] = (request.get_json()['areaList'][2], request.get_json()['areaList'][3])
     res = {
         "code": "00000",
         "msg": "success"

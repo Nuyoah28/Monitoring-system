@@ -160,7 +160,9 @@ def stream_video():
     #设置时间
     post_delay = 20  # 告警推送延迟20秒
     last_post_time = time.time()  # 记录上一次post的时间
-    
+    warning_streak = [0] * 12
+    stable_warning_min_hits = int(os.environ.get("WARNING_STREAK_MIN_HITS", "3"))
+
     save_img_delay = 10  # 保存图片间隔10秒
     last_save_time = time.time()  # 记录上一次保存图片的时间
     
@@ -230,8 +232,16 @@ def stream_video():
                 continue
             print(warningList)
             current_time = time.time()
-            if any(warningList) and current_time - last_post_time >= post_delay:
-                AlarmService.postAlarm(copy.deepcopy(warningList))
+            stable_warning_list = [False] * len(warningList)
+            for idx, flag in enumerate(warningList):
+                if flag:
+                    warning_streak[idx] += 1
+                else:
+                    warning_streak[idx] = 0
+                stable_warning_list[idx] = warning_streak[idx] >= stable_warning_min_hits
+
+            if any(stable_warning_list) and current_time - last_post_time >= post_delay:
+                AlarmService.postAlarm(copy.deepcopy(stable_warning_list))
                 last_post_time = current_time
 
             # 每10秒保存一次带检测框的图片

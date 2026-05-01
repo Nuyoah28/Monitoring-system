@@ -9,14 +9,14 @@
           <view
             class="left"
             :class="choosen === 0 ? 'choosen' : ''"
-            @click="choosen = 0"
+            @click="switchTab(0)"
           >
-            <span>实时警报</span>
+            <span>待处理</span>
           </view>
           <view
             class="right"
             :class="choosen === 1 ? 'choosen' : ''"
-            @click="choosen = 1"
+            @click="switchTab(1)"
           >
             <span>历史事件</span>
           </view>
@@ -203,21 +203,22 @@ export default {
       show: false,
       showFilter: false,
       showStatus: false,
-      status: [["1级", "2级", "3级"]],
-      statusValue: [1, 2, 3],
+      status: [["高", "中", "低"]],
+      statusValue: [3, 2, 1],
       statusIndex: null,
       filters: [
         [
-          "进入危险区域", "烟雾", "区域停留", "摔倒", "明火", 
-          "吸烟", "打架斗殴", "垃圾乱放", "冰面", "电动车进楼", 
+          "进入危险区域", "烟雾", "区域停留", "摔倒", "明火",
+          "吸烟", "打架斗殴", "垃圾乱放", "电动车进楼",
           "载具占用车道", "挥手呼救"
         ]
       ],
-      filterValue: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      filterValue: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12],
       filterIndex: null,
       scrollHeight: 0,
       choosen: 0,
-      pageSize: 6,
+      pageSize: 100,
+      pendingPageSize: 5000,
       pageNum: 1,
       warnIsAll: false,
       hisIsAll: false,
@@ -250,7 +251,7 @@ export default {
 	
 	// 监听 WebSocket 发送的新报警事件
 	uni.$on('newAlarm', () => {
-		// 只有在查看实时警报时自动刷新
+			// 只有在查看待处理警情时自动刷新
 		if (this.choosen === 0) {
 			this.pageNum = 1;
 			this.warnIsAll = false;
@@ -280,17 +281,31 @@ export default {
    //    clearInterval(this.dataFetchInterval); // 组件销毁前清除定时器
    //  },
   methods: {
-	buildTodayRange() {
-	  const now = new Date();
-	  const y = now.getFullYear();
-	  const m = String(now.getMonth() + 1).padStart(2, "0");
-	  const d = String(now.getDate()).padStart(2, "0");
-	  return {
-		startTime: `${y}-${m}-${d} 00:00:00`,
-		endTime: `${y}-${m}-${d} 23:59:59`,
-	  };
-	},
-	updateScrollHeight() {
+    switchTab(tab) {
+      if (this.choosen === tab) return;
+      this.choosen = tab;
+      this.pageNum = 1;
+      this.hisIsAll = false;
+      this.warnIsAll = false;
+      this.statusList = "nomore";
+      if (tab === 0) {
+        this.getRealList();
+      } else {
+        this.getHistoryList();
+      }
+    },
+    isVisibleAlarm(item) {
+      return ![6, 9, 13].includes(Number(item && item.caseType));
+    },
+    isPendingAlarm(item) {
+      if (!item) return false;
+      const status = Number(item.status);
+      return status === 0 || item.deal === "未处理";
+    },
+    isPendingAlarmVisible(item) {
+      return this.isVisibleAlarm(item) && this.isPendingAlarm(item);
+    },
+		updateScrollHeight() {
 	  const query = uni.createSelectorQuery().in(this);
 	  query.select("#warnBox").boundingClientRect();
 	  query.select(".content").boundingClientRect();
@@ -372,7 +387,7 @@ export default {
         }
         uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
 			console.log('data',data)
-          const filteredList = data.data.alarmList.filter(item => item.caseType !== 13);
+          const filteredList = data.data.alarmList.filter(this.isVisibleAlarm);
           this.historyData.push(...filteredList);
           if (data.data.count < this.pageSize) {
 			  // console.log(data.data.count)
@@ -390,13 +405,11 @@ export default {
       } else if (!this.choosen && !this.warnIsAll) {
         // console.log("0 more");
         this.pageNum++;
-        const range = this.buildTodayRange();
+        const pageSize = this.pendingPageSize;
         const data = {
           pageNum: this.pageNum,
-          pageSize: this.pageSize,
+          pageSize,
           status: 0,
-          startTime: range.startTime,
-          endTime: range.endTime,
         };
         // console.log(data);
         if (this.caseType) {
@@ -407,9 +420,9 @@ export default {
         }
         uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
           console.log(data);
-          const filteredList = data.data.alarmList.filter(item => item.caseType !== 13);
+          const filteredList = (data.data.alarmList || []).filter(this.isPendingAlarmVisible);
           this.warnData.push(...filteredList);
-          if (data.data.count < this.pageSize) {
+          if ((data.data.alarmList || []).length < pageSize) {
             this.warnIsAll = true;
             this.statusList = "nomore";
           }
@@ -426,15 +439,12 @@ export default {
       this.top = e.detail.scrollTop;
     },
     getRealList() {
-		this.statusList = 'loading'
-	  const range = this.buildTodayRange();
-      const data = {
-        pageNum: this.pageNum,
-        pageSize: this.pageSize,
-        status: 0,
-        startTime: range.startTime,
-        endTime: range.endTime,
-      };
+			this.statusList = 'loading'
+	      const data = {
+	        pageNum: this.pageNum,
+	        pageSize: this.pendingPageSize,
+	        status: 0,
+	      };
       if (this.caseType) {
         data.caseType = this.caseType;
       }
@@ -443,11 +453,11 @@ export default {
       }
       uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
         // console.log(data);
-        this.warnData = data.data.alarmList.filter(item => item.caseType !== 13);
-		if(!this.warnData.length) this.statusList = 'nomore'
-        if (data.data.count < this.pageSize) {
+        this.warnData = (data.data.alarmList || []).filter(this.isPendingAlarmVisible);
+        if (!this.warnData.length) this.statusList = 'nomore';
+        if ((data.data.alarmList || []).length < this.pendingPageSize) {
           this.warnIsAll = true;
-		  this.statusList = 'nomore'
+          this.statusList = 'nomore';
         }
         this.warnData.map((item) => {
           this.$set(item, "moveX", 0);
@@ -467,7 +477,7 @@ export default {
         data.warningLevel = this.warningLevel;
       }
       uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
-        this.historyData = data.data.alarmList.filter(item => item.caseType !== 13);
+        this.historyData = data.data.alarmList.filter(this.isVisibleAlarm);
 		if(!this.historyData.length) this.statusList = 'nomore'
         if (data.data.count < this.pageSize) {
           this.hisIsAll = true;

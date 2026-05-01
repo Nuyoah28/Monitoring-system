@@ -37,7 +37,7 @@
       class="map-native"
       :longitude="mapCenter.longitude"
       :latitude="mapCenter.latitude"
-      :scale="17"
+      :scale="initialMapScale"
       :markers="mapMarkers"
       :show-location="false"
       :enable-scroll="true"
@@ -45,6 +45,7 @@
       :enable-rotate="true"
       :enable-overlooking="true"
       @markertap="onMarkerTap"
+      @regionchange="onNativeRegionChange"
     ></map>
     <!-- #endif -->
   </view>
@@ -115,6 +116,11 @@ const FALLBACK_SPOTS = [
   [117.0121804687718, 39.14508368025604],
   [117.0130204687718, 39.14402368025603],
 ];
+
+const DEFAULT_MAP_SCALE = 17;
+const LABEL_VISIBLE_SCALE = 16;
+const COMPACT_LABEL_LEN = 6;
+const FULL_LABEL_LEN = 8;
 
 const normalizeName = (value) => String(value || "").replace(/\s+/g, "").toLowerCase();
 
@@ -223,10 +229,16 @@ export default {
       type: Boolean,
       default: false,
     },
+    showLabels: {
+      type: Boolean,
+      default: true,
+    },
   },
   data() {
     return {
       h5Map: null,
+      h5MapZoom: DEFAULT_MAP_SCALE,
+      nativeMapScale: DEFAULT_MAP_SCALE,
       h5MarkerOverlays: [],
       h5Error: "",
       h5PulseStyleInjected: false,
@@ -234,6 +246,14 @@ export default {
     };
   },
   computed: {
+    initialMapScale() {
+      return DEFAULT_MAP_SCALE;
+    },
+    shouldShowPointLabels() {
+      if (!this.showLabels) return false;
+      const currentScale = this.h5Map ? this.h5MapZoom : this.nativeMapScale;
+      return Number(currentScale) >= LABEL_VISIBLE_SCALE;
+    },
     alarmCountMap() {
       const monitorSource = Array.isArray(this.monitorList) ? this.monitorList : [];
       const pendingAlarmList = Array.isArray(this.alarmList) ? this.alarmList : [];
@@ -379,7 +399,7 @@ export default {
     mapMarkers() {
       return this.points.map((item) => {
         const labelText = this.getNativeLabelText(item);
-        return {
+        const marker = {
           id: item.markerId,
           longitude: item.longitude,
           latitude: item.latitude,
@@ -387,7 +407,9 @@ export default {
           width: item.hasAlert ? 38 : 30,
           height: item.hasAlert ? 38 : 30,
           zIndex: item.hasAlert ? 999 : 100,
-          label: {
+        };
+        if (labelText) {
+          marker.label = {
             content: labelText,
             color: item.hasAlert ? "#b91c1c" : "#0f4c81",
             fontSize: 11,
@@ -398,8 +420,9 @@ export default {
             padding: 6,
             anchorX: item.hasAlert ? 22 : 18,
             anchorY: item.hasAlert ? -34 : -30,
-          },
-        };
+          };
+        }
+        return marker;
       });
     },
   },
@@ -486,19 +509,18 @@ export default {
       return APP_ALERT_BADGE_ICONS[count] || APP_ALERT_MARKER_ICON;
     },
     getNativeLabelText(point) {
-      if (!point) return "监测点";
-      const name = this.getShortText(point.camera || point.name || "监测点", 12);
+      if (!point || !this.shouldShowPointLabels) return "";
+      const name = this.getShortText(point.camera || point.name || "监测点", COMPACT_LABEL_LEN);
       if (!point.hasAlert) return name;
       const count = this.getAlarmCountText(point.alarmCount);
-      const title = this.getShortText(pickAlarmTitle(point.latestAlarm), 8);
-      return `${name}｜${count}条告警｜${title}`;
+      return `${name}｜${count}条`;
     },
     getAlarmCountText(count) {
       return Number(count) > 9 ? "9+" : String(count || 0);
     },
     getH5LabelText(point) {
       if (!point) return "监测点";
-      return this.getShortText(point.camera || point.name || "监测点", 14);
+      return this.getShortText(point.camera || point.name || "监测点", this.shouldShowPointLabels ? FULL_LABEL_LEN : COMPACT_LABEL_LEN);
     },
     getShortText(value, maxLen = 12) {
       const text = String(value || "");
@@ -517,8 +539,8 @@ export default {
       const text = this.escapeHtml(this.getH5LabelText(point));
       const count = Number(point.alarmCount) > 99 ? "99+" : String(point.alarmCount || "");
       const statusHtml = point.hasAlert
-        ? `<span class="monitor-map-label-status monitor-map-label-status--alert">告警 ${count}</span>`
-        : `<span class="monitor-map-label-status monitor-map-label-status--safe">正常</span>`;
+        ? `<span class="monitor-map-label-status monitor-map-label-status--alert">${count}条</span>`
+        : "";
       const alertClass = point.hasAlert ? "monitor-map-label--alert" : "monitor-map-label--safe";
       return `<div class="monitor-map-label ${alertClass}">
         <span class="monitor-map-label-text">${text}</span>
@@ -699,10 +721,14 @@ export default {
 
         if (!this.h5Map) {
           this.h5Map = new AMap.Map(container, {
-            zoom: 17,
+            zoom: DEFAULT_MAP_SCALE,
             center: [this.mapCenter.longitude, this.mapCenter.latitude],
             resizeEnable: true,
             viewMode: "2D",
+          });
+          this.h5Map.on("zoomend", () => {
+            this.h5MapZoom = this.h5Map.getZoom();
+            this.renderH5Markers(false);
           });
         }
 
@@ -737,7 +763,7 @@ export default {
           title: item.camera || item.name || "",
         });
 
-        if (item.hasAlert) {
+        if (this.shouldShowPointLabels) {
           marker.setLabel({
             direction: "top",
             content: this.buildH5LabelHtml(item),
@@ -756,6 +782,9 @@ export default {
         this.h5Map.add(markers);
         if (needFitView) {
           this.h5Map.setFitView(markers, false, [36, 36, 36, 36]);
+          this.$nextTick(() => {
+            if (this.h5Map) this.h5MapZoom = this.h5Map.getZoom();
+          });
         }
       }
       // #endif
@@ -774,6 +803,13 @@ export default {
         });
       }
     },
+    onNativeRegionChange(e) {
+      const detail = (e && e.detail) || {};
+      const scale = Number(detail.scale || detail.zoom);
+      if (Number.isFinite(scale)) {
+        this.nativeMapScale = scale;
+      }
+    },
     onMarkerTap(e) {
       const markerId = Number(e.detail && e.detail.markerId);
       const point = this.points.find((item) => item.markerId === markerId);
@@ -781,6 +817,7 @@ export default {
         this.$emit("point-click", point);
       }
     },
+
     onFallbackPointTap(point) {
       this.$emit("point-click", point);
     },
