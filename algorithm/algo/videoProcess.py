@@ -135,6 +135,12 @@ def stream_video():
     if monitorCommon.ACTION_MODEL_BACKEND == "ctrgcn":
         action_recognizer = ActionRecognizer(
             checkpoint_path=monitorCommon.ACTION_CTR_GCN_WEIGHTS,
+            joint_checkpoint_path=monitorCommon.ACTION_CTR_GCN_JOINT_WEIGHTS,
+            bone_checkpoint_path=monitorCommon.ACTION_CTR_GCN_BONE_WEIGHTS,
+            fusion=monitorCommon.ACTION_CTR_GCN_FUSION,
+            fusion_mode=monitorCommon.ACTION_CTR_GCN_FUSION_MODE,
+            joint_alpha=monitorCommon.ACTION_CTR_GCN_JOINT_ALPHA,
+            bone_alpha=monitorCommon.ACTION_CTR_GCN_BONE_ALPHA,
             ctrgcn_root=monitorCommon.ACTION_CTR_GCN_ROOT,
             label_order=monitorCommon.ACTION_LABEL_ORDER,
             buffer_size=monitorCommon.ACTION_WINDOW_SIZE,

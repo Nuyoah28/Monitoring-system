@@ -7,6 +7,7 @@ class ActionFSMConfig:
     fall_off_thr: float = 0.15
     fall_hold_frames: int = 75
     fall_release_frames: int = 30
+    fall_latch: bool = False
 
     wave_on_thr: float = 0.45
     wave_off_thr: float = 0.25
@@ -78,6 +79,11 @@ class TrackActionFSM:
         st["fall_event"] = fall_prob >= self.cfg.fall_on_thr
 
         if st["fallen_state"]:
+            if self.cfg.fall_latch:
+                st["fall_hold_left"] = self.cfg.fall_hold_frames
+                st["fall_low_count"] = 0
+                return
+
             st["fall_hold_left"] = max(0, st["fall_hold_left"] - 1)
             if fall_prob < self.cfg.fall_off_thr:
                 st["fall_low_count"] += 1

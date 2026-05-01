@@ -10,6 +10,14 @@ from common import monitor as monitorCommon
 from Yolov8.action_fsm import ActionFSMConfig, TrackActionFSM
 
 
+COCO17_BONE_PAIRS = (
+    (0, 1), (0, 2), (1, 3), (2, 4),
+    (0, 5), (0, 6), (5, 7), (7, 9),
+    (6, 8), (8, 10), (5, 11), (6, 12),
+    (11, 13), (13, 15), (12, 14), (14, 16),
+    (5, 6), (11, 12),
+)
+
 def _resolve_ctrgcn_root(explicit_root=None):
     candidates = [
         explicit_root,
@@ -63,6 +71,12 @@ class ActionRecognizer:
     def __init__(
         self,
         checkpoint_path,
+        joint_checkpoint_path=None,
+        bone_checkpoint_path=None,
+        fusion=None,
+        fusion_mode=None,
+        joint_alpha=None,
+        bone_alpha=None,
         ctrgcn_root="",
         label_order=None,
         buffer_size=90,
@@ -75,6 +89,16 @@ class ActionRecognizer:
         max_missing=10,
     ):
         self.device = torch.device(device or ("cuda:0" if torch.cuda.is_available() else "cpu"))
+        self.fusion = (fusion or getattr(monitorCommon, "ACTION_CTR_GCN_FUSION", "single")).lower()
+        self.fusion_mode = (fusion_mode or getattr(monitorCommon, "ACTION_CTR_GCN_FUSION_MODE", "logits")).lower()
+        self.joint_alpha = float(
+            joint_alpha if joint_alpha is not None
+            else getattr(monitorCommon, "ACTION_CTR_GCN_JOINT_ALPHA", 1.0)
+        )
+        self.bone_alpha = float(
+            bone_alpha if bone_alpha is not None
+            else getattr(monitorCommon, "ACTION_CTR_GCN_BONE_ALPHA", 1.0)
+        )
         self.label_order = tuple(label_order or ("normal", "fall", "punch", "wave"))
         self.label_to_idx = {name: idx for idx, name in enumerate(self.label_order)}
         self.buffer_size = int(buffer_size)
@@ -97,20 +121,55 @@ class ActionRecognizer:
         self.last_overlays = []
 
         self.ctrgcn_root = _resolve_ctrgcn_root(ctrgcn_root)
-        if not os.path.isfile(checkpoint_path):
-            raise FileNotFoundError(f"CTR-GCN weight file not found: {checkpoint_path}")
-        self.model = _load_ctrgcn_model(
-            self.ctrgcn_root,
-            checkpoint_path,
-            self.device,
-            num_class=len(self.label_order),
+        self.use_joint_bone = self.fusion in {"joint_bone", "joint+bone", "two_stream", "2stream"}
+        self.model = None
+        self.joint_model = None
+        self.bone_model = None
+        self.joint_weights = (
+            joint_checkpoint_path
+            or getattr(monitorCommon, "ACTION_CTR_GCN_JOINT_WEIGHTS", "")
+            or checkpoint_path
         )
+        self.bone_weights = (
+            bone_checkpoint_path
+            or getattr(monitorCommon, "ACTION_CTR_GCN_BONE_WEIGHTS", "")
+        )
+
+        if self.use_joint_bone:
+            if not os.path.isfile(self.joint_weights):
+                raise FileNotFoundError(f"CTR-GCN joint weight file not found: {self.joint_weights}")
+            if not self.bone_weights or not os.path.isfile(self.bone_weights):
+                raise FileNotFoundError(f"CTR-GCN bone weight file not found: {self.bone_weights}")
+            self.joint_model = _load_ctrgcn_model(
+                self.ctrgcn_root,
+                self.joint_weights,
+                self.device,
+                num_class=len(self.label_order),
+            )
+            self.bone_model = _load_ctrgcn_model(
+                self.ctrgcn_root,
+                self.bone_weights,
+                self.device,
+                num_class=len(self.label_order),
+            )
+        else:
+            active_weights = self.bone_weights if self.fusion == "bone" and self.bone_weights else checkpoint_path
+            if not os.path.isfile(active_weights):
+                raise FileNotFoundError(f"CTR-GCN weight file not found: {active_weights}")
+            self.model = _load_ctrgcn_model(
+                self.ctrgcn_root,
+                active_weights,
+                self.device,
+                num_class=len(self.label_order),
+            )
+            self.joint_weights = active_weights
         self.fsm = TrackActionFSM(
             ActionFSMConfig(
                 fall_on_thr=monitorCommon.ACTION_FALL_ON_THR,
                 fall_off_thr=monitorCommon.ACTION_FALL_OFF_THR,
                 fall_hold_frames=monitorCommon.ACTION_FALL_HOLD_FRAMES,
                 fall_release_frames=monitorCommon.ACTION_FALL_RELEASE_FRAMES,
+                fall_latch=getattr(monitorCommon, "ACTION_FALL_LATCH", False),
                 wave_on_thr=monitorCommon.ACTION_WAVE_ON_THR,
                 wave_off_thr=monitorCommon.ACTION_WAVE_OFF_THR,
                 wave_confirm_frames=monitorCommon.ACTION_WAVE_CONFIRM_FRAMES,
@@ -127,7 +186,12 @@ class ActionRecognizer:
 
         print("[CTR-GCN] model loaded")
         print(f"   root: {self.ctrgcn_root}")
-        print(f"   weights: {checkpoint_path}")
+        if self.use_joint_bone:
+            print(f"   fusion: joint+bone ({self.fusion_mode}) alpha=({self.joint_alpha}, {self.bone_alpha})")
+            print(f"   joint weights: {self.joint_weights}")
+            print(f"   bone weights: {self.bone_weights}")
+        else:
+            print(f"   weights: {self.joint_weights}")
         print(f"   labels: {self.label_order}")
         print(f"   buffer={self.buffer_size} min_frames={self.min_frames} smooth={self.smooth}")
 
@@ -268,6 +332,13 @@ class ActionRecognizer:
         data[1][invalid] = 0
         return torch.from_numpy(data).unsqueeze(0)
 
+    @staticmethod
+    def _to_bone_stream(data):
+        bone = torch.zeros_like(data)
+        for v1, v2 in COCO17_BONE_PAIRS:
+            bone[:, :, :, v1, :] = data[:, :, :, v1, :] - data[:, :, :, v2, :]
+        return bone
+
     def _compute_nearby_flags(self, active_track_ids):
         flags = {track_id: False for track_id in active_track_ids}
         ratio = self.fsm.cfg.fight_distance_ratio
@@ -362,8 +433,23 @@ class ActionRecognizer:
             x = torch.cat(batch, dim=0).float().to(self.device)
 
             with torch.no_grad():
-                logits = self.model(x)
-                probs = F.softmax(logits, dim=1).detach().cpu().numpy()
+                if self.use_joint_bone:
+                    joint_logits = self.joint_model(x)
+                    bone_x = self._to_bone_stream(x)
+                    bone_logits = self.bone_model(bone_x)
+                    if self.fusion_mode == "prob":
+                        joint_prob = F.softmax(joint_logits, dim=1)
+                        bone_prob = F.softmax(bone_logits, dim=1)
+                        probs_tensor = (
+                            self.joint_alpha * joint_prob + self.bone_alpha * bone_prob
+                        ) / max(self.joint_alpha + self.bone_alpha, 1e-6)
+                    else:
+                        logits = self.joint_alpha * joint_logits + self.bone_alpha * bone_logits
+                        probs_tensor = F.softmax(logits, dim=1)
+                else:
+                    logits = self.model(x)
+                    probs_tensor = F.softmax(logits, dim=1)
+                probs = probs_tensor.detach().cpu().numpy()
 
             for idx_in_batch, track_id in enumerate(infer_track_ids):
                 self.track_last_probs[track_id] = probs[idx_in_batch]

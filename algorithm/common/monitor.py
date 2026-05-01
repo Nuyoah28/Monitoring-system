@@ -61,11 +61,32 @@ CUSTOM_DETECTION_PROMPTS = [
 # 标志位：提示词是否发生更改
 PROMPTS_CHANGED = False
 
-# Action-model runtime config. The defaults are tuned for the
-# current CTR-GCN action weights (window=90, label order fixed).
+# Action-model runtime config. These defaults target the current project
+# deployment: CTR-GCN joint+bone fusion, window=90, label order fixed.
+# Environment variables can still override these values for experiments.
+def _env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return bool(default)
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
 ACTION_MODEL_BACKEND = os.environ.get("ACTION_MODEL_BACKEND", "ctrgcn").lower()
-ACTION_CTR_GCN_ROOT = os.environ.get("ACTION_CTR_GCN_ROOT", "")
-ACTION_CTR_GCN_WEIGHTS = os.environ.get("ACTION_CTR_GCN_WEIGHTS", "algo/ctrgcn_action4.pt")
+ACTION_CTR_GCN_ROOT = os.environ.get("ACTION_CTR_GCN_ROOT", "/home/Documents/algorithm/CTR-GCN")
+ACTION_CTR_GCN_FUSION = os.environ.get("ACTION_CTR_GCN_FUSION", "joint_bone").lower()
+ACTION_CTR_GCN_FUSION_MODE = os.environ.get("ACTION_CTR_GCN_FUSION_MODE", "logits").lower()
+ACTION_CTR_GCN_JOINT_WEIGHTS = os.environ.get(
+    "ACTION_CTR_GCN_JOINT_WEIGHTS",
+    "/home/Documents/algorithm/algo/ctrgcn_joint_w90_ref_lie_vfF5O15_wCE.pt",
+)
+ACTION_CTR_GCN_BONE_WEIGHTS = os.environ.get(
+    "ACTION_CTR_GCN_BONE_WEIGHTS",
+    "/home/Documents/algorithm/algo/ctrgcn_bone_w90_ref_lie_vfF5O15_wCE.pt",
+)
+# Backward-compatible single-weight alias. In joint+bone mode this is the joint stream.
+ACTION_CTR_GCN_WEIGHTS = os.environ.get("ACTION_CTR_GCN_WEIGHTS", ACTION_CTR_GCN_JOINT_WEIGHTS)
+ACTION_CTR_GCN_JOINT_ALPHA = float(os.environ.get("ACTION_CTR_GCN_JOINT_ALPHA", "1.0"))
+ACTION_CTR_GCN_BONE_ALPHA = float(os.environ.get("ACTION_CTR_GCN_BONE_ALPHA", "1.0"))
 ACTION_LABEL_ORDER = ("normal", "fall", "punch", "wave")
 ACTION_WINDOW_SIZE = int(os.environ.get("ACTION_WINDOW_SIZE", "90"))
 ACTION_MIN_FRAMES = int(os.environ.get("ACTION_MIN_FRAMES", "8"))
@@ -79,6 +100,7 @@ ACTION_FALL_ON_THR = float(os.environ.get("ACTION_FALL_ON_THR", "0.35"))
 ACTION_FALL_OFF_THR = float(os.environ.get("ACTION_FALL_OFF_THR", "0.15"))
 ACTION_FALL_HOLD_FRAMES = int(os.environ.get("ACTION_FALL_HOLD_FRAMES", "75"))
 ACTION_FALL_RELEASE_FRAMES = int(os.environ.get("ACTION_FALL_RELEASE_FRAMES", "30"))
+ACTION_FALL_LATCH = _env_bool("ACTION_FALL_LATCH", True)
 
 ACTION_WAVE_ON_THR = float(os.environ.get("ACTION_WAVE_ON_THR", "0.40"))
 ACTION_WAVE_OFF_THR = float(os.environ.get("ACTION_WAVE_OFF_THR", "0.20"))
