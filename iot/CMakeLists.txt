@@ -25,12 +25,10 @@ MESSAGE(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
 include_directories(${PROJECT_SOURCE_DIR}/include/)
 LINK_DIRECTORIES(${PROJECT_SOURCE_DIR}/lib)
 
-# try locate libcurl for both include path and linker
-find_package(CURL REQUIRED)
-if(CURL_FOUND)
-    include_directories(${CURL_INCLUDE_DIRS})
-endif()
-
 add_executable(main src/main.cpp src/utils.cpp src/network.cpp)
 
-target_link_libraries (main ${OpenCV_LIBS} libMNN.so libMNN_Express.so libMNNOpenCV.so -lpthread ${CURL_LIBRARIES})
+target_link_libraries (main ${OpenCV_LIBS} libMNN.so libMNN_Express.so libMNNOpenCV.so -lpthread)
+
+if (WIN32)
+    target_link_libraries(main ws2_32)
+endif()

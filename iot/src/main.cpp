@@ -154,16 +154,12 @@ int main(int argc, char const *argv[])
     // 输入尺寸（网络固定）
     const int INPUT_SIZE = 320;
 
-    // 启动天气监测，初始温度25度，湿度50%
-    startWeatherMonitoring(25, 50);
-
     // 加载模型
     std::string model_name = "../models/yolov12_fp16.mnn";
 
     std::shared_ptr<MNN::Interpreter> net = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(model_name.c_str()));
     if (nullptr == net)
     {
-        stopWeatherMonitoring();
         return 0;
     }
 
@@ -184,7 +180,6 @@ int main(int argc, char const *argv[])
         auto inputTensor = net->getSessionInput(session, nullptr);
         if (nullptr == inputTensor) {
             std::cerr << "getSessionInput returned null" << std::endl;
-            stopWeatherMonitoring();
             return -1;
         }
         auto orig = inputTensor->shape();
@@ -215,7 +210,6 @@ int main(int argc, char const *argv[])
             }
         }
         if (!session_ok) {
-            stopWeatherMonitoring();
             return -1;
         }
     }
@@ -230,7 +224,6 @@ int main(int argc, char const *argv[])
         auto testres = decode(pimg, net, session, mmat_objection.inpSize);
         if (testres.empty()) {
             std::cerr << "[ERROR] session test run produced no output, aborting.\n";
-            stopWeatherMonitoring();
             return -1;
         }
     }
@@ -281,8 +274,5 @@ int main(int argc, char const *argv[])
         time = (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec);
         if(time > 0) printf(">> Time : %lf ms\n", (double)time / 1000000);
     }
-
-    // 程序退出前停止天气监测
-    stopWeatherMonitoring();
     return 0;
 }

@@ -1,0 +1,12 @@
+Optimizer stripped from parking_space_occupancy_detection/runs_emcad/train/vehicle_flow_yolov13_lite/weights/last.pt, 5.7MB
+Optimizer stripped from parking_space_occupancy_detection/runs_emcad/train/vehicle_flow_yolov13_lite/weights/best.pt, 5.7MB
+
+Validating parking_space_occupancy_detection/runs_emcad/train/vehicle_flow_yolov13_lite/weights/best.pt...
+Ultralytics 8.3.63 🚀 Python-3.10.20 torch-2.5.1+cu121 CUDA:0 (NVIDIA GeForce RTX 4090, 24210MiB)
+YOLOv13 summary: 559 layers, 2,572,061 parameters, 0 gradients, 6.9 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50      mAP75  mAP50-95): 100%|██████████| 39
+                   all       2483     143316      0.999      0.998      0.994      0.994      0.982
+           space-empty       2062      73629      0.998      0.998      0.995      0.995      0.985
+                   car       1967      69687      0.999      0.999      0.994      0.994       0.98
+Speed: 0.1ms preprocess, 0.9ms inference, 0.0ms loss, 0.5ms postprocess per image
+Results saved to parking_space_occupancy_detection/runs_emcad/train/vehicle_flow_yolov13_lite

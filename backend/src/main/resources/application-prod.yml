@@ -62,3 +62,11 @@ agent:
 algorithm:
   api:
     url: http://localhost:6006 # 算法服务API地址
+iot:
+  mqtt:
+    enabled: true
+    broker-url: tcp://127.0.0.1:1883
+    client-id: monitoring-system-backend
+    environment-topic: iot/sensor/+/environment
+    alarm-topic: iot/algo/+/alarm
+    qos: 1

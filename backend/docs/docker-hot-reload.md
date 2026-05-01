@@ -24,6 +24,12 @@ Jib 没有自定义 `appRoot`，所以镜像内应用默认放在 `/app`：
 - `/app/resources`：资源文件
 - `/app/libs`：依赖 jar
 
+直跑模式下的文件位置：
+
+PID：/opt/Monitoring-system/backend/run/backend.pid
+日志目录：/opt/Monitoring-system/backend/logs/
+当前最新日志：/opt/Monitoring-system/backend/logs/current.log
+
 所以生产容器里运行的是已经打包好的应用，不是源码仓库目录。
 
 ## 3. 为什么不建议在生产容器里直接 `git pull`

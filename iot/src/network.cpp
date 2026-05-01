@@ -1,276 +1,312 @@
 #include "network.h"
-#include <curl/curl.h>
-#include <string>
+
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <iostream>
 #include <sstream>
-#include <thread>
-#include <chrono>
-#include <atomic>
-#include <cstdlib>
-#include <ctime>
+#include <string>
 #include <vector>
 
-static std::atomic<bool> weather_monitoring_active(false);
-static std::thread weather_thread;
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
+#include <netdb.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
-static const std::string kServerIp = []() {
-    const char* ip = std::getenv("SERVER_IP");
-    return ip ? std::string(ip) : std::string("192.168.213.197");
-}();
+namespace {
 
-static const int kJavaPort = []() {
-    const char* port = std::getenv("JAVA_PORT");
-    return port ? std::atoi(port) : 10215;
-}();
+std::string getEnvOrDefault(const char* key, const std::string& fallback) {
+    const char* value = std::getenv(key);
+    return (value && *value) ? std::string(value) : fallback;
+}
 
-struct ParkingZoneState {
-    std::string area_code;
-    std::string area_name;
-    int total_spaces;
-    int occupied_spaces;
-};
+int getEnvOrDefaultInt(const char* key, int fallback) {
+    const char* value = std::getenv(key);
+    return (value && *value) ? std::atoi(value) : fallback;
+}
 
-static std::vector<ParkingZoneState> parking_zones = {
-    {"garage_a", "Garage-A", 62, 36},
-    {"garage_b", "Garage-B", 44, 24},
-    {"east_ground", "East-Ground", 30, 15},
-    {"west_ground", "West-Ground", 24, 10},
-};
+std::string getTimestamp() {
+    std::time_t now = std::time(nullptr);
+    std::tm tm_buf;
+#ifdef _WIN32
+    localtime_s(&tm_buf, &now);
+#else
+    localtime_r(&now, &tm_buf);
+#endif
+    char buffer[32];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm_buf);
+    return std::string(buffer);
+}
 
-static std::string makeUrl(const std::string& path) {
+std::string makeClipId() {
     std::ostringstream oss;
-    oss << "http://" << kServerIp << ':' << kJavaPort << path;
+    oss << getEnvOrDefault("MQTT_ALARM_CLIP_PREFIX", "mqtt-alarm") << '-' << std::time(nullptr);
     return oss.str();
 }
 
-static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
-    size_t totalSize = size * nmemb;
-    userp->append((char*)contents, totalSize);
-    return totalSize;
+void appendUtf8String(std::vector<unsigned char>& buffer, const std::string& value) {
+    const unsigned short len = static_cast<unsigned short>(value.size());
+    buffer.push_back(static_cast<unsigned char>((len >> 8) & 0xFF));
+    buffer.push_back(static_cast<unsigned char>(len & 0xFF));
+    buffer.insert(buffer.end(), value.begin(), value.end());
 }
 
-static int getTemperature() {
-    return rand() % 10 + 20;
-}
-
-static int getHumidity() {
-    return rand() % 20 + 40;
-}
-
-static int getPm25() {
-    return rand() % 50 + 18;
-}
-
-static int getCombustibleGas() {
-    return rand() % 35 + 5;
-}
-
-void triggerAlarm() {
-    CURL* curl;
-    CURLcode res;
-    std::string response_data;
-
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init();
-
-    if (curl) {
-        std::string url = makeUrl("/api/v1/monitor-device/alarm");
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-
-        struct curl_slist* headers = NULL;
-        headers = curl_slist_append(headers, "Content-Type: application/json");
-        headers = curl_slist_append(headers, "Authorization: sipc115");
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-        std::string postData = "{}";
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, postData.length());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
-
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            std::cerr << "triggerAlarm curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
-        } else {
-            long response_code;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-            std::cout << "Alarm triggered. Response code: " << response_code << std::endl;
-            std::cout << "Response: " << response_data << std::endl;
+void appendRemainingLength(std::vector<unsigned char>& buffer, std::size_t value) {
+    do {
+        unsigned char encoded = static_cast<unsigned char>(value % 128);
+        value /= 128;
+        if (value > 0) {
+            encoded |= 0x80;
         }
+        buffer.push_back(encoded);
+    } while (value > 0);
+}
 
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl);
+class SocketHandle {
+public:
+#ifdef _WIN32
+    using NativeSocket = SOCKET;
+    static constexpr NativeSocket kInvalid = INVALID_SOCKET;
+#else
+    using NativeSocket = int;
+    static constexpr NativeSocket kInvalid = -1;
+#endif
+
+    SocketHandle() : socket_(kInvalid) {}
+    ~SocketHandle() { close(); }
+
+    void reset(NativeSocket socket) {
+        close();
+        socket_ = socket;
     }
 
-    curl_global_cleanup();
-}
+    NativeSocket get() const { return socket_; }
+    bool valid() const { return socket_ != kInvalid; }
 
-void sendWeatherData(int temperature, int humidity) {
-    CURL* curl;
-    CURLcode res;
-    std::string response_data;
-
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init();
-
-    if (curl) {
-        std::string url = makeUrl("/api/v1/iot/environment/report");
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-
-        struct curl_slist* headers = NULL;
-        headers = curl_slist_append(headers, "Content-Type: application/json");
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-        const int pm25 = getPm25();
-        const int combustibleGas = getCombustibleGas();
-        std::ostringstream jsonStream;
-        jsonStream << "{";
-        jsonStream << "\"monitorId\": 1,";
-        jsonStream << "\"deviceCode\": \"iot-simulator-01\",";
-        jsonStream << "\"temperature\":" << temperature << ",";
-        jsonStream << "\"humidity\":" << humidity << ",";
-        jsonStream << "\"pm25\":" << pm25 << ",";
-        jsonStream << "\"combustibleGas\":" << combustibleGas;
-        jsonStream << "}";
-
-        std::string postData = jsonStream.str();
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, postData.length());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
-
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            std::cerr << "sendWeatherData curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
-        } else {
-            long response_code;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-            std::cout << "Environment data sent. Response code: " << response_code << std::endl;
-            std::cout << "Response: " << response_data << std::endl;
+    void close() {
+        if (!valid()) {
+            return;
         }
-
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl);
+#ifdef _WIN32
+        closesocket(socket_);
+#else
+        ::close(socket_);
+#endif
+        socket_ = kInvalid;
     }
 
-    curl_global_cleanup();
-}
+private:
+    NativeSocket socket_;
+};
 
-void sendParkingData() {
-    CURL* curl;
-    CURLcode res;
-    std::string response_data;
-
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init();
-
-    if (curl) {
-        std::string url = makeUrl("/api/v1/iot/parking/report");
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-
-        struct curl_slist* headers = NULL;
-        headers = curl_slist_append(headers, "Content-Type: application/json");
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-        const std::time_t now = std::time(nullptr);
-        const std::tm* local_time = std::localtime(&now);
-        const int hour = local_time ? local_time->tm_hour : 12;
-        const int traffic_bias = ((hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 21)) ? 1 : -1;
-
-        for (auto& zone : parking_zones) {
-            int delta = (rand() % 5) - 2 + traffic_bias;
-            int next_occupied = zone.occupied_spaces + delta;
-            if (next_occupied < 0) next_occupied = 0;
-            if (next_occupied > zone.total_spaces) next_occupied = zone.total_spaces;
-            zone.occupied_spaces = next_occupied;
-        }
-
-        std::ostringstream jsonStream;
-        jsonStream << "{";
-        jsonStream << "\"monitorId\": 1,";
-        jsonStream << "\"deviceCode\": \"iot-simulator-01\",";
-        jsonStream << "\"zones\": [";
-        for (size_t i = 0; i < parking_zones.size(); ++i) {
-            const auto& zone = parking_zones[i];
-            if (i > 0) jsonStream << ",";
-            jsonStream << "{";
-            jsonStream << "\"areaCode\": \"" << zone.area_code << "\",";
-            jsonStream << "\"areaName\": \"" << zone.area_name << "\",";
-            jsonStream << "\"totalSpaces\": " << zone.total_spaces << ",";
-            jsonStream << "\"occupiedSpaces\": " << zone.occupied_spaces;
-            jsonStream << "}";
-        }
-        jsonStream << "]";
-        jsonStream << "}";
-
-        std::string postData = jsonStream.str();
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, postData.length());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
-
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            std::cerr << "sendParkingData curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
-        } else {
-            long response_code;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-            std::cout << "Parking data sent. Response code: " << response_code << std::endl;
-            std::cout << "Response: " << response_data << std::endl;
-        }
-
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl);
+#ifdef _WIN32
+class WinsockGuard {
+public:
+    WinsockGuard() : active_(false) {
+        WSADATA wsa_data;
+        active_ = (WSAStartup(MAKEWORD(2, 2), &wsa_data) == 0);
     }
 
-    curl_global_cleanup();
+    ~WinsockGuard() {
+        if (active_) {
+            WSACleanup();
+        }
+    }
+
+    bool active() const { return active_; }
+
+private:
+    bool active_;
+};
+#endif
+
+bool sendAll(SocketHandle::NativeSocket socket_fd, const std::vector<unsigned char>& buffer) {
+    std::size_t sent = 0;
+    while (sent < buffer.size()) {
+#ifdef _WIN32
+        int result = send(socket_fd,
+                          reinterpret_cast<const char*>(buffer.data() + sent),
+                          static_cast<int>(buffer.size() - sent), 0);
+#else
+        ssize_t result = send(socket_fd, buffer.data() + sent, buffer.size() - sent, 0);
+#endif
+        if (result <= 0) {
+            return false;
+        }
+        sent += static_cast<std::size_t>(result);
+    }
+    return true;
 }
 
-static void weatherMonitoringLoop(int initial_temperature, int initial_humidity) {
-    sendWeatherData(initial_temperature, initial_humidity);
-    sendParkingData();
-
-    while (weather_monitoring_active.load()) {
-        for (int i = 0; i < 120 && weather_monitoring_active.load(); i++) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+bool recvAll(SocketHandle::NativeSocket socket_fd, unsigned char* buffer, std::size_t size) {
+    std::size_t received = 0;
+    while (received < size) {
+#ifdef _WIN32
+        int result = recv(socket_fd, reinterpret_cast<char*>(buffer + received),
+                          static_cast<int>(size - received), 0);
+#else
+        ssize_t result = recv(socket_fd, buffer + received, size - received, 0);
+#endif
+        if (result <= 0) {
+            return false;
         }
+        received += static_cast<std::size_t>(result);
+    }
+    return true;
+}
 
-        if (!weather_monitoring_active.load()) {
+bool connectTcp(SocketHandle& socket_handle, const std::string& host, int port) {
+    addrinfo hints{};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    addrinfo* results = nullptr;
+    std::string port_str = std::to_string(port);
+    if (getaddrinfo(host.c_str(), port_str.c_str(), &hints, &results) != 0) {
+        return false;
+    }
+
+    bool connected = false;
+    for (addrinfo* rp = results; rp != nullptr; rp = rp->ai_next) {
+        SocketHandle::NativeSocket socket_fd = ::socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (socket_fd == SocketHandle::kInvalid) {
+            continue;
+        }
+        socket_handle.reset(socket_fd);
+        if (::connect(socket_fd, rp->ai_addr, static_cast<int>(rp->ai_addrlen)) == 0) {
+            connected = true;
             break;
         }
-
-        int temp = getTemperature();
-        int hum = getHumidity();
-        sendWeatherData(temp, hum);
-        sendParkingData();
+        socket_handle.close();
     }
+
+    freeaddrinfo(results);
+    return connected;
 }
 
-void startWeatherMonitoring(int initial_temperature, int initial_humidity) {
-    if (weather_monitoring_active.load()) {
-        std::cout << "Weather monitoring is already running." << std::endl;
-        return;
+std::vector<unsigned char> buildConnectPacket(
+        const std::string& client_id,
+        const std::string& username,
+        const std::string& password) {
+    std::vector<unsigned char> variable_header;
+    appendUtf8String(variable_header, "MQTT");
+    variable_header.push_back(0x04);
+
+    unsigned char connect_flags = 0x02;
+    if (!username.empty()) {
+        connect_flags |= 0x80;
+    }
+    if (!password.empty()) {
+        connect_flags |= 0x40;
+    }
+    variable_header.push_back(connect_flags);
+    variable_header.push_back(0x00);
+    variable_header.push_back(0x3C);
+
+    std::vector<unsigned char> payload;
+    appendUtf8String(payload, client_id);
+    if (!username.empty()) {
+        appendUtf8String(payload, username);
+    }
+    if (!password.empty()) {
+        appendUtf8String(payload, password);
     }
 
-    weather_monitoring_active.store(true);
-    srand(static_cast<unsigned int>(time(nullptr)));
-    weather_thread = std::thread(weatherMonitoringLoop, initial_temperature, initial_humidity);
-    std::cout << "Weather monitoring started. Will send data every 2 minutes." << std::endl;
+    std::vector<unsigned char> packet;
+    packet.push_back(0x10);
+    appendRemainingLength(packet, variable_header.size() + payload.size());
+    packet.insert(packet.end(), variable_header.begin(), variable_header.end());
+    packet.insert(packet.end(), payload.begin(), payload.end());
+    return packet;
 }
 
-void stopWeatherMonitoring() {
-    if (!weather_monitoring_active.load()) {
-        std::cout << "Weather monitoring is not running." << std::endl;
-        return;
+std::vector<unsigned char> buildPublishPacket(const std::string& topic, const std::string& payload) {
+    std::vector<unsigned char> variable_header;
+    appendUtf8String(variable_header, topic);
+
+    std::vector<unsigned char> packet;
+    packet.push_back(0x30);
+    appendRemainingLength(packet, variable_header.size() + payload.size());
+    packet.insert(packet.end(), variable_header.begin(), variable_header.end());
+    packet.insert(packet.end(), payload.begin(), payload.end());
+    return packet;
+}
+
+std::vector<unsigned char> buildDisconnectPacket() {
+    return {0xE0, 0x00};
+}
+
+bool publishMqttMessage(const std::string& topic, const std::string& payload) {
+    const std::string host = getEnvOrDefault("MQTT_BROKER_HOST", "127.0.0.1");
+    const int port = getEnvOrDefaultInt("MQTT_BROKER_PORT", 1883);
+    const std::string username = getEnvOrDefault("MQTT_USERNAME", "");
+    const std::string password = getEnvOrDefault("MQTT_PASSWORD", "");
+    const std::string client_id = getEnvOrDefault("MQTT_CLIENT_ID", "iot-algo-publisher");
+
+#ifdef _WIN32
+    WinsockGuard winsock_guard;
+    if (!winsock_guard.active()) {
+        return false;
+    }
+#endif
+
+    SocketHandle socket_handle;
+    if (!connectTcp(socket_handle, host, port)) {
+        std::cerr << "MQTT TCP connect failed: " << host << ':' << port << std::endl;
+        return false;
     }
 
-    weather_monitoring_active.store(false);
-    if (weather_thread.joinable()) {
-        weather_thread.join();
+    if (!sendAll(socket_handle.get(), buildConnectPacket(client_id, username, password))) {
+        std::cerr << "MQTT CONNECT send failed" << std::endl;
+        return false;
     }
 
-    std::cout << "Weather monitoring stopped." << std::endl;
+    unsigned char connack[4];
+    if (!recvAll(socket_handle.get(), connack, sizeof(connack))) {
+        std::cerr << "MQTT CONNACK receive failed" << std::endl;
+        return false;
+    }
+    if (connack[0] != 0x20 || connack[1] != 0x02 || connack[3] != 0x00) {
+        std::cerr << "MQTT CONNACK rejected, code=" << static_cast<int>(connack[3]) << std::endl;
+        return false;
+    }
+
+    if (!sendAll(socket_handle.get(), buildPublishPacket(topic, payload))) {
+        std::cerr << "MQTT PUBLISH send failed" << std::endl;
+        return false;
+    }
+
+    sendAll(socket_handle.get(), buildDisconnectPacket());
+    return true;
+}
+
+}  // namespace
+
+void triggerAlarm() {
+    const std::string device_code = getEnvOrDefault("DEVICE_CODE", "iot-algo-01");
+    const std::string topic = getEnvOrDefault(
+            "MQTT_TOPIC_ALARM",
+            "iot/algo/" + device_code + "/alarm");
+    const int camera_id = getEnvOrDefaultInt("ALARM_CAMERA_ID", 1);
+    const int case_type = getEnvOrDefaultInt("ALARM_CASE_TYPE", 1);
+    const std::string clip_id = makeClipId();
+    const std::string occurred_at = getTimestamp();
+
+    std::ostringstream payload;
+    payload << "{\"cameraId\":" << camera_id
+            << ",\"caseType\":" << case_type
+            << ",\"clipId\":\"" << clip_id
+            << "\",\"occurredAt\":\"" << occurred_at
+            << "\"}";
+
+    if (!publishMqttMessage(topic, payload.str())) {
+        std::cerr << "triggerAlarm mqtt publish failed" << std::endl;
+    } else {
+        std::cout << "Alarm published to MQTT topic: " << topic << std::endl;
+    }
 }
