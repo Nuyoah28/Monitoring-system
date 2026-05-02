@@ -48,7 +48,7 @@ pip install -r requirements.txt
 python agent_api.py
 ```
 
-默认启动在 `5000` 端口。
+默认启动在 `5050` 端口。
 
 ## cli启动 
 ```bash

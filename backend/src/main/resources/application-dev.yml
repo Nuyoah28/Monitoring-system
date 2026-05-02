@@ -62,3 +62,4 @@ iot:
     environment-topic: ${IOT_MQTT_ENVIRONMENT_TOPIC:iot/sensor/+/environment}
     alarm-topic: ${IOT_MQTT_ALARM_TOPIC:iot/algo/+/alarm}
     qos: ${IOT_MQTT_QOS:1}
+
