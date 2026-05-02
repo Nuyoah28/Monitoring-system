@@ -1,8 +1,66 @@
+import json
 import os
 
 
-# Single configuration entry for app-owned runtime settings.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_FILE_BY_CONFIG = {
+    "dev": ".env.dev",
+    "prod": ".env.prod",
+}
+
+
+def _join_base(*parts):
+    return os.path.join(BASE_DIR, *parts)
+
+
+def _resolve_path(value, default=""):
+    path = value if value not in (None, "") else default
+    if not path:
+        return ""
+    if os.path.isabs(path):
+        return path
+    return _join_base(path)
+
+
+def _parse_env_line(raw_line):
+    line = raw_line.strip()
+    if not line or line.startswith("#"):
+        return None, None
+    if line.startswith("export "):
+        line = line[7:].strip()
+    if "=" not in line:
+        return None, None
+    key, value = line.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        value = value[1:-1]
+    return key, value
+
+
+def _load_env_file(config_name):
+    env_name = ENV_FILE_BY_CONFIG.get(config_name, ENV_FILE_BY_CONFIG["dev"])
+    env_path = os.path.join(BASE_DIR, env_name)
+    if not os.path.exists(env_path):
+        return env_path
+
+    with open(env_path, "r", encoding="utf-8") as env_file:
+        for raw_line in env_file:
+            key, value = _parse_env_line(raw_line)
+            if key:
+                os.environ.setdefault(key, value)
+    return env_path
+
+
+def _normalize_config_name(value):
+    name = (value or "dev").strip().lower() or "dev"
+    if name not in ENV_FILE_BY_CONFIG:
+        return "dev"
+    return name
+
+
+DEFAULT_CONFIG_NAME = _normalize_config_name(os.environ.get("APP_CONFIG"))
+ACTIVE_ENV_FILE = _load_env_file(DEFAULT_CONFIG_NAME)
 
 
 def _env_str(name, default=""):
@@ -31,11 +89,21 @@ def _env_bool(name, default=False):
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
-def _join_base(*parts):
-    return os.path.join(BASE_DIR, *parts)
+def _env_json(name, default):
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return json.loads(value)
 
 
-class Config:
+def _env_tuple(name, default):
+    return tuple(_env_json(name, list(default)))
+
+
+class RuntimeConfig:
+    APP_CONFIG = DEFAULT_CONFIG_NAME
+    ACTIVE_ENV_FILE = ACTIVE_ENV_FILE
+
     APP_HOST = _env_str("APP_HOST", "0.0.0.0")
     APP_PORT = _env_int("APP_PORT", 6006)
 
@@ -49,8 +117,11 @@ class Config:
     LATITUDE = _env_float("LATITUDE", 0)
     LONGITUDE = _env_float("LONGITUDE", 0)
 
-    TYPE_LIST = [False, False, False, True, False, False, True, False, False, False, False, True]
-    AREA_LIST = [(0, 0), (1280, 720)]
+    TYPE_LIST = _env_json(
+        "TYPE_LIST",
+        [False, False, False, True, False, False, True, False, False, False, False, True],
+    )
+    AREA_LIST = [tuple(point) for point in _env_json("AREA_LIST", [[0, 0], [1280, 720]])]
 
     VIDEO_PROCESSING_ENABLED = _env_bool("VIDEO_PROCESSING_ENABLED", True)
     VIDEO_CACHE_SIZE = _env_int("VIDEO_CACHE_SIZE", 50)
@@ -61,31 +132,28 @@ class Config:
     FRAMERATE = _env_int("FRAMERATE", 60)
     FLIP_METHOD = _env_int("FLIP_METHOD", 0)
 
-    CUSTOM_DETECTION_PROMPTS = [
-        "overflow",
-        "garbage",
-        "garbage bin",
-        "bicycle",
-        "motorcycle",
-    ]
+    CUSTOM_DETECTION_PROMPTS = _env_json(
+        "CUSTOM_DETECTION_PROMPTS",
+        ["overflow", "garbage", "garbage bin", "bicycle", "motorcycle"],
+    )
     ENABLE_PROMPT_SYNONYMS = _env_bool("ENABLE_PROMPT_SYNONYMS", False)
 
     ACTION_MODEL_BACKEND = _env_str("ACTION_MODEL_BACKEND", "ctrgcn").lower()
-    ACTION_CTR_GCN_ROOT = _env_str("ACTION_CTR_GCN_ROOT", _join_base("CTR-GCN"))
+    ACTION_CTR_GCN_ROOT = _resolve_path(_env_str("ACTION_CTR_GCN_ROOT", "CTR-GCN"))
     ACTION_CTR_GCN_FUSION = _env_str("ACTION_CTR_GCN_FUSION", "joint_bone").lower()
     ACTION_CTR_GCN_FUSION_MODE = _env_str("ACTION_CTR_GCN_FUSION_MODE", "logits").lower()
-    ACTION_CTR_GCN_JOINT_WEIGHTS = _env_str(
-        "ACTION_CTR_GCN_JOINT_WEIGHTS",
-        _join_base("algo", "ctrgcn_joint_w90_ref_lie_vfF5O15_wCE.pt"),
+    ACTION_CTR_GCN_JOINT_WEIGHTS = _resolve_path(
+        _env_str("ACTION_CTR_GCN_JOINT_WEIGHTS", os.path.join("algo", "ctrgcn_joint_w90_ref_lie_vfF5O15_wCE.pt"))
     )
-    ACTION_CTR_GCN_BONE_WEIGHTS = _env_str(
-        "ACTION_CTR_GCN_BONE_WEIGHTS",
-        _join_base("algo", "ctrgcn_bone_w90_ref_lie_vfF5O15_wCE.pt"),
+    ACTION_CTR_GCN_BONE_WEIGHTS = _resolve_path(
+        _env_str("ACTION_CTR_GCN_BONE_WEIGHTS", os.path.join("algo", "ctrgcn_bone_w90_ref_lie_vfF5O15_wCE.pt"))
     )
-    ACTION_CTR_GCN_WEIGHTS = _env_str("ACTION_CTR_GCN_WEIGHTS", ACTION_CTR_GCN_JOINT_WEIGHTS)
+    ACTION_CTR_GCN_WEIGHTS = _resolve_path(
+        _env_str("ACTION_CTR_GCN_WEIGHTS", ACTION_CTR_GCN_JOINT_WEIGHTS)
+    )
     ACTION_CTR_GCN_JOINT_ALPHA = _env_float("ACTION_CTR_GCN_JOINT_ALPHA", 1.0)
     ACTION_CTR_GCN_BONE_ALPHA = _env_float("ACTION_CTR_GCN_BONE_ALPHA", 1.0)
-    ACTION_LABEL_ORDER = ("normal", "fall", "punch", "wave")
+    ACTION_LABEL_ORDER = _env_tuple("ACTION_LABEL_ORDER", ("normal", "fall", "punch", "wave"))
     ACTION_WINDOW_SIZE = _env_int("ACTION_WINDOW_SIZE", 90)
     ACTION_MIN_FRAMES = _env_int("ACTION_MIN_FRAMES", 8)
     ACTION_SMOOTH = _env_int("ACTION_SMOOTH", 4)
@@ -123,26 +191,11 @@ class Config:
     ALARM_SYNC_BATCH_SIZE = _env_int("ALARM_SYNC_BATCH_SIZE", 20)
     ALARM_REQUEST_TIMEOUT_SECONDS = _env_int("ALARM_REQUEST_TIMEOUT_SECONDS", 5)
 
-    TENCENT_SECRET_ID = _env_str("TENCENT_SECRET_ID", "AKIDT7ufHm8NOF4IHdmkaJtaFxYyHe9f1XvB")
-    TENCENT_SECRET_KEY = _env_str("TENCENT_SECRET_KEY", "B9wWO8j9MYfdoqpeHhtth5HH3cy85pLd")
-
-
-class DevConfig(Config):
-    BACKEND_URL = _env_str("BACKEND_URL", "http://host.docker.internal:10215")
-    STREAM_URL = _env_str("STREAM_URL", "rtmp://host.docker.internal:1935")
-    STREAM_RAW_URL = _env_str("STREAM_RAW_URL", "rtmp://host.docker.internal:1935/live/raw")
-    STREAM_PROCESSED_URL = _env_str("STREAM_PROCESSED_URL", "rtmp://host.docker.internal:1935/live/ai")
-
-
-class ProdConfig(Config):
-    pass
+    TENCENT_SECRET_ID = _env_str("TENCENT_SECRET_ID", "")
+    TENCENT_SECRET_KEY = _env_str("TENCENT_SECRET_KEY", "")
 
 
 config = {
-    "dev": DevConfig,
-    "prod": ProdConfig,
+    "dev": RuntimeConfig,
+    "prod": RuntimeConfig,
 }
-
-
-DEFAULT_CONFIG_NAME = _env_str("APP_CONFIG", "dev").lower()
-RuntimeConfig = config.get(DEFAULT_CONFIG_NAME, DevConfig)

@@ -1,7 +1,7 @@
 from flask import Flask
 import requests, time, logging
 from controller import config_blueprint
-from config import RuntimeConfig, config
+from config import RuntimeConfig
 from algo import videoProcess
 import threading
 from util import Logger
@@ -10,9 +10,9 @@ from service import AlarmService
 logger = Logger.setup_logger()
 
 
-def create_app(config_name):
+def create_app():
     app = Flask(__name__)
-    app.config.from_object(config.get(config_name, RuntimeConfig))
+    app.config.from_object(RuntimeConfig)
     print(app.config)
     config_blueprint(app)
     try:

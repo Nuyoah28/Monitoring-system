@@ -1,9 +1,8 @@
 from __init__ import create_app
-from config import DEFAULT_CONFIG_NAME, RuntimeConfig
+from config import RuntimeConfig
 
 
-config_name = DEFAULT_CONFIG_NAME
-app = create_app(config_name)
+app = create_app()
 
 
 if __name__ == "__main__":
