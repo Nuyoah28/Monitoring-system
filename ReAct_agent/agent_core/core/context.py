@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# AI辅助生成：本文件中的请求身份字段与线程安全缓存增强逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional

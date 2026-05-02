@@ -980,6 +980,7 @@
 </template>
 
 <script setup lang="ts">
+// AI辅助生成：GPT-5 Codex, 2026-03-28。数字人舞台接入与大屏页面联动展示逻辑。
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '@/components/DashboardLayout.vue'

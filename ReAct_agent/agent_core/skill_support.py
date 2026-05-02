@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# AI辅助生成：本文件中的上下文事实记忆、监控点追溯补全与结构化观察逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+
 from typing import Any, Optional, Sequence
 
 from agent_core import formatters

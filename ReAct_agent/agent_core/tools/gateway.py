@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# AI辅助生成：本文件中的工具分类鉴权与 web_access 安全限制逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+
 from typing import Any, Callable, Optional, cast
 from urllib.parse import quote
 

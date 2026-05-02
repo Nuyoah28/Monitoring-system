@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# AI辅助生成：本文件中的 QQ 身份映射与可信会话透传逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+
 import hashlib
 import time
 from typing import Any, Callable

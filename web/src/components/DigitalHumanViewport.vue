@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+// AI辅助生成：GPT-5 Codex, 2026-03-28。数字人渲染形态切换、点击唤醒与语音联动逻辑。
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { agentBaseUrl } from '@/config/config';
 import { digitalHumanConfig, type DigitalHumanMode } from '@/config/digitalHuman';

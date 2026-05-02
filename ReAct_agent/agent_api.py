@@ -3,6 +3,8 @@ Agent API 服务 - 提供HTTP接口供前端或其他服务调用
 可以集成到Spring Boot后端，或作为独立服务运行
 """
 
+# AI辅助生成：本文件中的多用户会话隔离与身份上下文透传逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 

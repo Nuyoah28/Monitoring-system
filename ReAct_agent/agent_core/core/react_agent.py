@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# AI辅助生成：本文件中的 ReAct 并发读工具调度、写操作鉴权与时间直答逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional

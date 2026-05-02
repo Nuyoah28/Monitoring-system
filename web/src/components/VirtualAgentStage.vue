@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+// AI辅助生成：GPT-5 Codex, 2026-03-28。数字人舞台布局、SVG 形象与状态氛围表现逻辑。
 import DigitalHumanViewport from '@/components/DigitalHumanViewport.vue';
 
 type AgentStageStatus = 'idle' | 'listening' | 'thinking' | 'speaking';

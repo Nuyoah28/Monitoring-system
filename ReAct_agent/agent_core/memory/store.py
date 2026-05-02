@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# AI辅助生成：本文件中的会话事实记忆存储与清理逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+
 import copy
 import json
 import math
