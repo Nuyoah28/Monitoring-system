@@ -3,8 +3,8 @@ import av
 import time
 
 # 配置参数
-RTMP_URL = "rtmp://192.168.213.197:1935/live/raw"  # 您的RTMP目标地址
-CAMERA_INDEX = 0  # 默认摄像头索引，通常0是内置摄像头。如果是USB摄像头，可能需要尝试1,2等。
+RTMP_URL = "rtmp://123.56.248.17:1935/live/raw"  # 您的RTMP目标地址
+CAMERA_INDEX = 1  # 默认摄像头索引，通常0是内置摄像头。如果是USB摄像头，可能需要尝试1,2等。
 FRAME_RATE = 30  # 帧率
 RESOLUTION = (1280, 720)  # 分辨率 (宽度, 高度)
 

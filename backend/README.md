@@ -92,4 +92,36 @@ tail -f logs/current.log
 ps -fp "$(cat run/backend.pid)"
 ```
 
+## Ubuntu server runtime config
+
+Use environment variables for server-specific addresses and credentials instead
+of editing `application-*.yml` directly.
+
+Example:
+
+```bash
+export SPRING_PROFILES_ACTIVE=prod
+export MYSQL_HOST=127.0.0.1
+export MYSQL_PORT=3306
+export MYSQL_DATABASE=SweatPear
+export MYSQL_USERNAME=monitoring_app
+export MYSQL_PASSWORD='replace-me'
+export REDIS_HOST=127.0.0.1
+export REDIS_PORT=6379
+export REDIS_PASSWORD=''
+export AGENT_API_URL=http://127.0.0.1:5050
+export ALGORITHM_API_URL=http://127.0.0.1:6006
+export IOT_MQTT_ENABLED=true
+export IOT_MQTT_BROKER_URL=tcp://127.0.0.1:1883
+```
+
+Important:
+
+- Ubuntu MySQL often maps `root@localhost` to `auth_socket`, which causes
+  error `1698 Access denied` for password logins from the app. Prefer a
+  dedicated MySQL user for Spring Boot instead of `root`.
+- If MongoDB logs still show `localhost:27017`, that value is not coming from
+  the tracked Spring YAML files in this repo. Check the server process
+  environment, startup script, or any untracked profile files on the server.
+
 

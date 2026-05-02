@@ -1,6 +1,5 @@
-import os
 from queue import Queue
-from config import DevConfig as Config
+from config import RuntimeConfig as Config
 
 cacheQueue = Queue()
 cacheMax = 250
@@ -9,8 +8,8 @@ STREAM_RAW_URL = Config.STREAM_RAW_URL  # python后端拉原始流的地址
 STREAM_PROCESSED_URL = Config.STREAM_PROCESSED_URL  # python后端推处理之后的流的地址
 
 # 添加新的配置项用于视频流处理
-VIDEO_PROCESSING_ENABLED = True
-VIDEO_CACHE_SIZE = 50
+VIDEO_PROCESSING_ENABLED = Config.VIDEO_PROCESSING_ENABLED
+VIDEO_CACHE_SIZE = Config.VIDEO_CACHE_SIZE
 
 # -----------------------------------------------------------------------
 # TYPE_LIST: 检测能力开关列表
@@ -31,17 +30,17 @@ VIDEO_CACHE_SIZE = 50
 #  [10]    11      载具占用车道       暂交由后续算法实现
 #  [11]    12      挥手呼救          ST-GCN++ 动作识别
 # -----------------------------------------------------------------------
-TYPE_LIST = [False, False, False, True, False, False, True, False, False, False, False, True]
+TYPE_LIST = list(Config.TYPE_LIST)
 
 # 左上 右下
-AREA_LIST = [(0, 0), (1280, 720)]
+AREA_LIST = list(Config.AREA_LIST)
 
-capture_width = 1280
-capture_height = 720
-display_width = 1280
-display_height = 720
-framerate = 60
-flip_method = 0
+capture_width = Config.CAPTURE_WIDTH
+capture_height = Config.CAPTURE_HEIGHT
+display_width = Config.DISPLAY_WIDTH
+display_height = Config.DISPLAY_HEIGHT
+framerate = Config.FRAMERATE
+flip_method = Config.FLIP_METHOD
 # ST-GCN++ maintains its own internal buffer, so preList only needs
 # danger zone + Mamba-YOLO state (indices_danger, fire_indices, smoke_indices)
 preList = [None, None, None]
@@ -50,68 +49,47 @@ preList = [None, None, None]
 # Mamba-YOLO 自定义检测目标（在"火"和"烟"之外动态扩展）
 # 这个列表会在 Flask 进程里修改，在 video stream 进程里被读取。
 # -----------------------------------------------------------------------
-CUSTOM_DETECTION_PROMPTS = [
-    "overflow",
-    "garbage",
-    "garbage bin",
-    "bicycle",
-    "motorcycle",
-]
+CUSTOM_DETECTION_PROMPTS = list(Config.CUSTOM_DETECTION_PROMPTS)
 
 # 标志位：提示词是否发生更改
 PROMPTS_CHANGED = False
 
-# Action-model runtime config. These defaults target the current project
-# deployment: CTR-GCN joint+bone fusion, window=90, label order fixed.
-# Environment variables can still override these values for experiments.
-def _env_bool(name, default=False):
-    value = os.environ.get(name)
-    if value is None:
-        return bool(default)
-    return value.strip().lower() in ("1", "true", "yes", "on")
+ACTION_MODEL_BACKEND = Config.ACTION_MODEL_BACKEND
+ACTION_CTR_GCN_ROOT = Config.ACTION_CTR_GCN_ROOT
+ACTION_CTR_GCN_FUSION = Config.ACTION_CTR_GCN_FUSION
+ACTION_CTR_GCN_FUSION_MODE = Config.ACTION_CTR_GCN_FUSION_MODE
+ACTION_CTR_GCN_JOINT_WEIGHTS = Config.ACTION_CTR_GCN_JOINT_WEIGHTS
+ACTION_CTR_GCN_BONE_WEIGHTS = Config.ACTION_CTR_GCN_BONE_WEIGHTS
+ACTION_CTR_GCN_WEIGHTS = Config.ACTION_CTR_GCN_WEIGHTS
+ACTION_CTR_GCN_JOINT_ALPHA = Config.ACTION_CTR_GCN_JOINT_ALPHA
+ACTION_CTR_GCN_BONE_ALPHA = Config.ACTION_CTR_GCN_BONE_ALPHA
+ACTION_LABEL_ORDER = Config.ACTION_LABEL_ORDER
+ACTION_WINDOW_SIZE = Config.ACTION_WINDOW_SIZE
+ACTION_MIN_FRAMES = Config.ACTION_MIN_FRAMES
+ACTION_SMOOTH = Config.ACTION_SMOOTH
+ACTION_MAX_TRACKS = Config.ACTION_MAX_TRACKS
+ACTION_TOP_K_TRACKS = Config.ACTION_TOP_K_TRACKS
+ACTION_INFER_INTERVAL = Config.ACTION_INFER_INTERVAL
+ACTION_MAX_MISSING = Config.ACTION_MAX_MISSING
 
+ACTION_FALL_ON_THR = Config.ACTION_FALL_ON_THR
+ACTION_FALL_OFF_THR = Config.ACTION_FALL_OFF_THR
+ACTION_FALL_HOLD_FRAMES = Config.ACTION_FALL_HOLD_FRAMES
+ACTION_FALL_RELEASE_FRAMES = Config.ACTION_FALL_RELEASE_FRAMES
+ACTION_FALL_LATCH = Config.ACTION_FALL_LATCH
 
-ACTION_MODEL_BACKEND = os.environ.get("ACTION_MODEL_BACKEND", "ctrgcn").lower()
-ACTION_CTR_GCN_ROOT = os.environ.get("ACTION_CTR_GCN_ROOT", "/home/Documents/algorithm/CTR-GCN")
-ACTION_CTR_GCN_FUSION = os.environ.get("ACTION_CTR_GCN_FUSION", "joint_bone").lower()
-ACTION_CTR_GCN_FUSION_MODE = os.environ.get("ACTION_CTR_GCN_FUSION_MODE", "logits").lower()
-ACTION_CTR_GCN_JOINT_WEIGHTS = os.environ.get(
-    "ACTION_CTR_GCN_JOINT_WEIGHTS",
-    "/home/Documents/algorithm/algo/ctrgcn_joint_w90_ref_lie_vfF5O15_wCE.pt",
-)
-ACTION_CTR_GCN_BONE_WEIGHTS = os.environ.get(
-    "ACTION_CTR_GCN_BONE_WEIGHTS",
-    "/home/Documents/algorithm/algo/ctrgcn_bone_w90_ref_lie_vfF5O15_wCE.pt",
-)
-# Backward-compatible single-weight alias. In joint+bone mode this is the joint stream.
-ACTION_CTR_GCN_WEIGHTS = os.environ.get("ACTION_CTR_GCN_WEIGHTS", ACTION_CTR_GCN_JOINT_WEIGHTS)
-ACTION_CTR_GCN_JOINT_ALPHA = float(os.environ.get("ACTION_CTR_GCN_JOINT_ALPHA", "1.0"))
-ACTION_CTR_GCN_BONE_ALPHA = float(os.environ.get("ACTION_CTR_GCN_BONE_ALPHA", "1.0"))
-ACTION_LABEL_ORDER = ("normal", "fall", "punch", "wave")
-ACTION_WINDOW_SIZE = int(os.environ.get("ACTION_WINDOW_SIZE", "90"))
-ACTION_MIN_FRAMES = int(os.environ.get("ACTION_MIN_FRAMES", "8"))
-ACTION_SMOOTH = int(os.environ.get("ACTION_SMOOTH", "4"))
-ACTION_MAX_TRACKS = int(os.environ.get("ACTION_MAX_TRACKS", "8"))
-ACTION_TOP_K_TRACKS = int(os.environ.get("ACTION_TOP_K_TRACKS", "4"))
-ACTION_INFER_INTERVAL = int(os.environ.get("ACTION_INFER_INTERVAL", "1"))
-ACTION_MAX_MISSING = int(os.environ.get("ACTION_MAX_MISSING", "10"))
+ACTION_WAVE_ON_THR = Config.ACTION_WAVE_ON_THR
+ACTION_WAVE_OFF_THR = Config.ACTION_WAVE_OFF_THR
+ACTION_WAVE_CONFIRM_FRAMES = Config.ACTION_WAVE_CONFIRM_FRAMES
+ACTION_WAVE_RELEASE_FRAMES = Config.ACTION_WAVE_RELEASE_FRAMES
 
-ACTION_FALL_ON_THR = float(os.environ.get("ACTION_FALL_ON_THR", "0.35"))
-ACTION_FALL_OFF_THR = float(os.environ.get("ACTION_FALL_OFF_THR", "0.15"))
-ACTION_FALL_HOLD_FRAMES = int(os.environ.get("ACTION_FALL_HOLD_FRAMES", "75"))
-ACTION_FALL_RELEASE_FRAMES = int(os.environ.get("ACTION_FALL_RELEASE_FRAMES", "30"))
-ACTION_FALL_LATCH = _env_bool("ACTION_FALL_LATCH", True)
+ACTION_PUNCH_ON_THR = Config.ACTION_PUNCH_ON_THR
+ACTION_PUNCH_OFF_THR = Config.ACTION_PUNCH_OFF_THR
+ACTION_PUNCH_CONFIRM_FRAMES = Config.ACTION_PUNCH_CONFIRM_FRAMES
+ACTION_PUNCH_RELEASE_FRAMES = Config.ACTION_PUNCH_RELEASE_FRAMES
+ACTION_FIGHT_DISTANCE_RATIO = Config.ACTION_FIGHT_DISTANCE_RATIO
+ACTION_FIGHT_CONFIRM_FRAMES = Config.ACTION_FIGHT_CONFIRM_FRAMES
+ACTION_FIGHT_RELEASE_FRAMES = Config.ACTION_FIGHT_RELEASE_FRAMES
 
-ACTION_WAVE_ON_THR = float(os.environ.get("ACTION_WAVE_ON_THR", "0.40"))
-ACTION_WAVE_OFF_THR = float(os.environ.get("ACTION_WAVE_OFF_THR", "0.20"))
-ACTION_WAVE_CONFIRM_FRAMES = int(os.environ.get("ACTION_WAVE_CONFIRM_FRAMES", "3"))
-ACTION_WAVE_RELEASE_FRAMES = int(os.environ.get("ACTION_WAVE_RELEASE_FRAMES", "8"))
-
-ACTION_PUNCH_ON_THR = float(os.environ.get("ACTION_PUNCH_ON_THR", "0.45"))
-ACTION_PUNCH_OFF_THR = float(os.environ.get("ACTION_PUNCH_OFF_THR", "0.20"))
-ACTION_PUNCH_CONFIRM_FRAMES = int(os.environ.get("ACTION_PUNCH_CONFIRM_FRAMES", "3"))
-ACTION_PUNCH_RELEASE_FRAMES = int(os.environ.get("ACTION_PUNCH_RELEASE_FRAMES", "8"))
-ACTION_FIGHT_DISTANCE_RATIO = float(os.environ.get("ACTION_FIGHT_DISTANCE_RATIO", "1.40"))
-ACTION_FIGHT_CONFIRM_FRAMES = int(os.environ.get("ACTION_FIGHT_CONFIRM_FRAMES", "4"))
-ACTION_FIGHT_RELEASE_FRAMES = int(os.environ.get("ACTION_FIGHT_RELEASE_FRAMES", "12"))
+WARNING_STREAK_MIN_HITS = Config.WARNING_STREAK_MIN_HITS
 

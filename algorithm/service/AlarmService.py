@@ -10,7 +10,7 @@ import copy
 import time
 import threading
 from util import UploadCos
-from config import DevConfig as Config
+from config import RuntimeConfig as Config
 from service import AlarmCacheService
 
 logger = setup_logger()

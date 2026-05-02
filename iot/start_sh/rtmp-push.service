@@ -1,0 +1,18 @@
+[Unit]
+Description=RTMP push service
+Wants=network-online.target
+After=network-online.target
+Wants=preferred-wifi.service
+After=preferred-wifi.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/user/Documents/iot/rtmpService
+ExecStart=/bin/bash /home/user/Documents/iot/start_sh/start_rtmp_service.sh
+Restart=always
+RestartSec=5
+User=user
+Environment=PYTHON_BIN=python3
+
+[Install]
+WantedBy=multi-user.target

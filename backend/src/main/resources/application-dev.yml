@@ -1,16 +1,13 @@
 server:
-  port: 10215
+  port: ${SERVER_PORT:10215}
 
 spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/SweatPear?serverTimezone=GMT%2B8&rewriteBatchedStatements=true&tinyInt1isBit=false
-    username: root
-    # 数据库密码 自己改成自己电脑的密码，后面建议写上是谁的别搞混了
-    # password: '050130' # 赵博文
-    password: fast2005 # 冯博轩
-    #password: 'root' # 刘少帅
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:SweatPear}?serverTimezone=GMT%2B8&rewriteBatchedStatements=true&tinyInt1isBit=false}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
     druid:
       initial-size: 5
       min-idle: 10
@@ -19,35 +16,24 @@ spring:
       min-evictable-idle-time-millis: 300000
       time-between-eviction-runs-millis: 60000
       filters: stat,wall
-      # 检测连接是否有效的 SQL语句，为空时以下三个配置均无效
       validation-query: SELECT 1
-      # 申请连接时执行validationQuery检测连接是否有效，默认true，开启后会降低性能
       test-on-borrow: true
-      # 归还连接时执行validationQuery检测连接是否有效，默认false，开启后会降低性能
       test-on-return: true
-      # 申请连接时如果空闲时间大于timeBetweenEvictionRunsMillis，执行validationQuery检测连接是否有效，默认false，建议开启，不影响性能
       test-while-idle: true
 
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
-      database: 0
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
       jedis:
         pool:
-          # 连接池最大连接数（使用负值表示没有限制）
           max-active: 8
-          # 连接池最大阻塞等待时间（使用负值表示没有限制）
           max-wait: -1ms
-          # 连接池中的最大空闲连接
           max-idle: 8
-          # 连接池中的最小空闲连接
           min-idle: 0
-          # 连接超时时间（毫秒）默认是2000ms
           timeout: 10000ms
-      # redis密码 自己改成自己电脑的密码，后面建议写上是谁的别搞混了
-      # password: 123456  # 赵博文
-      password: # 冯博轩
+      password: ${REDIS_PASSWORD:}
   cache:
     type: redis
     redis:
@@ -58,25 +44,21 @@ oss:
   id:
   pass:
 
-## chatgpt的apikey
-#keys:
-#  list:
-#    - sk-xxx10
-#    - sk-xxxx
-
-## AI Agent配置
 agent:
   api:
-    url: http://localhost:5050  # Python Agent API地址
+    url: ${AGENT_API_URL:http://127.0.0.1:5050}
 
 algorithm:
   api:
-    url: http://localhost:6006 # 算法服务API地址
+    url: ${ALGORITHM_API_URL:http://127.0.0.1:6006}
+
 iot:
   mqtt:
-    enabled: true
-    broker-url: tcp://127.0.0.1:1883
-    client-id: monitoring-system-backend
-    environment-topic: iot/sensor/+/environment
-    alarm-topic: iot/algo/+/alarm
-    qos: 1
+    enabled: ${IOT_MQTT_ENABLED:true}
+    broker-url: ${IOT_MQTT_BROKER_URL:tcp://127.0.0.1:1883}
+    client-id: ${IOT_MQTT_CLIENT_ID:monitoring-system-backend}
+    username: ${IOT_MQTT_USERNAME:}
+    password: ${IOT_MQTT_PASSWORD:}
+    environment-topic: ${IOT_MQTT_ENVIRONMENT_TOPIC:iot/sensor/+/environment}
+    alarm-topic: ${IOT_MQTT_ALARM_TOPIC:iot/algo/+/alarm}
+    qos: ${IOT_MQTT_QOS:1}

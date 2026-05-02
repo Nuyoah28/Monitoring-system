@@ -167,7 +167,7 @@ def stream_video():
     post_delay = 20  # 告警推送延迟20秒
     last_post_time = time.time()  # 记录上一次post的时间
     warning_streak = [0] * 12
-    stable_warning_min_hits = int(os.environ.get("WARNING_STREAK_MIN_HITS", "3"))
+    stable_warning_min_hits = monitorCommon.WARNING_STREAK_MIN_HITS
 
     save_img_delay = 10  # 保存图片间隔10秒
     last_save_time = time.time()  # 记录上一次保存图片的时间

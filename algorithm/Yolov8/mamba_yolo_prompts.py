@@ -5,8 +5,7 @@ model architecture, checkpoint loading, or the prompt format passed to
 YOLO-World.
 """
 
-import os
-
+from config import RuntimeConfig as Config
 from Yolov8.utils1 import update_event_names
 
 
@@ -89,7 +88,7 @@ def _dedupe_keep_order(items):
     return result
 
 
-ENABLE_PROMPT_SYNONYMS = os.environ.get("ENABLE_PROMPT_SYNONYMS", "0") == "1"
+ENABLE_PROMPT_SYNONYMS = Config.ENABLE_PROMPT_SYNONYMS
 
 
 def build_prompt_groups(extra_prompts=None):
@@ -104,8 +103,9 @@ def build_prompt_groups(extra_prompts=None):
     keeps their backend slots but reports them as False unless implemented
     elsewhere.
 
-    Set ENABLE_PROMPT_SYNONYMS=1 to expand each business target into multiple
-    English prompts and aggregate their labels back to the same business group.
+    Enable prompt synonyms in config.py to expand each business target into
+    multiple English prompts and aggregate their labels back to the same
+    business group.
     """
     raw_prompts = BUILTIN_CATEGORIES + DEFAULT_BUSINESS_PROMPTS
     if extra_prompts:

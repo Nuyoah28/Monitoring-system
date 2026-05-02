@@ -22,7 +22,6 @@ def _resolve_ctrgcn_root(explicit_root=None):
     candidates = [
         explicit_root,
         getattr(monitorCommon, "ACTION_CTR_GCN_ROOT", ""),
-        os.environ.get("ACTION_CTR_GCN_ROOT", ""),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "CTR-GCN")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "third_party", "CTR-GCN")),
     ]

@@ -4,12 +4,12 @@ from tencentcloud.common.profile.client_profile import ClientProfile
 from tencentcloud.common.profile.http_profile import HttpProfile
 from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
 from tencentcloud.tmt.v20180321 import tmt_client, models
-from config import DevConfig
+from config import RuntimeConfig as Config
 
 class TencentTranslator:
     def __init__(self, secret_id=None, secret_key=None):
-        self.secret_id = secret_id or DevConfig.TENCENT_SECRET_ID
-        self.secret_key = secret_key or DevConfig.TENCENT_SECRET_KEY
+        self.secret_id = secret_id or Config.TENCENT_SECRET_ID
+        self.secret_key = secret_key or Config.TENCENT_SECRET_KEY
         self.client = None
 
         if self.secret_id and self.secret_key:

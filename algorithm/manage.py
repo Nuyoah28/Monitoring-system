@@ -1,7 +1,10 @@
 from __init__ import create_app
+from config import DEFAULT_CONFIG_NAME, RuntimeConfig
 
-config_name = 'dev'
+
+config_name = DEFAULT_CONFIG_NAME
 app = create_app(config_name)
 
-if __name__ == '__main__':
-    app.run('0.0.0.0',port=6006) # 0.0.0.0 表示监听所有网络接口，包括公网
+
+if __name__ == "__main__":
+    app.run(RuntimeConfig.APP_HOST, port=RuntimeConfig.APP_PORT)

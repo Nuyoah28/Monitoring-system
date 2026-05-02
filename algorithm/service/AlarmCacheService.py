@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from config import DevConfig as Config
+from config import RuntimeConfig as Config
 from util.Logger import setup_logger
 
 logger = setup_logger()
