@@ -17,4 +17,6 @@ public class RegisterParam {
 
     @NotNull(message = "role不能为空")
     private Integer role;
+
+    private String homeArea;
 }

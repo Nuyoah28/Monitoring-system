@@ -4,13 +4,16 @@ import com.sipc.monitoringsystem.aop.ClearRedis;
 import com.sipc.monitoringsystem.aop.Pass;
 import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.param.Monitor.CreateMonitorParam;
+import com.sipc.monitoringsystem.model.dto.param.Monitor.SaveMonitorRecognitionRulesParam;
 import com.sipc.monitoringsystem.model.dto.param.Monitor.UpdateMonitorParam;
 import com.sipc.monitoringsystem.model.dto.res.BlankRes;
 import com.sipc.monitoringsystem.model.dto.res.Monitor.CreateMonitorRes;
 import com.sipc.monitoringsystem.model.dto.res.Monitor.GetMonitorsPosRes;
 import com.sipc.monitoringsystem.model.dto.res.Monitor.GetMonitorListRes;
+import com.sipc.monitoringsystem.model.dto.res.Monitor.MonitorRecognitionRuleRes;
 import com.sipc.monitoringsystem.model.po.Monitor.Monitor;
 import com.sipc.monitoringsystem.model.po.User.User;
+import com.sipc.monitoringsystem.service.MonitorRecognitionRuleService;
 import com.sipc.monitoringsystem.service.MonitorService;
 import com.sipc.monitoringsystem.service.UserService;
 import com.sipc.monitoringsystem.util.JwtUtils;
@@ -42,6 +45,9 @@ public class MonitorController {
     MonitorService monitorService;
 
     @Autowired
+    MonitorRecognitionRuleService monitorRecognitionRuleService;
+
+    @Autowired
     UserService userService;
 
     @Value("${agent.api.url:http://localhost:5000}")
@@ -54,22 +60,21 @@ public class MonitorController {
 
     @GetMapping()
     public CommonResult<List<GetMonitorListRes>> getMonitorList() {
-        // 从 Token 获取当前用户信息
         User tokenUser = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
         User user = userService.getById(tokenUser.getId());
         if (user == null) {
             user = tokenUser;
         }
 
-        // 根据用户权限获取监控列表
         List<Monitor> sqlMonitors = monitorService.getMonitorList(user);
         if (sqlMonitors == null) {
             return CommonResult.fail("获取监控列表失败");
         }
-        System.out.println(sqlMonitors);
         List<GetMonitorListRes> getMonitorListResList = new ArrayList<>();
         for (Monitor monitor : sqlMonitors) {
             GetMonitorListRes getMonitorListRes = new GetMonitorListRes(monitor);
+            getMonitorListRes.setRecognitionRuleConfigured(
+                    !monitorRecognitionRuleService.getRulesByMonitorId(monitor.getId()).isEmpty());
             getMonitorListResList.add(getMonitorListRes);
         }
 
@@ -140,10 +145,28 @@ public class MonitorController {
         return CommonResult.success("开启或关闭成功");
     }
 
+    @GetMapping("/rules/{monitorId}")
+    public CommonResult<List<MonitorRecognitionRuleRes>> getRecognitionRules(@PathVariable @NotNull Integer monitorId) {
+        if (monitorService.getMonitorById(monitorId) == null) {
+            return CommonResult.fail("摄像头不存在");
+        }
+        return CommonResult.success(monitorRecognitionRuleService.getRulesByMonitorId(monitorId));
+    }
+
+    @PostMapping("/rules/{monitorId}")
+    @ClearRedis
+    public CommonResult<List<MonitorRecognitionRuleRes>> saveRecognitionRules(
+            @PathVariable @NotNull Integer monitorId,
+            @RequestBody SaveMonitorRecognitionRulesParam param) {
+        if (monitorService.getMonitorById(monitorId) == null) {
+            return CommonResult.fail("摄像头不存在");
+        }
+        return CommonResult.success(monitorRecognitionRuleService.saveRules(monitorId, param));
+    }
+
     @PostMapping("/update_prompt")
     public CommonResult<?> updatePrompt(@RequestBody Map<String, Object> body) {
         try {
-            // 将前端发来的包含中文的 prompts 透传给 Python 算法端进行翻译和动态加载
             String targetUrl = algorithmApiUrl + "/api/v1/monitor-device/update_prompt";
             ResponseEntity<Map> response = restTemplate.postForEntity(targetUrl, body, Map.class);
             Map respBody = response.getBody();

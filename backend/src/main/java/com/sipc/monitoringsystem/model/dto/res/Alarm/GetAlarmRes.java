@@ -3,7 +3,6 @@ package com.sipc.monitoringsystem.model.dto.res.Alarm;
 import com.alibaba.excel.annotation.ExcelProperty;
 import com.sipc.monitoringsystem.model.po.Alarm.SqlGetAlarm;
 import lombok.Data;
-import com.sipc.monitoringsystem.util.OssUtil;
 
 import java.text.SimpleDateFormat;
 
@@ -17,7 +16,6 @@ public class GetAlarmRes
 {
 
     public GetAlarmRes(SqlGetAlarm sqlGetAlarm){
-        OssUtil ossUtil = new OssUtil();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         this.setId(sqlGetAlarm.getId());
         this.setMonitorId(sqlGetAlarm.getMonitorId());
@@ -29,7 +27,7 @@ public class GetAlarmRes
         this.setDepartment(sqlGetAlarm.getArea());
         this.setDeal(sqlGetAlarm.getStatus() ? "已处理":"未处理");
         this.setContent(sqlGetAlarm.getProcessingContent());
-        this.setVideo(ossUtil.getClipLinkByUuid(sqlGetAlarm.getClipLink()));
+        this.setVideo(sqlGetAlarm.getClipLink());
         this.setPhone(sqlGetAlarm.getPhone());
     }
 

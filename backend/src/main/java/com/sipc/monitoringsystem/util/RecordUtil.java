@@ -57,19 +57,23 @@ public class RecordUtil extends Thread {
             throw new RuntimeException(e);
         }
         String randomId = String.valueOf(UUID.randomUUID());
+        String objectKey = randomId + ".flv";
         PutObjectRequest putObjectRequest = new PutObjectRequest(
-                "hospital-alarm-1318141347",
-                randomId + ".flv",
+                ossConfig.getBucketName(),
+                objectKey,
                 is,
                 objectMetadata);
         COSClient cosClient = ossConfig.cosClient();
-        cosClient.putObject(putObjectRequest);
-
-        return cosClient.generatePresignedUrl(
-                "hospital-alarm-1318141347",
-                randomId + ".flv",
-                new Date(System.currentTimeMillis() + (long) 365 * 24 * 60 * 60 * 1000),
-                HttpMethodName.GET).toString();
+        try {
+            cosClient.putObject(putObjectRequest);
+            return cosClient.generatePresignedUrl(
+                    ossConfig.getBucketName(),
+                    objectKey,
+                    new Date(System.currentTimeMillis() + (long) 365 * 24 * 60 * 60 * 1000),
+                    HttpMethodName.GET).toString();
+        } finally {
+            cosClient.shutdown();
+        }
     }
 
 

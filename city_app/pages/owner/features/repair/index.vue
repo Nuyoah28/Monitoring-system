@@ -95,9 +95,7 @@ export default {
           uni.$showMsg(res.message || '加载报修记录失败');
           return;
         }
-        const username = uni.getStorageSync('username') || '';
-        const all = Array.isArray(res.data) ? res.data : [];
-        this.records = username ? all.filter((item) => item.publisher === username) : all;
+        this.records = Array.isArray(res.data) ? res.data : [];
       } catch (e) {
         uni.$showMsg('网络异常，请稍后重试');
       }
@@ -120,7 +118,6 @@ export default {
         location: this.form.location.trim(),
         reportTime: this.nowTimeStr(),
         repairDetail: this.form.repairDetail.trim(),
-        publisher: uni.getStorageSync('username') || '业主用户',
       };
       try {
         const { data: res } = await uni.$http.post('/api/v1/device-repair/create', payload);
@@ -161,7 +158,7 @@ export default {
   box-sizing: border-box;
   background: linear-gradient(180deg, #f2f9ff 0%, #fbfdfd 54%, #ffffff 100%);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .bg-shape {

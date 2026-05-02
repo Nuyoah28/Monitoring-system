@@ -7,7 +7,9 @@ export const APP_CONFIG = {
     useSwitchTab: true,
   },
   owner: {
-    loginApi: '/api/v1/user/login',
+    loginApi: '/api/v1/user/owner/login',
+    registerApi: '/api/v1/user/register',
+    wxRegisterApi: '',
     successUrl: '/pages/owner/home/index',
     appType: 'owner',
     enableWebsocket: true,

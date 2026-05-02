@@ -26,22 +26,48 @@ mysql --default-character-set=utf8mb4 -u root -p
 
 ### 1. `final_schema.sql`
 
-唯一完整建库脚本，适合新环境初始化。
+最终表结构脚本，适合新环境初始化的第一步。
 
 包含：
 
 - 主业务表结构
-- 告警类型、默认等级和启用状态
+- 索引和外键
 - IoT 环境、车位、天气、推送相关表
-- 基础演示数据
+- 业主端访客/报修隔离字段
+- 个人中心头像、住户区域、推送配置字段
+- 摄像头自定义识别规则表
 
 注意：
 
 - 脚本里包含 `DROP TABLE`
 - 脚本里自带 `CREATE DATABASE` 和 `USE SweatPear`
 - 已有数据库不要直接执行这个文件
+- 这个文件不包含演示数据
 
-### 2. `migrate_case_type_warning_level.sql`
+### 2. `final_seed_data.sql`
+
+最终演示数据脚本，适合新环境初始化的第二步。
+
+包含：
+
+- 默认账号，密码均为 `123456`
+- 12 类告警类型及默认等级
+- 摄像头/监控点演示数据
+- 告警、社区消息、报警推送记录
+- 环境监测、天气、停车服务演示数据
+- 访客登记、设备报修演示数据
+- 摄像头自定义识别规则演示数据
+
+新机器初始化顺序：
+
+```sql
+source backend/sql/final_schema.sql;
+source backend/sql/final_seed_data.sql;
+```
+
+如果用 Navicat，就先打开并执行 `final_schema.sql`，再打开并执行 `final_seed_data.sql`。
+
+### 3. `migrate_case_type_warning_level.sql`
 
 适合已有数据库升级到“告警等级由 `case_type_info` 配置”的版本。
 
@@ -52,15 +78,15 @@ mysql --default-character-set=utf8mb4 -u root -p
 - 将吸烟、冰面设为隐藏/停用
 - 同步历史 `alarm_info.warning_level`
 
-### 3. `migrate_nearby_push.sql`
+### 4. `migrate_nearby_push.sql`
 
 这是“邻近居民告警推送”相关的增量迁移脚本。
 
-### 4. `iot_env_parking.sql`
+### 5. `iot_env_parking.sql`
 
 这是 IoT 环境与车位数据相关表的建表脚本，历史环境可按需参考；新环境已合并进 `final_schema.sql`。
 
-### 5. `env_weather_flow.sql`
+### 6. `env_weather_flow.sql`
 
 这是环境与天气流程的增量脚本，历史环境可按需参考；新环境已合并进 `final_schema.sql`。
 
@@ -124,4 +150,22 @@ Important:
   the tracked Spring YAML files in this repo. Check the server process
   environment, startup script, or any untracked profile files on the server.
 
+## 腾讯云 COS 配置
 
+项目里已经接入腾讯云 COS SDK，配置统一走 Spring Boot 的 `oss` 配置项。不要把 SecretId / SecretKey 写进仓库，建议在本机或服务器环境变量里配置：
+
+```bash
+export COS_SECRET_ID='你的 SecretId'
+export COS_SECRET_KEY='你的 SecretKey'
+export COS_REGION='ap-beijing'
+export COS_BUCKET='my-server-1397492316'
+export COS_BASE_URL='https://my-server-1397492316.cos.ap-beijing.myqcloud.com'
+```
+
+对应配置文件：
+
+- `application-dev.yml`
+- `application-dev-my.yml`
+- `application-prod.yml`
+
+报警视频仍然保存对象 key / clipId 到数据库，后端服务层会把它转换成 COS 访问链接。这样数据库迁移到新机器时不需要因为 COS 域名变化批量改历史数据。

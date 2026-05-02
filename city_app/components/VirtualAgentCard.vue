@@ -39,8 +39,11 @@
     </view>
 
     <view class="agent-status-card">
-      <view class="agent-status-dot"></view>
-      <text class="agent-state-pill">{{ statusText }}</text>
+      <view class="agent-status-top">
+        <view class="agent-status-dot"></view>
+        <text class="agent-state-pill">{{ statusText }}</text>
+      </view>
+      <text v-if="subtitle" class="agent-status-subtitle">{{ subtitle }}</text>
     </view>
   </view>
 </template>
@@ -83,7 +86,7 @@ export default {
     },
     fitScale: {
       type: Number,
-      default: 0.96,
+      default: 0.88,
     },
     positionX: {
       type: Number,
@@ -125,7 +128,7 @@ export default {
         runtimeScriptUrl: this.runtimeScriptUrl,
         live2dScriptUrl: this.live2dScriptUrl,
         cubismVersion: Number(this.cubismVersion) === 2 ? 2 : 4,
-        fitScale: Number(this.fitScale) || 0.96,
+        fitScale: Number(this.fitScale) || 0.88,
         positionX: Number(this.positionX) || 0,
         positionY: Number(this.positionY) || 0.08,
         motions: {
@@ -145,6 +148,7 @@ export default {
     setLive2DFailed() {
       this.live2dReady = false;
       this.live2dFailed = true;
+      this.$emit('failed');
     },
   },
 };
@@ -526,10 +530,10 @@ export default {
 .live2d-layer {
   position: absolute;
   left: 50%;
-  top: 78rpx;
-  bottom: 170rpx;
-  width: 92%;
-  max-width: 820rpx;
+  top: calc(var(--status-bar-height, 0px) + 112rpx);
+  bottom: 230rpx;
+  width: 86%;
+  max-width: 760rpx;
   z-index: 6;
   opacity: 0;
   transform: translateX(-50%);
@@ -565,13 +569,14 @@ export default {
 .agent-portrait-wrap {
   position: absolute;
   left: 50%;
-  bottom: 250rpx;
-  width: 420rpx;
-  height: 420rpx;
+  bottom: 276rpx;
+  width: 340rpx;
+  height: 340rpx;
   z-index: 5;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scale(0.82);
   animation: agentFloat 4.8s ease-in-out infinite;
   transition: opacity 0.32s ease, transform 0.32s ease;
+  transform-origin: center bottom;
 }
 
 .agent-back-halo {
@@ -736,17 +741,25 @@ export default {
 
 .agent-status-card {
   position: absolute;
-  right: 28rpx;
-  top: 24rpx;
+  left: 28rpx;
+  right: auto;
+  top: calc(var(--status-bar-height, 0px) + 112rpx);
   z-index: 8;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 260rpx;
   padding: 10rpx 16rpx;
-  border-radius: 999rpx;
-  background: rgba(7, 27, 54, 0.48);
-  border: 1px solid rgba(139, 219, 255, 0.18);
-  box-shadow: 0 10rpx 28rpx rgba(0, 13, 38, 0.14);
+  border-radius: 22rpx;
+  background: rgba(7, 27, 54, 0.32);
+  border: 1px solid rgba(139, 219, 255, 0.14);
+  box-shadow: 0 10rpx 28rpx rgba(0, 13, 38, 0.12);
   backdrop-filter: blur(8px);
+}
+
+.agent-status-top {
+  display: flex;
+  align-items: center;
 }
 
 .agent-status-dot {
@@ -763,6 +776,14 @@ export default {
   color: #dff7ff;
   font-size: 22rpx;
   font-weight: 700;
+}
+
+.agent-status-subtitle {
+  display: none;
+  margin-top: 6rpx;
+  color: rgba(204, 229, 244, 0.78);
+  font-size: 19rpx;
+  line-height: 1.35;
 }
 
 .agent-stage.state-listening .agent-status-dot {
@@ -792,10 +813,10 @@ export default {
 @keyframes agentFloat {
   0%,
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) scale(0.82) translateY(0);
   }
   50% {
-    transform: translateX(-50%) translateY(-10rpx);
+    transform: translateX(-50%) scale(0.82) translateY(-10rpx);
   }
 }
 

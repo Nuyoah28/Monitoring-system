@@ -20,7 +20,7 @@ const resolveLaunchTarget = () => {
   }
 
   return {
-    navType: "switchTab",
+    navType: "reLaunch",
     url: "/pages/manage/controls/controls",
   };
 };
@@ -41,18 +41,18 @@ export default {
         let MediaPlayer = plus.android.importClass("android.media.MediaPlayer");
         let player = MediaPlayer.create(main, uri);
         let check = 1;
-        
+
         uni.onPushMessage((res) => {
           // console.log(res);
           if (res.type === "click") {
             const currentAppType = uni.getStorageSync("appType");
             if (currentAppType === "owner") {
-              uni.switchTab({
+              uni.reLaunch({
                 url: "/pages/owner/home/index",
               });
             } else {
-              uni.switchTab({
-                url: "/pages/manage/monitor/index",
+              uni.reLaunch({
+                url: "/pages/manage/controls/controls",
               });
             }
           } else if (res.type === "receive") {
@@ -82,7 +82,7 @@ export default {
         });
     }
     // #endif
-    
+
     const userId = uni.getStorageSync("userId");
     const appType = uni.getStorageSync("appType");
     const token = uni.getStorageSync("token");

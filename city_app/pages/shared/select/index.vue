@@ -96,7 +96,6 @@ export default {
   margin-top: 56rpx;
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
 }
 
 .role-btn {
@@ -110,6 +109,10 @@ export default {
   &::after {
     border: none;
   }
+}
+
+.role-btn + .role-btn {
+  margin-top: 28rpx;
 }
 
 .manage {

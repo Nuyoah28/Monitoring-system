@@ -10,9 +10,6 @@
         </view>
       </view>
       <text class="header-title">AI助手</text>
-      <view class="setting-btn" @tap="jumpSetting">
-        <image class="setting-tag" src="/static/settings.png"></image>
-      </view>
     </view>
 
     <view class="session-drawer" :class="{ open: showSessionList }" @touchmove.stop.prevent>
@@ -43,7 +40,16 @@
     </view>
 
     <view class="body" id="ai-body" :class="{ 'chat-open': showChatPanel }" :style="bodyStyle">
-      <virtual-agent-card :state="agentState" :status-text="agentStatusText" :subtitle="agentStatusSubText" @tap="handleAgentTap" />
+      <virtual-agent-card :state="agentState" :status-text="agentStatusText" :subtitle="agentStatusSubText" :fit-scale="0.88" @tap="handleAgentTap" />
+      <view class="assistant-dock">
+        <view class="assistant-dock-title">智能管理助手</view>
+        <view class="assistant-chip-row">
+          <view class="assistant-chip">报警</view>
+          <view class="assistant-chip">巡检</view>
+          <view class="assistant-chip">环境</view>
+          <view class="assistant-chip">车位</view>
+        </view>
+      </view>
 
       <view class="floating-dialog" v-if="latestUserText || latestAssistantText">
         <view class="floating-bubble user-bubble" v-if="latestUserText">
@@ -149,6 +155,11 @@ export default {
     isOwnerApp() {
       return uni.getStorageSync('appType') === 'owner';
     },
+    sessionCacheKey() {
+      const appType = uni.getStorageSync('appType') || 'manage';
+      const userId = uni.getStorageSync('userId') || 'anonymous';
+      return `aiSessionCache:${appType}:${userId}`;
+    },
     voiceClickHandler() {
       const self = this;
       return function () {
@@ -226,9 +237,11 @@ export default {
     });
   },
   onHide() {
+    this.stopAllVoiceAndTts();
     this.closeWs();
   },
   onUnload() {
+    this.stopAllVoiceAndTts();
     this.closeWs();
   },
   methods: {
@@ -271,11 +284,11 @@ export default {
         uni.reLaunch({ url: '/pages/owner/home/index' });
         return;
       }
-      uni.switchTab({ url: '/pages/manage/controls/controls' });
+      uni.reLaunch({ url: '/pages/manage/controls/controls' });
     },
     loadSessionCache() {
       try {
-        const cache = uni.getStorageSync('aiSessionCache');
+        const cache = uni.getStorageSync(this.sessionCacheKey);
         if (!cache) return;
         const parsed = typeof cache === 'string' ? JSON.parse(cache) : cache;
         if (parsed && Array.isArray(parsed.sessions)) {
@@ -286,7 +299,7 @@ export default {
     },
     saveSessionCache() {
       try {
-        uni.setStorageSync('aiSessionCache', {
+        uni.setStorageSync(this.sessionCacheKey, {
           sessions: this.sessions,
           currentSessionId: this.currentSessionId,
         });
@@ -414,14 +427,20 @@ export default {
       return text.length > limit ? text.slice(0, limit) + '...' : text;
     },
     getLatestAssistantContent() {
+      let welcomeText = '';
       for (let i = this.textList.length - 1; i >= 0; i -= 1) {
         const item = this.textList[i];
-        if (this.getMessageRole(item, i) === 'assistant' && item.type !== 'welcome') {
+        if (this.getMessageRole(item, i) === 'assistant') {
           const text = this.getMessageText(item).replace(/\s+/g, ' ').trim();
-          if (text) return text;
+          if (!text) continue;
+          if (item.type === 'welcome') {
+            welcomeText = text;
+            continue;
+          }
+          return text;
         }
       }
-      return '';
+      return welcomeText;
     },
     mdToHtml(str) {
       if (str == null || typeof str !== 'string') return '';
@@ -482,13 +501,6 @@ export default {
       this.isLoading = false;
       this.isVoiceProcessing = false;
       this.isDisabled = false;
-    },
-    jumpSetting() {
-      if (this.isOwnerApp) {
-        uni.reLaunch({ url: '/pages/owner/personal/index' });
-        return;
-      }
-      uni.navigateTo({ url: '/pages/manage/personal/setting/setting' });
     },
     send() {
       const ask = (this.text || '').trim();
@@ -770,6 +782,28 @@ export default {
         },
       });
     },
+    stopAllVoiceAndTts() {
+      this.ttsPlaybackToken += 1;
+      if (this.ttsDownloadTask && typeof this.ttsDownloadTask.abort === 'function') {
+        try { this.ttsDownloadTask.abort(); } catch (e) {}
+      }
+      this.ttsDownloadTask = null;
+      if (this.innerAudioContext) {
+        try {
+          if (typeof this.innerAudioContext.stop === 'function') this.innerAudioContext.stop();
+          if (typeof this.innerAudioContext.destroy === 'function') this.innerAudioContext.destroy();
+        } catch (e) {}
+        this.innerAudioContext = null;
+      }
+      if (this.recorderManager && typeof this.recorderManager.stop === 'function') {
+        try { this.recorderManager.stop(); } catch (e) {}
+      }
+      this.recorderManager = null;
+      this.voiceRecordStartAt = 0;
+      this.isRecording = false;
+      this.isVoiceProcessing = false;
+      this.isTtsPlaying = false;
+    },
     stopTtsPlayback() {
       this.ttsPlaybackToken += 1;
       if (this.ttsDownloadTask && typeof this.ttsDownloadTask.abort === 'function') {
@@ -816,39 +850,70 @@ export default {
   flex-direction: column;
   align-items: center;
   background:
-    radial-gradient(1200rpx 520rpx at 12% -5%, rgba(89, 171, 255, 0.3) 0%, rgba(89, 171, 255, 0) 70%),
-    radial-gradient(1000rpx 460rpx at 92% 8%, rgba(0, 210, 255, 0.2) 0%, rgba(0, 210, 255, 0) 72%),
-    linear-gradient(180deg, #deedfb 0%, #ebf5ff 46%, #f4f9ff 100%);
+    radial-gradient(840rpx 520rpx at 18% 4%, rgba(88, 178, 255, 0.22) 0%, rgba(88, 178, 255, 0) 68%),
+    radial-gradient(760rpx 460rpx at 88% 10%, rgba(40, 210, 210, 0.14) 0%, rgba(40, 210, 210, 0) 72%),
+    linear-gradient(180deg, #102c55 0%, #09203f 52%, #06172f 100%);
+}
+
+.main .agent-stage {
+  background:
+    radial-gradient(620rpx 460rpx at 16% 14%, rgba(86, 180, 255, 0.24) 0%, rgba(86, 180, 255, 0) 72%),
+    radial-gradient(680rpx 480rpx at 92% 78%, rgba(33, 193, 176, 0.18) 0%, rgba(33, 193, 176, 0) 70%),
+    radial-gradient(520rpx 360rpx at 50% 42%, rgba(92, 149, 255, 0.12) 0%, rgba(92, 149, 255, 0) 72%),
+    linear-gradient(180deg, #173f68 0%, #0a2343 48%, #06172f 100%);
+}
+
+.main .agent-grid {
+  opacity: 0.42;
+}
+
+.main .glow-one {
+  width: 300rpx;
+  height: 300rpx;
+  left: 42rpx;
+  top: 160rpx;
+  background: rgba(78, 178, 255, 0.16);
+}
+
+.main .glow-two {
+  width: 300rpx;
+  height: 300rpx;
+  right: 8rpx;
+  bottom: 210rpx;
+  background: rgba(51, 214, 190, 0.14);
 }
 
 .header {
   position: fixed;
   left: 24rpx;
   right: 24rpx;
-  top: calc(var(--status-bar-height, 0px) + 16rpx);
+  top: calc(var(--status-bar-height, 0px) + 28rpx);
   z-index: 1200;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 74rpx;
   pointer-events: none;
 }
 
 .top-nav {
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: 24rpx;
   pointer-events: auto;
 }
 
 .back-btn,
 .list-btn,
 .setting-btn {
-  width: 66rpx;
-  height: 66rpx;
-  border-radius: 22rpx;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(126, 187, 255, 0.28);
-  box-shadow: 0 12rpx 30rpx rgba(8, 31, 75, 0.14);
+  width: 62rpx;
+  height: 62rpx;
+  border-radius: 20rpx;
+  background: rgba(235, 246, 255, 0.9);
+  border: 1px solid rgba(170, 219, 255, 0.44);
+  box-shadow:
+    0 10rpx 24rpx rgba(3, 19, 45, 0.18),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.78);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -865,8 +930,8 @@ export default {
 }
 
 .session-tag {
-  width: 42rpx;
-  height: 42rpx;
+  width: 38rpx;
+  height: 38rpx;
   object-fit: contain;
 }
 
@@ -874,15 +939,16 @@ export default {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  padding: 10rpx 22rpx;
+  padding: 10rpx 26rpx;
   border-radius: 999rpx;
-  color: rgba(232, 245, 255, 0.92);
+  color: rgba(239, 250, 255, 0.96);
   font-size: 26rpx;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 2rpx;
-  background: rgba(7, 27, 54, 0.34);
-  border: 1px solid rgba(139, 219, 255, 0.16);
-  backdrop-filter: blur(8px);
+  background: rgba(10, 42, 77, 0.66);
+  border: 1px solid rgba(139, 219, 255, 0.22);
+  box-shadow: 0 8rpx 24rpx rgba(3, 19, 45, 0.2);
+  backdrop-filter: blur(10px);
 }
 
 .setting-tag {
@@ -1025,6 +1091,55 @@ export default {
   flex-direction: column;
   align-items: center;
 }
+.assistant-dock {
+  position: absolute;
+  left: 26rpx;
+  right: 26rpx;
+  bottom: 148rpx;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  min-height: 74rpx;
+  padding: 12rpx 18rpx;
+  border-radius: 28rpx;
+  background: rgba(7, 25, 52, 0.64);
+  border: 1px solid rgba(149, 217, 255, 0.28);
+  box-shadow:
+    0 14rpx 34rpx rgba(0, 12, 40, 0.22),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
+  box-sizing: border-box;
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.assistant-dock-title {
+  color: rgba(238, 248, 255, 0.96);
+  font-size: 25rpx;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.assistant-chip-row {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 8rpx;
+  min-width: 0;
+}
+
+.assistant-chip {
+  padding: 7rpx 13rpx;
+  border-radius: 999rpx;
+  background: rgba(216, 241, 255, 0.16);
+  border: 1px solid rgba(168, 224, 255, 0.28);
+  color: rgba(225, 243, 255, 0.92);
+  font-size: 20rpx;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 
 .floating-dialog {
   position: absolute;
@@ -1036,10 +1151,10 @@ export default {
 }
 
 .floating-bubble {
-  max-width: 58%;
-  padding: 18rpx 22rpx;
-  border-radius: 28rpx;
-  box-shadow: 0 14rpx 36rpx rgba(8, 31, 75, 0.16);
+  max-width: 66%;
+  padding: 18rpx 24rpx;
+  border-radius: 30rpx;
+  box-shadow: 0 14rpx 34rpx rgba(2, 18, 45, 0.2);
 }
 
 .floating-bubble text {
@@ -1050,8 +1165,9 @@ export default {
 .user-bubble {
   margin-left: auto;
   margin-bottom: 18rpx;
-  border-bottom-right-radius: 8rpx;
-  background: linear-gradient(135deg, rgba(64, 123, 255, 0.94) 0%, rgba(91, 156, 255, 0.94) 100%);
+  border-bottom-right-radius: 10rpx;
+  background: linear-gradient(135deg, rgba(45, 105, 230, 0.96) 0%, rgba(64, 145, 255, 0.96) 100%);
+  border: 1rpx solid rgba(179, 218, 255, 0.2);
 }
 
 .user-bubble text {
@@ -1060,9 +1176,9 @@ export default {
 
 .assistant-bubble {
   margin-right: auto;
-  border-bottom-left-radius: 8rpx;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(126, 187, 255, 0.28);
+  border-bottom-left-radius: 10rpx;
+  background: rgba(239, 248, 255, 0.94);
+  border: 1px solid rgba(177, 218, 255, 0.42);
 }
 
 .assistant-bubble text {
@@ -1078,9 +1194,9 @@ export default {
   line-height: 64rpx;
   padding: 0 24rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(126, 187, 255, 0.3);
-  box-shadow: 0 12rpx 30rpx rgba(8, 31, 75, 0.14);
+  background: rgba(239, 248, 255, 0.94);
+  border: 1px solid rgba(177, 218, 255, 0.46);
+  box-shadow: 0 12rpx 30rpx rgba(3, 19, 45, 0.18);
 }
 
 .chat-toggle text {
@@ -1166,10 +1282,11 @@ export default {
 }
 
 .avatar {
-  width: 100rpx;
-  height: 100rpx;
-  background-color: #fff;
+  width: 68rpx;
+  height: 68rpx;
+  background-color: rgba(255, 255, 255, 0.96);
   border-radius: 50%;
+  box-shadow: 0 8rpx 18rpx rgba(8, 31, 75, 0.12);
 }
 
 .avatar image {
@@ -1179,21 +1296,25 @@ export default {
 }
 
 .msg {
-  margin-top: 15rpx;
-  max-width: 70%;
+  margin-top: 4rpx;
+  max-width: 74%;
   box-sizing: border-box;
-  padding: 16rpx 20rpx;
-  border-radius: 24rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 26rpx;
+  box-shadow: 0 8rpx 22rpx rgba(8, 31, 75, 0.1);
 }
 
 .left .msg {
-  background: rgba(255, 255, 255, 0.9);
-  margin-left: 20rpx;
+  background: rgba(255, 255, 255, 0.96);
+  margin-left: 16rpx;
+  border: 1rpx solid rgba(177, 218, 255, 0.4);
+  border-bottom-left-radius: 8rpx;
 }
 
 .right .msg {
-  background: linear-gradient(135deg, #3f78ff 0%, #5b9cff 100%);
-  margin-right: 20rpx;
+  background: linear-gradient(135deg, #2f6ee8 0%, #4c92ff 100%);
+  margin-right: 16rpx;
+  border-bottom-right-radius: 8rpx;
 }
 
 .msg view,
@@ -1204,6 +1325,11 @@ export default {
 
 .right .msg view {
   color: #fff;
+}
+
+.left .msg view,
+.left .msg-rich {
+  color: #17345d;
 }
 
 .loading {
@@ -1231,17 +1357,19 @@ export default {
 .input-wrap {
   width: 93%;
   max-width: 700rpx;
-  height: 92rpx;
+  height: 88rpx;
   display: flex;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.96);
-  border-radius: 46rpx;
+  background-color: rgba(249, 252, 255, 0.98);
+  border-radius: 44rpx;
   overflow: hidden;
   padding: 0 8rpx 0 28rpx;
   box-sizing: border-box;
   margin: 0 auto;
-  border: 1px solid rgba(126, 187, 255, 0.24);
-  box-shadow: 0 16rpx 42rpx rgba(0, 12, 42, 0.2);
+  border: 1px solid rgba(177, 218, 255, 0.42);
+  box-shadow:
+    0 16rpx 38rpx rgba(0, 12, 42, 0.24),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.8);
 }
 
 .input-inner {
@@ -1251,11 +1379,11 @@ export default {
 }
 
 .btn-voice {
-  width: 72rpx;
-  height: 72rpx;
-  min-width: 72rpx;
+  width: 68rpx;
+  height: 68rpx;
+  min-width: 68rpx;
   border-radius: 50%;
-  background-color: #e6eeff;
+  background: linear-gradient(180deg, #eaf2ff 0%, #dbe8ff 100%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1271,7 +1399,7 @@ export default {
 }
 
 .btn-send {
-  height: 72rpx;
+  height: 68rpx;
   min-width: 120rpx;
   padding: 0 28rpx;
   margin-left: 12rpx;

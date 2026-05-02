@@ -20,6 +20,12 @@ public class LoginRes {
 
     private Integer role;
 
+    private String avatarUrl;
+
+    private String homeArea;
+
+    private Boolean notifyEnabled;
+
     private String token;
 
 }

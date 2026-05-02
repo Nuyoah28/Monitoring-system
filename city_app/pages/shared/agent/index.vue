@@ -10,10 +10,7 @@
 				</view>
 			</view>
 		<view class="header-title">
-				<text>AI助手</text>
-			</view>
-			<view class="setting-btn" @tap="jump">
-				<image class="setting-tag" src="/static/settings.png"></image>
+				<text>{{ isOwnerApp ? '社区助手' : 'AI助手' }}</text>
 			</view>
 		</view>
 		<view class="session-drawer" :class="{ open: showSessionList }" @touchmove.stop.prevent>
@@ -43,7 +40,21 @@
 			<view class="session-peek" @tap="showSessionList = false"></view>
 		</view>
 		<view class="body" id="ai-body" :class="{ 'chat-open': showChatPanel }" :style="bodyStyle">
-			<virtual-agent-card :state="agentState" :status-text="agentStatusText" :subtitle="agentStatusSubText" @tap="handleAgentTap" />
+			<view class="agent-fallback-card" v-if="visualFallback">
+					<view class="fallback-avatar">助</view>
+					<view class="fallback-title">社区助手已就绪</view>
+					<view class="fallback-sub">当前使用简化模式，仍可继续对话</view>
+				</view>
+				<virtual-agent-card v-else :state="agentState" :status-text="agentStatusText" :subtitle="agentStatusSubText" :fit-scale="0.88" @tap="handleAgentTap" @failed="handleVisualFailed" />
+				<view class="assistant-dock">
+					<view class="assistant-dock-title">{{ isOwnerApp ? '社区助手' : 'AI助手' }}</view>
+					<view class="assistant-chip-row">
+						<view class="assistant-chip">提醒</view>
+						<view class="assistant-chip">环境</view>
+						<view class="assistant-chip">停车</view>
+						<view class="assistant-chip">事项</view>
+					</view>
+				</view>
 
 			<view class="floating-dialog" v-if="latestUserText || latestAssistantText">
 				<view class="floating-bubble user-bubble" v-if="latestUserText">
@@ -118,7 +129,7 @@ import Vue from 'vue';
 	import OwnerTabbar from '@/components/navigation/owner-tabbar.vue';
 	import VirtualAgentCard from '@/components/VirtualAgentCard.vue';
 
-	const AI_WELCOME_MESSAGE = '你好，我是社区智眼 AI 助手。你可以问我报警处置、监控巡检、环境数据、车位引导相关的问题，我会尽量用简单清楚的方式帮你分析。';
+	const AI_WELCOME_MESSAGE = '你好，我是社区助手。你可以问我社区提醒、环境数据、停车服务和日常事项，我会尽量用简单清楚的方式帮你说明。';
 
 	export default {
 		components: {
@@ -152,6 +163,8 @@ import Vue from 'vue';
 				ttsPlaybackToken: 0,
 				showSessionList: false,
 				showChatPanel: false,
+				visualFallback: false,
+				visualFallbackTimer: null,
 				sessions: [],
 				currentSessionId: '',
 				sessionLongPressLock: false,
@@ -180,27 +193,39 @@ import Vue from 'vue';
 			} catch (e) {
 				this.isLoading = false;
 			}
+			this.scheduleVisualFallback();
 		},
 		onReady() {
 			this.$nextTick(() => {
 				this.refreshScrollViewport(true);
 			});
 		},
-		onHide() {
-			this.closeWs();
-		},
-		onUnload() {
-			this.closeWs();
-		},
-		beforeDestroy() {
-			this.closeWs();
-		},
-		computed: {
-			isOwnerApp() {
-				return uni.getStorageSync('appType') === 'owner';
+			onHide() {
+				this.stopAllVoiceAndTts();
+				this.closeWs();
+				this.clearVisualFallbackTimer();
 			},
-			voiceClickHandler() {
-				const self = this;
+			onUnload() {
+				this.stopAllVoiceAndTts();
+				this.closeWs();
+				this.clearVisualFallbackTimer();
+			},
+			beforeDestroy() {
+				this.stopAllVoiceAndTts();
+				this.closeWs();
+				this.clearVisualFallbackTimer();
+			},
+	computed: {
+		isOwnerApp() {
+			return uni.getStorageSync('appType') === 'owner';
+		},
+		sessionCacheKey() {
+			const appType = uni.getStorageSync('appType') || 'manage';
+			const userId = uni.getStorageSync('userId') || 'anonymous';
+			return `aiSessionCache:${appType}:${userId}`;
+		},
+		voiceClickHandler() {
+			const self = this;
 				return function() {
 					try {
 						if (self.isRecording) self.stopVoiceRecordAndSend();
@@ -273,25 +298,25 @@ import Vue from 'vue';
 					uni.reLaunch({ url: '/pages/owner/home/index' });
 					return;
 				}
-				uni.switchTab({ url: '/pages/manage/controls/controls' });
+				uni.reLaunch({ url: '/pages/manage/controls/controls' });
 			},
-			loadSessionCache() {
-				try {
-					const cache = uni.getStorageSync('aiSessionCache');
-					if (!cache) return;
-					const parsed = typeof cache === 'string' ? JSON.parse(cache) : cache;
-					if (parsed && Array.isArray(parsed.sessions)) {
+    loadSessionCache() {
+      try {
+        const cache = uni.getStorageSync(this.sessionCacheKey);
+        if (!cache) return;
+        const parsed = typeof cache === 'string' ? JSON.parse(cache) : cache;
+        if (parsed && Array.isArray(parsed.sessions)) {
 						this.sessions = parsed.sessions;
 						this.currentSessionId = parsed.currentSessionId || '';
 					}
 				} catch (e) {}
 			},
-			saveSessionCache() {
-				try {
-					uni.setStorageSync('aiSessionCache', {
-						sessions: this.sessions,
-						currentSessionId: this.currentSessionId,
-					});
+    saveSessionCache() {
+      try {
+        uni.setStorageSync(this.sessionCacheKey, {
+          sessions: this.sessions,
+          currentSessionId: this.currentSessionId,
+        });
 				} catch (e) {}
 			},
 			toggleSessionList() {
@@ -319,6 +344,45 @@ import Vue from 'vue';
 					return;
 				}
 				uni.showToast({ title: '有什么可以帮你？', icon: 'none' });
+			},
+			handleVisualFailed() {
+				this.visualFallback = true;
+				this.clearVisualFallbackTimer();
+			},
+			stopAllVoiceAndTts() {
+				this.ttsPlaybackToken += 1;
+				if (this.ttsDownloadTask && typeof this.ttsDownloadTask.abort === 'function') {
+					try { this.ttsDownloadTask.abort(); } catch (e) {}
+				}
+				this.ttsDownloadTask = null;
+				if (this.innerAudioContext) {
+					try {
+						if (typeof this.innerAudioContext.stop === 'function') this.innerAudioContext.stop();
+						if (typeof this.innerAudioContext.destroy === 'function') this.innerAudioContext.destroy();
+					} catch (e) {}
+					this.innerAudioContext = null;
+				}
+				if (this.recorderManager && typeof this.recorderManager.stop === 'function') {
+					try { this.recorderManager.stop(); } catch (e) {}
+				}
+				this.recorderManager = null;
+				this.voiceRecordStartAt = 0;
+				this.isRecording = false;
+				this.isVoiceProcessing = false;
+				this.isTtsPlaying = false;
+			},
+			scheduleVisualFallback() {
+				this.clearVisualFallbackTimer();
+				this.visualFallback = false;
+				this.visualFallbackTimer = setTimeout(() => {
+					this.visualFallback = true;
+				}, 2600);
+			},
+			clearVisualFallbackTimer() {
+				if (this.visualFallbackTimer) {
+					clearTimeout(this.visualFallbackTimer);
+					this.visualFallbackTimer = null;
+				}
 			},
 			startNewSession() {
 				const id = String(Date.now());
@@ -522,6 +586,7 @@ import Vue from 'vue';
 				this.isLoading = false;
 				this.isVoiceProcessing = false;
 				this.isDisabled = false;
+				this.clearVisualFallbackTimer();
 			},
 			refreshScrollViewport(scrollToBottom = false) {
 				const info = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : uni.getSystemInfoSync();
@@ -545,15 +610,6 @@ import Vue from 'vue';
 							this.$nextTick(() => this.toBottom());
 						}
 					});
-				});
-			},
-			jump() {
-				if (this.isOwnerApp) {
-					uni.reLaunch({ url: '/pages/owner/personal/index' });
-					return;
-				}
-				uni.navigateTo({
-					url: "/pages/manage/personal/setting/setting",
 				});
 			},
 			send(){
@@ -948,11 +1004,12 @@ import Vue from 'vue';
 				position: fixed;
 				left: 24rpx;
 				right: 24rpx;
-				top: calc(var(--status-bar-height, 0px) + 16rpx);
+				top: calc(var(--status-bar-height, 0px) + 28rpx);
 				z-index: 1200;
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
+				min-height: 74rpx;
 				pointer-events: none;
 
 				.topNav {
@@ -1383,6 +1440,50 @@ import Vue from 'vue';
 				.tts-bar-text {
 					font-size: 24rpx;
 					color: #e65100;
+				}
+				.agent-fallback-card {
+					position: absolute;
+					left: 50%;
+					top: calc(var(--status-bar-height, 0px) + 150rpx);
+					transform: translateX(-50%);
+					z-index: 7;
+					width: 72%;
+					max-width: 640rpx;
+					padding: 28rpx 24rpx;
+					border-radius: 30rpx;
+					background: rgba(7, 27, 54, 0.36);
+					border: 1px solid rgba(139, 219, 255, 0.18);
+					box-shadow: 0 16rpx 40rpx rgba(0, 13, 38, 0.18);
+					backdrop-filter: blur(10px);
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					text-align: center;
+				}
+				.fallback-avatar {
+					width: 92rpx;
+					height: 92rpx;
+					border-radius: 30rpx;
+					background: linear-gradient(135deg, #4ea8ff 0%, #6d7cff 100%);
+					box-shadow: 0 12rpx 30rpx rgba(78, 168, 255, 0.28);
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					color: #fff;
+					font-size: 34rpx;
+					font-weight: 900;
+				}
+				.fallback-title {
+					margin-top: 18rpx;
+					color: #e8f5ff;
+					font-size: 32rpx;
+					font-weight: 800;
+				}
+				.fallback-sub {
+					margin-top: 10rpx;
+					color: rgba(232, 245, 255, 0.84);
+					font-size: 23rpx;
+					line-height: 1.5;
 				}
 				.btn-stop-tts {
 					padding: 10rpx 28rpx;

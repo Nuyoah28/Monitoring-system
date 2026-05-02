@@ -51,6 +51,12 @@
         <text class="detail-alert__label">最新告警</text>
         <text class="detail-alert__text">{{ activePoint.latestAlarm ? (activePoint.latestAlarm.eventName || activePoint.latestAlarm.caseTypeName || '警情告警') : '暂无最新告警' }}</text>
       </view>
+
+      <view class="detail-actions">
+        <view class="detail-action detail-action--primary" @tap="openVideo(activePoint)">查看视频</view>
+        <view class="detail-action" @tap="openPointAlarms(activePoint)">查看告警</view>
+        <view class="detail-action" @tap="openAiConfig(activePoint)">识别规则</view>
+      </view>
     </view>
 
     <view class="list-panel">
@@ -256,6 +262,15 @@ export default {
       if (!Number.isFinite(num)) return '-';
       return num.toFixed(6);
     },
+    openPointAlarms(point) {
+      uni.reLaunch({ url: '/pages/manage/realtime/realtime' });
+    },
+    openAiConfig(point) {
+      const item = point || {};
+      uni.navigateTo({
+        url: `/pages/manage/monitor/ai-config?id=${item.id || item.monitorId || ''}&name=${encodeURIComponent(item.camera || item.name || '')}&area=${encodeURIComponent(item.department || item.area || '')}`,
+      });
+    },
     openVideo(item) {
       const videoUrl = item.video || item.ip || '';
       if (!videoUrl) {
@@ -270,7 +285,7 @@ export default {
       if (getCurrentPages().length > 1) {
         uni.navigateBack();
       } else {
-        uni.switchTab({ url: '/pages/manage/controls/controls' });
+        uni.reLaunch({ url: '/pages/manage/controls/controls' });
       }
     },
   },
@@ -430,6 +445,34 @@ export default {
   margin-top: 6rpx;
   font-size: 22rpx;
   font-weight: 700;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 16rpx;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.detail-action {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  padding: 12rpx 12rpx;
+  border-radius: 14rpx;
+  background: #f8fbff;
+  border: 1rpx solid #dcebfa;
+  color: #1470d8;
+  font-size: 21rpx;
+  font-weight: 800;
+  box-sizing: border-box;
+}
+
+.detail-action--primary {
+  background: linear-gradient(135deg, #1470d8, #38a4ff);
+  border-color: transparent;
+  color: #fff;
 }
 
 .list-panel {

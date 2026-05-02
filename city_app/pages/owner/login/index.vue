@@ -1,6 +1,8 @@
 <template>
   <app-login
     :loginApi="config.loginApi"
+    :registerApi="config.registerApi"
+    :wxRegisterApi="config.wxRegisterApi"
     :successUrl="config.successUrl"
     :appType="config.appType"
     :enableWebsocket="config.enableWebsocket"

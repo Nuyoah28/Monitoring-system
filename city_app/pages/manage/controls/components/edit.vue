@@ -10,200 +10,259 @@
   >
     <view class="informBox" v-show="showEdit">
       <view class="titleBox">
-        <view class="title">
-          {{ warnData.name }}
-        </view>
+        <view class="title">{{ dialogTitle }}</view>
         <view class="img" @tap="locked = !locked">
           <image
-            :src="
-              locked ? '../../../static/lock.png' : '../../../static/unlock.png'
-            "
+            :src="locked ? '../../../static/lock.png' : '../../../static/unlock.png'"
             mode="aspectFit"
           ></image>
         </view>
       </view>
-      <view class="video">
-        <video
-          src="rtmp://play2.city-guardian.top/live/test?auth_key=1715827660-0-0-7c20eca63c0cf1f0b1c7467b0441897a"
-          :is-live="true"
-          :autoplay="true"
-          style="
-            height: 100%;
-            width: 100%;
-            object-fit: fill;
-            position: relative;
-          "
-        >
-          <cover-view
-            class="border"
-            v-for="(box, index) in border"
-            :key="index"
-            :style="{
-              width: box.rightX - box.leftX + 'px',
-              height: box.rightY - box.leftY + 'px',
-              top: box.leftY + 'px',
-              left: box.leftX + 'px',
-            }"
-          ></cover-view>
-        </video>
-      </view>
-      <view class="scroll">
-        <view class="edit">
-          <span>编辑区</span>
-          <image
-            src="../../../../static/fde8aa31-f3f3-41af-b0ec-d85398199844.png"
-            mode="aspectFit"
-            style="width: 40rpx; height: 40rpx"
-            @tap="resetBorder"
-          ></image>
-        </view>
-        <view class="img">
-          <canvas
-            canvas-id="myCanvas"
-            style="
-              margin: 0 auto;
-              position: absolute;
-              top: 0;
-              left: 0;
-              z-index: 10;
-            "
-            :style="{ height: 246 + 'px', width: 328 + 'px' }"
-            @touchstart="start"
-            @touchmove="move"
-            @touchend="stop"
-            :disable-scroll="!locked"
-          ></canvas>
-          <image
-            :src="img.replace(/[\r\n]/g, '')"
-            mode="aspectFit"
-            style="width: 100%; height: 100%"
-          ></image>
-          <view
-            class="border"
-            v-for="(box, index) in border"
-            :key="index"
-            :style="{
-              width: box.rightX - box.leftX + 'px',
-              height: box.rightY - box.leftY + 'px',
-              top: box.leftY + 'px',
-              left: box.leftX + 'px',
-            }"
-          >
+
+      <scroll-view scroll-y class="dialog-scroll">
+        <view class="panel panel--preview">
+          <view class="panel-head">
+            <text>区域预览</text>
+            <text class="panel-tag">当前截图画面</text>
+          </view>
+
+          <view class="preview-box">
+            <image
+              v-if="img"
+              :src="img.replace(/[\r\n]/g, '')"
+              mode="aspectFit"
+              class="snapshot"
+            ></image>
+            <view v-else class="snapshot placeholder">
+              <text>截图加载中…</text>
+            </view>
+            <view
+              class="border border--preview"
+              v-for="(box, index) in border"
+              :key="`preview-${index}`"
+              :style="boxStyle(box)"
+            ></view>
+          </view>
+
+          <view class="panel-tip">
+            上方用于确认当前画面和已选区域，下方用于实际框选。
           </view>
         </view>
-        <view class="edit">
-          <span>编辑区</span>
-          <image
-            src="../../../../static/fde8aa31-f3f3-41af-b0ec-d85398199844.png"
-            mode="aspectFit"
-            style="width: 40rpx; height: 40rpx"
-            @tap="reset"
-          ></image>
+
+        <view class="panel panel--editor">
+          <view class="panel-head panel-head--line">
+            <text>区域编辑</text>
+            <view class="action-chip action-chip--warn" @tap="resetBorder">清空区域</view>
+          </view>
+          <view class="panel-tip panel-tip--compact">
+            请在截图上框选需要识别的区域，框选结果会同步到算法端。
+          </view>
+
+          <view class="img">
+            <canvas
+              canvas-id="myCanvas"
+              class="canvas-layer"
+              @touchstart="start"
+              @touchmove="move"
+              @touchend="stop"
+              :disable-scroll="!locked"
+            ></canvas>
+            <image
+              v-if="img"
+              :src="img.replace(/[\r\n]/g, '')"
+              mode="aspectFit"
+              class="snapshot"
+            ></image>
+            <view v-else class="snapshot placeholder">
+              <text>截图加载中…</text>
+            </view>
+            <view
+              class="border"
+              v-for="(box, index) in border"
+              :key="`img-${index}`"
+              :style="boxStyle(box)"
+            ></view>
+          </view>
         </view>
-        <view class="options">
-          <view class="uni-list">
+
+        <view class="panel panel--abilities">
+          <view class="panel-head panel-head--line">
+            <text>识别能力</text>
+            <view class="action-chip action-chip--ghost" @tap="resetAbilities">恢复默认</view>
+          </view>
+          <view class="panel-tip panel-tip--compact">
+            勾选后保存即可生效，已选能力会在下次打开时回显。
+          </view>
+
+          <view class="options">
             <checkbox-group @change="checkboxChange" class="group">
               <view class="borderBox" v-for="item in ability" :key="item.value">
                 <label class="uni-list-cell uni-list-cell-pd checkbox">
                   <view>
-                    <checkbox :value="item.value" :checked="item.checked" />
+                    <checkbox :value="String(item.value)" :checked="item.checked" />
                   </view>
                   <view>{{ item.name }}</view>
                 </label>
-                <!-- <view class="time">
-                  <input
-                    type="number"
-                    v-model="item.time"
-                    style="width: 100%; height: 100%; text-align: center"
-                    @input="limitation(item)"
-                  />
-                </view> -->
               </view>
             </checkbox-group>
           </view>
         </view>
-      </view>
+      </scroll-view>
     </view>
   </u-modal>
 </template>
 
 <script>
 import { throttle } from "lodash";
+
 export default {
   name: "Edit",
   props: {
     showEdit: {
       type: Boolean,
+      default: false,
     },
     warnData: {
       type: Object,
+      default: () => ({}),
     },
     monitorData: {
       type: Object,
+      default: () => ({}),
     },
-  },
-  mounted() {
-    // console.log(this.warnData, this.monitorData);
-    // console.log(this.border);
-    this.getImg();
   },
   data() {
     return {
-      lockImg: ["../../../static/lock.png", "../../../static/unlock.png"],
       locked: true,
       startPoint: {
         x: null,
         y: null,
       },
-      border: this.warnData.border,
+      border: [],
       borData: {},
       painting: false,
-      // warnData.ability is already an array of checked options, we initialize full list and merge
       ability: [],
       img: "",
+      moveThrottle: null,
     };
   },
-  watch: {
-    showEdit: {
-      handler(val) {
-        if (val) {
-            this.reset();
-            // sync backend truth to UI checkboxes
-            if (this.warnData && this.warnData.ability) {
-                let backendCheckedList = this.warnData.ability; 
-                this.ability.forEach(item => {
-                    let match = backendCheckedList.find(b => b.value === item.value);
-                    if (match && match.checked) {
-                        item.checked = true;
-                    }
-                });
-            }
-        }
-      },
-      immediate: true
+  computed: {
+    currentWarnData() {
+      return this.warnData || {};
+    },
+    currentMonitorData() {
+      return this.monitorData || {};
+    },
+    dialogTitle() {
+      return this.currentWarnData.name || "未命名摄像头";
+    },
+  },
+  created() {
+    this.moveThrottle = throttle((newPoint) => {
+      this.push(newPoint);
+    }, 80);
+    this.resetAbilities();
+  },
+  beforeDestroy() {
+    if (this.moveThrottle && this.moveThrottle.cancel) {
+      this.moveThrottle.cancel();
     }
   },
+  watch: {
+    showEdit(val) {
+      if (val) {
+        this.initDialog();
+      }
+    },
+  },
   methods: {
+    initDialog() {
+      this.locked = true;
+      this.painting = false;
+      this.startPoint = {
+        x: null,
+        y: null,
+      };
+      this.borData = {};
+      this.img = "";
+      this.border = this.getInitialBorder();
+      this.resetAbilities();
+      this.applyBackendAbilities();
+      this.syncDangerAreaByBorder();
+      this.getImg();
+    },
+    getInitialBorder() {
+      const data = this.currentWarnData;
+      const legacyBorder = Array.isArray(data.border) ? data.border : [];
+      if (legacyBorder.length) {
+        return legacyBorder
+          .map((item) => this.normalizeBox(item))
+          .filter(Boolean);
+      }
+
+      const leftX = Number(data.leftX);
+      const leftY = Number(data.leftY);
+      const rightX = Number(data.rightX);
+      const rightY = Number(data.rightY);
+      if ([leftX, leftY, rightX, rightY].every((value) => Number.isFinite(value))) {
+        const box = this.normalizeBox({ leftX, leftY, rightX, rightY });
+        return box ? [box] : [];
+      }
+
+      return [];
+    },
+    normalizeBox(box) {
+      if (!box) return null;
+      const leftX = Number(box.leftX);
+      const leftY = Number(box.leftY);
+      const rightX = Number(box.rightX);
+      const rightY = Number(box.rightY);
+      if (![leftX, leftY, rightX, rightY].every((value) => Number.isFinite(value))) {
+        return null;
+      }
+      const minX = Math.min(leftX, rightX);
+      const maxX = Math.max(leftX, rightX);
+      const minY = Math.min(leftY, rightY);
+      const maxY = Math.max(leftY, rightY);
+      if (maxX - minX < 2 || maxY - minY < 2) {
+        return null;
+      }
+      return {
+        leftX: minX,
+        leftY: minY,
+        rightX: maxX,
+        rightY: maxY,
+      };
+    },
+    boxStyle(box) {
+      const normalized = this.normalizeBox(box);
+      if (!normalized) return {};
+      return {
+        width: normalized.rightX - normalized.leftX + "px",
+        height: normalized.rightY - normalized.leftY + "px",
+        top: normalized.leftY + "px",
+        left: normalized.leftX + "px",
+      };
+    },
     async getImg() {
-      await uni.$http
-        .get(`/api/v1/monitor/image/${this.warnData.id}`)
-        .then(({ data }) => {
-          console.log('获取到监控信息',data);
-          this.img = ("data:image/png;base64," + data.message).replace(
-            /[\r\n]/g,
-            ""
-          );
-        });
+      if (!this.currentWarnData.id) return;
+      try {
+        const { data } = await uni.$http.get(`/api/v1/monitor/image/${this.currentWarnData.id}`);
+        this.img = ("data:image/png;base64," + (data && data.message ? data.message : "")).replace(/[\r\n]/g, "");
+      } catch (error) {
+        console.warn("[edit-area] 获取监控截图失败：", error);
+        this.img = "";
+      }
     },
     start(e) {
       if (this.locked) return;
-      let x = e.touches[0].x;
-      let y = e.touches[0].y;
-      /* let x = e.touches[0].y;
-				let y = e.touches[0].x; */
+      const point = e.touches && e.touches[0];
+      if (!point) return;
+      const x = Number(point.x);
+      const y = Number(point.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
       this.startPoint.x = x;
       this.startPoint.y = y;
-      // console.log(this.startPoint);
       this.painting = true;
       this.borData = {
         maxX: x,
@@ -213,30 +272,28 @@ export default {
       };
     },
     move(e) {
-      if (this.locked) return;
-      // console.log("e", e.touches[0]);
-      let x = e.touches[0].x;
-      let y = e.touches[0].y;
-      let newPoint = { x: x, y: y };
-      const throttlePush = throttle(this.push, 500);
-      if (this.painting) {
-        this.startPoint = newPoint;
-        throttlePush(newPoint);
+      if (this.locked || !this.painting) return;
+      const point = e.touches && e.touches[0];
+      if (!point) return;
+      const x = Number(point.x);
+      const y = Number(point.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      if (this.moveThrottle) {
+        this.moveThrottle({ x, y });
       }
     },
     stop() {
       if (this.locked) return;
       this.painting = false;
-      this.border = [
-        {
-          leftY: this.borData.minY,
-          leftX: this.borData.minX,
-          rightY: this.borData.maxY,
-          rightX: this.borData.maxX,
-        },
-      ];
+      const box = this.normalizeBox({
+        leftX: this.borData.minX,
+        leftY: this.borData.minY,
+        rightX: this.borData.maxX,
+        rightY: this.borData.maxY,
+      });
+      this.border = box ? [box] : [];
+      this.syncDangerAreaByBorder();
       this.borData = {};
-      // console.log("end", this.border);
     },
     push(newPoint) {
       this.borData.maxX = Math.max(newPoint.x, this.borData.maxX);
@@ -247,9 +304,13 @@ export default {
     changeShow() {
       this.$emit("change", false);
     },
-    reset() {
-      // console.log("bye");
+    resetAbilities() {
       this.ability = [
+        {
+          name: "危险区域",
+          value: 1,
+          checked: false,
+        },
         {
           name: "挥手",
           value: 2,
@@ -276,11 +337,6 @@ export default {
           checked: false,
         },
         {
-          name: "危险区域",
-          value: 1,
-          checked: false,
-        },
-        {
           name: "垃圾检测",
           value: 8,
           checked: false,
@@ -302,88 +358,107 @@ export default {
         },
       ];
     },
+    applyBackendAbilities() {
+      const backendCheckedList = Array.isArray(this.currentWarnData.ability)
+        ? this.currentWarnData.ability
+        : [];
+      this.ability.forEach((item) => {
+        const match = backendCheckedList.find((backendItem) => Number(backendItem && backendItem.value) === Number(item.value));
+        item.checked = !!(match && match.checked);
+      });
+    },
+    syncDangerAreaByBorder() {
+      if (this.hasValidBorder()) {
+        this.setAbilityChecked(1, true);
+      }
+    },
+    setAbilityChecked(value, checked) {
+      const target = this.ability.find((item) => Number(item.value) === Number(value));
+      if (target) {
+        target.checked = checked;
+      }
+    },
+    isAbilityChecked(value) {
+      const target = this.ability.find((item) => Number(item.value) === Number(value));
+      return !!(target && target.checked);
+    },
     resetBorder() {
-      // console.log("hi");
       this.border = [];
+      this.painting = false;
+      this.borData = {};
+      this.setAbilityChecked(1, false);
+    },
+    hasValidBorder() {
+      return !!this.normalizeBox(this.border && this.border[0]);
+    },
+    buildPayload() {
+      const border = this.normalizeBox(this.border && this.border[0]);
+      const hasBorder = !!border;
+
+      if (!hasBorder && this.isAbilityChecked(1)) {
+        uni.showToast({
+          title: "请先绘制识别区域",
+          icon: "none",
+        });
+        return null;
+      }
+
+      const payload = {
+        id: this.currentWarnData.id,
+        name: this.currentWarnData.name,
+        area: this.currentWarnData.department,
+        leader: this.currentWarnData.leader,
+        ip: this.currentWarnData.video,
+        longitude: this.currentMonitorData.longitude,
+        latitude: this.currentMonitorData.latitude,
+        fall: this.isAbilityChecked(3),
+        flame: this.isAbilityChecked(4),
+        smoke: this.isAbilityChecked(5),
+        wave: this.isAbilityChecked(2),
+        punch: this.isAbilityChecked(6),
+        rubbish: this.isAbilityChecked(8),
+        ice: this.isAbilityChecked(9),
+        ebike: this.isAbilityChecked(10),
+        vehicle: this.isAbilityChecked(11),
+        dangerArea: hasBorder,
+      };
+
+      if (hasBorder) {
+        payload.leftX = Math.floor(border.leftX);
+        payload.leftY = Math.floor(border.leftY);
+        payload.rightX = Math.floor(border.rightX);
+        payload.rightY = Math.floor(border.rightY);
+      }
+
+      return payload;
     },
     async checkChange() {
-      // console.log(this.border);
+      const payload = this.buildPayload();
+      if (!payload) return;
+
       uni.showModal({
         title: "警告",
         content: "确定修改?",
         showCancel: true,
         success: async (res) => {
-          if (res.confirm) {
-            let data = {};
-            if (this.border.length === 0) {
-              // console.log("empty");
-              data = {
-                id: this.warnData.id,
-                name: this.warnData.name,
-                area: this.warnData.department,
-                leader: this.warnData.leader,
-                ip: this.warnData.video,
-                longitude: this.monitorData.longitude,
-                latitude: this.monitorData.latitude,
-                latitude: this.monitorData.latitude,
-                fall: this.ability.find(x => x.value === 3)?.checked || false,
-                flame: this.ability.find(x => x.value === 4)?.checked || false,
-                smoke: this.ability.find(x => x.value === 5)?.checked || false,
-                wave: this.ability.find(x => x.value === 2)?.checked || false,
-                punch: this.ability.find(x => x.value === 6)?.checked || false,
-                rubbish: this.ability.find(x => x.value === 8)?.checked || false,
-                ice: this.ability.find(x => x.value === 9)?.checked || false,
-                ebike: this.ability.find(x => x.value === 10)?.checked || false,
-                vehicle: this.ability.find(x => x.value === 11)?.checked || false,
-                dangerArea: this.ability.find(x => x.value === 1)?.checked || false,
-              };
-            } else {
-              data = {
-                id: this.warnData.id,
-                name: this.warnData.name,
-                area: this.warnData.department,
-                leader: this.warnData.leader,
-                ip: this.warnData.video,
-                longitude: this.monitorData.longitude,
-                latitude: this.monitorData.latitude,
-                fall: this.ability.find(x => x.value === 3)?.checked || false,
-                flame: this.ability.find(x => x.value === 4)?.checked || false,
-                smoke: this.ability.find(x => x.value === 5)?.checked || false,
-                wave: this.ability.find(x => x.value === 2)?.checked || false,
-                punch: this.ability.find(x => x.value === 6)?.checked || false,
-                rubbish: this.ability.find(x => x.value === 8)?.checked || false,
-                ice: this.ability.find(x => x.value === 9)?.checked || false,
-                ebike: this.ability.find(x => x.value === 10)?.checked || false,
-                vehicle: this.ability.find(x => x.value === 11)?.checked || false,
-                dangerArea: this.ability.find(x => x.value === 1)?.checked || false,
-                leftX: Math.floor(this.border[0].leftX),
-                leftY: Math.floor(this.border[0].leftY),
-                rightX: Math.floor(this.border[0].rightX),
-                rightY: Math.floor(this.border[0].rightY),
-              };
+          if (!res.confirm) return;
+          try {
+            const { data } = await uni.$http.post("/api/v1/monitor/update", payload);
+            if (data && data.code === "00000") {
+              this.$emit("change", true);
             }
-            console.log(data);
-            await uni.$http
-              .post("/api/v1/monitor/update", data)
-              .then(({ data }) => {
-                console.log("edit", data);
-                this.$emit("change", true);
-              });
+          } catch (error) {
+            console.warn("[edit-area] 保存失败：", error);
           }
         },
       });
     },
     checkboxChange(e) {
-      let values = e.target.value;
-      console.log(values);
+      const values = (((e && e.detail && e.detail.value) || (e && e.target && e.target.value)) || []).map((value) => String(value));
       this.ability.forEach((item) => {
-        if (values.includes(item.value)) {
-          item.checked = true;
-        } else {
-          item.checked = false;
-        }
+        item.checked = values.includes(String(item.value));
       });
-      console.log(this.ability);
+      this.syncDangerAreaByBorder();
     },
     limitation(item) {
       item.time = Math.abs(item.time);
@@ -394,96 +469,202 @@ export default {
 
 <style lang="scss" scoped>
 .informBox {
-	// position: relative;
-	// top: 25%;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-sizing: border-box;
+
   .border {
     border: 1px dotted red;
     position: absolute;
-    background-color: rgba(red, 0.5);
-    z-index: 999;
+    background-color: rgba(red, 0.4);
+    z-index: 15;
+    box-sizing: border-box;
   }
+
   .titleBox {
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 10rpx;
+    margin-bottom: 12rpx;
+
     .title {
-      font-size: 38rpx;
+      font-size: 34rpx;
       font-weight: bold;
+      color: #1a2a3a;
+      line-height: 1.3;
+      padding-right: 12rpx;
     }
+
     .img {
       width: 48rpx;
       height: 48rpx;
+      flex-shrink: 0;
+
       image {
         height: 100%;
         width: 100%;
       }
     }
   }
-  .video {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 328px;
-    height: 246px;
-  }
-  .scroll {
-    margin-top: 10px;
-    height: 246px;
-    overflow: auto;
-    width: 328px;
 
-    .img {
-      overflow: hidden;
-      width: 328px;
-      height: 246px;
-      position: relative;
+  .dialog-scroll {
+    width: 100%;
+    max-height: 74vh;
+    box-sizing: border-box;
+  }
+
+  .panel {
+    width: 100%;
+    padding: 18rpx;
+    border-radius: 20rpx;
+    background: #fff;
+    border: 1rpx solid #dcebfa;
+    box-sizing: border-box;
+    margin-bottom: 14rpx;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12rpx;
+    margin-bottom: 12rpx;
+
+    text {
+      font-size: 26rpx;
+      font-weight: 800;
+      color: #1a2a3a;
     }
-    .edit {
-      width: 100%;
-      height: 48rpx;
+  }
+
+  .panel-head--line {
+    margin-bottom: 10rpx;
+  }
+
+  .panel-tag {
+    font-size: 18rpx;
+    color: #64748b;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .panel-tip {
+    margin-top: 10rpx;
+    font-size: 20rpx;
+    color: #64748b;
+    line-height: 1.45;
+  }
+
+  .preview-box {
+    width: 328px;
+    max-width: 100%;
+    height: 190px;
+    margin: 0 auto;
+    position: relative;
+    border-radius: 16rpx;
+    overflow: hidden;
+    background: #edf6ff;
+  }
+
+  .border--preview {
+    z-index: 6;
+    border-color: rgba(220, 38, 38, 0.8);
+    background-color: rgba(220, 38, 38, 0.14);
+  }
+
+  .img {
+    overflow: hidden;
+    width: 328px;
+    max-width: 100%;
+    height: 246px;
+    position: relative;
+    border-radius: 16rpx;
+    background: #edf6ff;
+    margin: 10rpx auto 0;
+  }
+
+  .snapshot {
+    width: 100%;
+    height: 100%;
+  }
+
+  .placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 22rpx;
+    background: linear-gradient(180deg, #f7fbff 0%, #eef6ff 100%);
+  }
+
+  .canvas-layer {
+    margin: 0 auto;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+  }
+
+  .action-chip {
+    min-width: 90rpx;
+    padding: 8rpx 14rpx;
+    border-radius: 999rpx;
+    text-align: center;
+    font-size: 20rpx;
+    font-weight: 800;
+    box-sizing: border-box;
+  }
+
+  .action-chip--warn {
+    background: #fff1f2;
+    color: #dc2626;
+  }
+
+  .action-chip--ghost {
+    background: #edf6ff;
+    color: #1470d8;
+  }
+
+  .options {
+    width: 100%;
+
+    .group {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      span {
-        font-size: 34rpx;
-        font-weight: bold;
-      }
-    }
-    .options {
+      flex-wrap: wrap;
       width: 100%;
-      .group {
+      padding: 0;
+      box-sizing: border-box;
+      gap: 10rpx;
+    }
+
+    .borderBox {
+      width: calc(50% - 5rpx);
+      box-sizing: border-box;
+
+      .checkbox {
         display: flex;
-        flex-wrap: wrap;
-        // background-color: pink;
-        padding: 0;
+        align-items: center;
+        gap: 10rpx;
+        border: 1px solid #d8e5f5;
+        padding: 10rpx 12rpx;
         width: 100%;
+        border-radius: 14rpx;
+        background: #f8fbff;
+        box-sizing: border-box;
+        font-size: 22rpx;
+        color: #1f2d3d;
       }
-      .borderBox {
-        width: 44%;
-        margin-top: 10px;
-        margin-left: 5px;
-        margin-right: 10px;
-        .checkbox {
-          display: flex;
-          align-items: center;
-          border: 1px solid grey;
-          padding: 4px;
-          padding-top: 2px;
-          width: 100%;
-          border-radius: 4px;
-        }
-        .time {
-          width: 36%;
-          height: 36px;
-          background-color: #e5e5e5;
-          border-radius: 4px;
-        }
+
+      .time {
+        width: 36%;
+        height: 36px;
+        background-color: #e5e5e5;
+        border-radius: 4px;
       }
     }
   }

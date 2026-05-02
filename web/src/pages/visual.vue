@@ -7,7 +7,7 @@
             v-for="tab in tabs"
             :key="tab.key"
             class="nav-btn"
-            :class="{ active: activeTab === tab.key }"
+            :class="[{ active: activeTab === tab.key }, `tab-${tab.key}`]"
             type="button"
             @click="activeTab = tab.key"
           >
@@ -2446,6 +2446,18 @@ interface ParkingTrendApiPoint {
   used: number
 }
 
+interface ParkingTrafficSummaryApi {
+  source?: string
+  todayInCount: number
+  todayOutCount: number
+  todayNetFlow: number
+  todayTotalFlow: number
+  latestInCount: number
+  latestOutCount: number
+  latestNetFlow: number
+  latestTotalFlow: number
+}
+
 const envTrendDataState = ref<Record<'day' | 'week' | 'month', EnvPoint[]>>({
   day: [
     { label: '00:00', aqi: 72, humidity: 63, pm25: 42, combustibleGas: 11 },
@@ -2595,6 +2607,19 @@ const parkingDayTrend = ref<ParkingDayPoint[]>([
   { label: '20:00', occupancy: 61, used: 98 },
   { label: '24:00', occupancy: 48, used: 77 },
 ])
+
+const trafficFlowState = ref<ParkingTrafficSummaryApi>({
+  source: 'mock',
+  todayInCount: 186,
+  todayOutCount: 163,
+  todayNetFlow: 23,
+  todayTotalFlow: 349,
+  latestInCount: 12,
+  latestOutCount: 9,
+  latestNetFlow: 3,
+  latestTotalFlow: 21,
+})
+
 const syncEnvParkingFromApi = async (): Promise<boolean> => {
   if (ENV_PARKING_DATA_MODE !== 'api') return false
   try {
@@ -2606,6 +2631,7 @@ const syncEnvParkingFromApi = async (): Promise<boolean> => {
     const envDayRes = await axios.get('/env/trend', { params: { monitorId, range: 'day' } })
     const parkingRealtimeRes = await axios.get('/parking/realtime', { params: { monitorId } })
     const parkingTrendRes = await axios.get('/parking/trend', { params: { monitorId, range: 'day' } })
+    const parkingTrafficRes = await axios.get('/parking/traffic/summary', { params: { monitorId } })
     const envScopedRes = envTrendRange.value === 'day'
       ? envDayRes
       : await axios.get('/env/trend', { params: { monitorId, range: envTrendRange.value } })
@@ -2615,6 +2641,7 @@ const syncEnvParkingFromApi = async (): Promise<boolean> => {
     const envScoped = Array.isArray(envScopedRes?.data?.data) ? envScopedRes.data.data as EnvPoint[] : []
     const parkingRealtime = parkingRealtimeRes?.data?.data as ParkingRealtimeApi | null
     const parkingTrend = Array.isArray(parkingTrendRes?.data?.data) ? parkingTrendRes.data.data as ParkingTrendApiPoint[] : []
+    const parkingTraffic = parkingTrafficRes?.data?.data as ParkingTrafficSummaryApi | null
 
     if (!envRealtime || !envDay.length || !parkingRealtime?.zones?.length || !parkingTrend.length) return false
 
@@ -2642,6 +2669,19 @@ const syncEnvParkingFromApi = async (): Promise<boolean> => {
       occupancy: Number(item.occupancy || 0),
       used: Number(item.used || 0),
     }))
+    if (parkingTraffic) {
+      trafficFlowState.value = {
+        source: parkingTraffic.source || 'real',
+        todayInCount: Number(parkingTraffic.todayInCount || 0),
+        todayOutCount: Number(parkingTraffic.todayOutCount || 0),
+        todayNetFlow: Number(parkingTraffic.todayNetFlow || 0),
+        todayTotalFlow: Number(parkingTraffic.todayTotalFlow || 0),
+        latestInCount: Number(parkingTraffic.latestInCount || 0),
+        latestOutCount: Number(parkingTraffic.latestOutCount || 0),
+        latestNetFlow: Number(parkingTraffic.latestNetFlow || 0),
+        latestTotalFlow: Number(parkingTraffic.latestTotalFlow || 0),
+      }
+    }
     return true
   } catch (error) {
     void error
@@ -2689,6 +2729,22 @@ const stepMockEnvParking = () => {
   const occupancy = total > 0 ? Math.round((used / total) * 100) : 0
   parkingDayTrend.value.push({ label: toHmLabel(now), occupancy, used })
   if (parkingDayTrend.value.length > 24) parkingDayTrend.value.shift()
+
+  const latestInCount = Math.max(3, Math.round(8 + Math.sin(now.getTime() / 180000) * 5))
+  const latestOutCount = Math.max(2, Math.round(7 + Math.cos(now.getTime() / 210000) * 4))
+  const todayInCount = trafficFlowState.value.todayInCount + Math.max(0, latestInCount - 4)
+  const todayOutCount = trafficFlowState.value.todayOutCount + Math.max(0, latestOutCount - 4)
+  trafficFlowState.value = {
+    source: 'mock',
+    todayInCount,
+    todayOutCount,
+    todayNetFlow: todayInCount - todayOutCount,
+    todayTotalFlow: todayInCount + todayOutCount,
+    latestInCount,
+    latestOutCount,
+    latestNetFlow: latestInCount - latestOutCount,
+    latestTotalFlow: latestInCount + latestOutCount,
+  }
 }
 
 const refreshEnvParkingData = async () => {
@@ -3140,13 +3196,12 @@ const envParkingAdviceList = computed(() => {
   return list
 })
 
-// 预留给后续车流量检测接口：接入算法后替换这里的数据来源即可。
 const trafficFlowReserve = computed(() => ({
-  status: '未启用',
-  today: '--',
-  inCount: '--',
-  outCount: '--',
-  peak: '--',
+  status: trafficFlowState.value.source === 'real' ? '已接入' : '演示',
+  today: trafficFlowState.value.todayTotalFlow,
+  inCount: trafficFlowState.value.todayInCount,
+  outCount: trafficFlowState.value.todayOutCount,
+  peak: Math.max(trafficFlowState.value.latestInCount, trafficFlowState.value.latestOutCount),
 }))
 
 // ====== 车位仪表盘 ======
@@ -3893,14 +3948,17 @@ watch(activeTab, (tab) => {
 }
 
 .nav-bar {
-  border: 1px solid rgba(126, 197, 255, 0.38);
+  border: 1px solid rgba(126, 197, 255, 0.42);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(15, 42, 70, 0.95), rgba(12, 34, 58, 0.92));
+  background:
+    radial-gradient(circle at 0% 0%, rgba(126, 232, 255, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(16, 44, 71, 0.98), rgba(9, 28, 49, 0.96));
   padding: 8px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  box-shadow: 0 16px 34px rgba(5, 14, 25, 0.28);
 }
 
 .nav-left {
@@ -3910,19 +3968,57 @@ watch(activeTab, (tab) => {
 }
 
 .nav-btn {
+  position: relative;
+  overflow: hidden;
   border: 1px solid rgba(126, 197, 255, 0.34);
-  background: linear-gradient(180deg, rgba(17, 47, 75, 0.82), rgba(14, 39, 64, 0.8));
-  color: #eaf6ff;
+  background:
+    linear-gradient(180deg, rgba(22, 56, 89, 0.95), rgba(12, 34, 57, 0.92));
+  color: #f5fbff;
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 22px rgba(4, 12, 20, 0.16);
+}
+
+.nav-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 40%);
+  opacity: 0.72;
+  pointer-events: none;
 }
 
 .nav-btn.active,
 .nav-btn:hover {
-  border-color: rgba(126, 197, 255, 0.75);
-  background: linear-gradient(180deg, rgba(31, 77, 116, 0.95), rgba(21, 58, 90, 0.95));
+  border-color: rgba(126, 232, 255, 0.82);
+  background:
+    linear-gradient(180deg, rgba(37, 98, 146, 0.98), rgba(18, 58, 92, 0.95));
+  box-shadow:
+    0 0 0 1px rgba(126, 232, 255, 0.18),
+    0 12px 24px rgba(31, 135, 206, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.nav-btn.tab-alarm {
+  border-color: rgba(255, 141, 141, 0.28);
+}
+
+.nav-btn.tab-alarm.active,
+.nav-btn.tab-alarm:hover {
+  border-color: rgba(255, 141, 141, 0.82);
+  background:
+    linear-gradient(180deg, rgba(132, 44, 58, 0.98), rgba(78, 22, 35, 0.96));
+  box-shadow:
+    0 0 0 1px rgba(255, 141, 141, 0.18),
+    0 12px 24px rgba(255, 78, 102, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .nav-current {
@@ -4020,9 +4116,31 @@ watch(activeTab, (tab) => {
 }
 
 .alarm-left {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  border-color: rgba(255, 141, 141, 0.22);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 141, 141, 0.12), transparent 30%),
+    radial-gradient(circle at 100% 0%, rgba(248, 203, 113, 0.06), transparent 24%),
+    linear-gradient(180deg, rgba(24, 40, 58, 0.94), rgba(12, 27, 44, 0.92));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 141, 141, 0.06),
+    0 18px 34px rgba(4, 12, 20, 0.22);
+}
+
+.alarm-left::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 14px 0 0 14px;
+  background: linear-gradient(180deg, rgba(255, 141, 141, 0.96), rgba(248, 203, 113, 0.82));
+  box-shadow: 0 0 16px rgba(255, 141, 141, 0.4);
+  pointer-events: none;
 }
 
 .alarm-right {
@@ -4041,25 +4159,27 @@ watch(activeTab, (tab) => {
 
 .alarm-list-head h3 {
   margin: 0;
-  color: #eef8ff;
-  font-size: 15px;
+  color: #fff1f1;
+  font-size: 16px;
   line-height: 1.3;
+  letter-spacing: 0.02em;
 }
 
 .alarm-list-head p {
   margin: 4px 0 0;
-  color: rgba(214, 230, 255, 0.62);
+  color: rgba(255, 224, 228, 0.68);
   font-size: 11px;
 }
 
 .queue-count {
-  border: 1px solid rgba(126, 197, 255, 0.24);
+  border: 1px solid rgba(255, 141, 141, 0.42);
   border-radius: 999px;
-  padding: 4px 9px;
-  background: rgba(17, 47, 75, 0.58);
-  color: #d9edff;
+  padding: 4px 10px;
+  background: rgba(86, 26, 38, 0.62);
+  color: #ffd0d5;
   font-size: 11px;
   white-space: nowrap;
+  box-shadow: 0 0 12px rgba(255, 78, 102, 0.12);
 }
 
 .table-filters.alarm-table-filters {
@@ -4082,23 +4202,23 @@ watch(activeTab, (tab) => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-color: rgba(126, 197, 255, 0.18);
+  border-color: rgba(255, 141, 141, 0.18);
   background:
-    radial-gradient(circle at 8% 0, rgba(126, 232, 255, 0.12), transparent 34%),
-    radial-gradient(circle at 100% 0, rgba(83, 213, 165, 0.08), transparent 30%),
-    linear-gradient(180deg, rgba(15, 46, 78, 0.9), rgba(10, 30, 54, 0.86));
+    radial-gradient(circle at 8% 0, rgba(255, 141, 141, 0.12), transparent 34%),
+    radial-gradient(circle at 100% 0, rgba(248, 203, 113, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(19, 39, 61, 0.92), rgba(10, 25, 45, 0.9));
 }
 
 .alarm-overview-card.high {
   box-shadow:
-    inset 0 0 0 1px rgba(255, 141, 141, 0.14),
-    0 0 24px rgba(255, 78, 102, 0.08);
+    inset 0 0 0 1px rgba(255, 141, 141, 0.16),
+    0 0 28px rgba(255, 78, 102, 0.12);
 }
 
 .alarm-overview-card.pending {
   box-shadow:
-    inset 0 0 0 1px rgba(248, 203, 113, 0.12),
-    0 0 20px rgba(248, 203, 113, 0.06);
+    inset 0 0 0 1px rgba(248, 203, 113, 0.16),
+    0 0 22px rgba(248, 203, 113, 0.1);
 }
 
 .overview-head {
@@ -4332,11 +4452,11 @@ watch(activeTab, (tab) => {
 }
 
 .selected-alarm-card {
-  border: 1px solid rgba(126, 197, 255, 0.18);
+  border: 1px solid rgba(255, 141, 141, 0.22);
   border-radius: 12px;
   background:
-    radial-gradient(circle at 100% 0, rgba(255, 141, 141, 0.09), transparent 36%),
-    rgba(9, 32, 56, 0.58);
+    radial-gradient(circle at 100% 0, rgba(255, 141, 141, 0.14), transparent 36%),
+    rgba(12, 30, 50, 0.66);
   padding: 10px;
   min-height: 0;
 }
@@ -4350,7 +4470,7 @@ watch(activeTab, (tab) => {
   border-color: rgba(255, 141, 141, 0.42);
   box-shadow:
     inset 0 0 0 1px rgba(255, 141, 141, 0.12),
-    0 0 24px rgba(255, 78, 102, 0.08);
+    0 0 26px rgba(255, 78, 102, 0.12);
 }
 
 .selected-alarm-main {
@@ -7471,13 +7591,15 @@ watch(activeTab, (tab) => {
 .state-chip.done {
   color: #6ce2b2;
   border: 1px solid rgba(108, 226, 178, 0.45);
-  background: rgba(108, 226, 178, 0.12);
+  background: rgba(108, 226, 178, 0.14);
 }
 
 .state-chip.pending {
-  color: #ff9fa9;
-  border: 1px solid rgba(255, 123, 136, 0.58);
-  background: rgba(255, 78, 102, 0.2);
+  color: #ffd0d5;
+  border: 1px solid rgba(255, 123, 136, 0.76);
+  background:
+    linear-gradient(135deg, rgba(255, 78, 102, 0.28), rgba(255, 141, 141, 0.14));
+  box-shadow: 0 0 12px rgba(255, 78, 102, 0.16);
 }
 
 .state-chip.clickable {
@@ -7487,7 +7609,7 @@ watch(activeTab, (tab) => {
 
 .state-chip.clickable:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 10px rgba(255, 120, 132, 0.24);
+  box-shadow: 0 2px 12px rgba(255, 120, 132, 0.3);
 }
 
 .process-modal-mask {

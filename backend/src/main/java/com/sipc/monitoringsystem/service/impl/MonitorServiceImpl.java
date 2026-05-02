@@ -125,12 +125,16 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
         // 更改Flask区域和能力
         try {
             String IP = getMonitorIPById(updateMonitorParam.getId());
-            // 更改Flask区域
-            List<Integer> area = new ArrayList<>();
-            area.add(updateMonitorParam.getLeftX());
-            area.add(updateMonitorParam.getLeftY());
-            area.add(updateMonitorParam.getRightX());
-            area.add(updateMonitorParam.getRightY());
+            if (dangerArea) {
+                List<Integer> area = new ArrayList<>();
+                area.add(updateMonitorParam.getLeftX());
+                area.add(updateMonitorParam.getLeftY());
+                area.add(updateMonitorParam.getRightX());
+                area.add(updateMonitorParam.getRightY());
+                if (!requestFlaskService.updateMonitorArea(IP, area)) {
+                    return false;
+                }
+            }
             List<Boolean> ability = new ArrayList<>();
             // 按照casetype表中的顺序添加：1危险区域，2烟雾/吸烟，3区域停留(暂无字段)，4摔倒，5明火，6吸烟(同烟雾)，7打架，8垃圾乱放，9冰面，10电动车进楼，11载具占用车道，12挥手
             // Flask服务已按照SQL表(case_type_info)的顺序修改，需要提供12个布尔值
@@ -147,8 +151,7 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
             ability.add(updateMonitorParam.getEbike()); // 9: 电动车进楼 (caseType=10)
             ability.add(updateMonitorParam.getVehicle()); // 10: 载具占用车道 (caseType=11)
             ability.add(updateMonitorParam.getWave()); // 11: 挥手 (caseType=12)
-            if (!requestFlaskService.updateMonitorArea(IP, area)
-                    && !requestFlaskService.updateMonitorAbility(IP, ability)) {
+            if (!requestFlaskService.updateMonitorAbility(IP, ability)) {
                 return false;
             }
             LambdaUpdateWrapper<Monitor> updateWrapper = new LambdaUpdateWrapper<>();

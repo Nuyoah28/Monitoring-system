@@ -163,7 +163,7 @@ export default {
   box-sizing: border-box;
   background: linear-gradient(180deg, #edf8ff 0%, #f9fbff 54%, #ffffff 100%);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .bg-shape {

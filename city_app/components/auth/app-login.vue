@@ -2,76 +2,122 @@
   <view class="loginBox">
     <view class="bg-shape shape-1"></view>
     <view class="bg-shape shape-2"></view>
-    <view class="bg-shape shape-3"></view>
 
-    <view class="login-container">
-      <view class="header">
-        <text class="title">社区智眼</text>
-        <view class="mainTitle">基于深度学习和边缘计算的智慧社区安防系统</view>
-      </view>
-
-      <view class="glass-card logContent">
-        <text class="card-title">LOGIN</text>
-
-        <view class="form-group">
-          <view class="input-item">
-            <view class="iconBox">
-              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M20 21C20 18.2386 16.4183 16 12 16C7.58172 16 4 18.2386 4 21" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </view>
-            <input
-              class="input custom-input"
-              type="text"
-              v-model="username"
-              placeholder="请输入用户名"
-              placeholder-style="color:#A0B2D4"
-            />
-          </view>
-
-          <view class="input-item">
-            <view class="iconBox">
-              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="5" y="11" width="14" height="10" rx="2" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M8 11V7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7V11" stroke="#5672b9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </view>
-            <input
-              class="input custom-input"
-              v-model="password"
-              password
-              type="text"
-              placeholder="请输入密码"
-              placeholder-style="color:#A0B2D4"
-            />
-          </view>
-
-          <view class="input-item" style="border: none; background: transparent; padding: 0;">
-            <button class="btn modern-btn" @tap="jump">登录</button>
-          </view>
-
-          <view class="input-item term-box" style="border: none; background: transparent; justify-content: center;">
-            <checkbox-group @change="checked = !checked">
-              <label class="deal-wrapper">
-                <checkbox class="theme-checkbox" style="transform: scale(0.65);" value="true" :checked="checked" color="#007aff"/>
-                <text class="deal">
-                  登录即代表您已阅读并同意
-                  <span class="link" @tap.stop="changeShow">用户协议</span>
-                  与
-                  <span class="link" @tap.stop="changeShow">隐私政策</span>
-                </text>
-              </label>
-            </checkbox-group>
-          </view>
+    <view class="login-shell" :style="{ paddingTop: pageTopPadding + 'px' }">
+      <view class="top-nav">
+        <view class="back-btn" @tap="goBack">
+          <u-icon name="arrow-left" color="#17314c" size="34rpx"></u-icon>
         </view>
+        <view class="top-nav-title">{{ isOwnerApp ? '业主端' : '管理端' }}</view>
+        <view class="top-nav-placeholder"></view>
       </view>
 
-      <view class="footer-more">
-        <view class="text-line">
-          <view class="line"></view>
-          <view class="word">DEVELOPED BY UNIAPP AND YOLOV8</view>
-          <view class="line"></view>
+      <view class="login-stage">
+        <view class="login-container">
+          <view class="header">
+            <text class="title">社区智眼</text>
+            <view class="mainTitle">{{ isOwnerApp ? '居民服务入口' : '智慧社区工作入口' }}</view>
+          </view>
+
+          <view class="glass-card logContent">
+            <view class="mode-switch" v-if="canRegister">
+              <view class="mode-item" :class="{ active: mode === 'login' }" @tap="setMode('login')">登录</view>
+              <view class="mode-item" :class="{ active: mode === 'register' }" @tap="setMode('register')">注册</view>
+            </view>
+            <text class="card-title">{{ mode === 'login' ? '欢迎回来' : '创建账号' }}</text>
+            <text class="card-subtitle">{{ mode === 'login' ? '登录后查看社区提醒与服务' : '填写账号信息后即可进入业主端' }}</text>
+
+            <view class="form-group">
+              <view class="input-item">
+                <view class="iconBox">
+                  <u-icon name="account" color="#5672b9" size="34rpx"></u-icon>
+                </view>
+                <input
+                  class="input custom-input"
+                  type="text"
+                  v-model="username"
+                  placeholder="请输入用户名"
+                  placeholder-style="color:#A0B2D4"
+                />
+              </view>
+
+              <view class="input-item" v-if="mode === 'register'">
+                <view class="iconBox">
+                  <u-icon name="account-fill" color="#5672b9" size="34rpx"></u-icon>
+                </view>
+                <input
+                  class="input custom-input"
+                  type="text"
+                  v-model="nickname"
+                  placeholder="请输入昵称（可选）"
+                  placeholder-style="color:#A0B2D4"
+                />
+              </view>
+
+              <view class="input-item" v-if="mode === 'register'">
+                <view class="iconBox">
+                  <u-icon name="map" color="#5672b9" size="34rpx"></u-icon>
+                </view>
+                <input
+                  class="input custom-input"
+                  type="text"
+                  v-model="homeArea"
+                  placeholder="请输入所属区域，如小区东门街道"
+                  placeholder-style="color:#A0B2D4"
+                />
+              </view>
+
+              <view class="input-item">
+                <view class="iconBox">
+                  <u-icon name="lock" color="#5672b9" size="34rpx"></u-icon>
+                </view>
+                <input
+                  class="input custom-input"
+                  v-model="password"
+                  password
+                  type="text"
+                  placeholder="请输入密码"
+                  placeholder-style="color:#A0B2D4"
+                />
+              </view>
+
+              <view class="input-item" v-if="mode === 'register'">
+                <view class="iconBox">
+                  <u-icon name="lock-fill" color="#5672b9" size="34rpx"></u-icon>
+                </view>
+                <input
+                  class="input custom-input"
+                  v-model="confirmPassword"
+                  password
+                  type="text"
+                  placeholder="请再次输入密码"
+                  placeholder-style="color:#A0B2D4"
+                />
+              </view>
+
+              <view class="submit-wrap">
+                <button class="btn modern-btn" @tap="submitAuth">{{ mode === 'login' ? '登录' : '注册并进入' }}</button>
+              </view>
+
+              <view class="wx-register" v-if="isOwnerApp && mode === 'register'" @tap="registerByWechat">
+                微信注册
+              </view>
+
+              <view class="term-box">
+                <checkbox-group @change="checked = !checked">
+                  <label class="deal-wrapper">
+                    <checkbox class="theme-checkbox" style="transform: scale(0.65);" value="true" :checked="checked" color="#007aff"/>
+                    <text class="deal">
+                      {{ mode === 'login' ? '登录' : '注册' }}即表示您已阅读并同意
+                      <span class="link" @tap.stop="changeShow">《用户服务协议》</span>
+                      与
+                      <span class="link" @tap.stop="changeShow">《隐私政策》</span>
+                    </text>
+                  </label>
+                </checkbox-group>
+              </view>
+            </view>
+          </view>
         </view>
       </view>
     </view>
@@ -81,35 +127,36 @@
       :closeOnClickOverlay="true"
       @close="isShow = false"
       @confirm="isShow = false"
-      title="用户协议与隐私政策"
+      title="用户服务协议与隐私政策"
       confirmColor="#007aff"
     >
       <scroll-view scroll-y="true" style="height: 60vh;">
         <view class="modal-content">
           <p>
-            欢迎使用我们的服务！在使用本应用程序之前，请仔细阅读以下用户协议。<br />用户协议规定了您与我们之间的权利和责任。通过使用本应用程序，即表示您同意遵守以下条款和条件。
+            欢迎您使用社区智眼服务。为保障您的合法权益，维护服务秩序，请您在注册、登录及使用本应用前，仔细阅读并充分理解本《用户服务协议》与《隐私政策》。当您点击同意或继续使用本服务，即视为您已阅读、理解并接受本协议全部条款。
           </p>
-          <h4>1. 服务接受与使用</h4>
-          <p>1.1 您确认并同意，您仅在合法、合规的目的下使用本应用程序，并遵守适用的法律法规。</p>
-          <p>1.2 您应确保所提供的个人信息和数据的准确性和完整性，并对您提供的信息和数据的安全负责。</p>
-          <p>1.3 您不得使用本应用程序进行任何违法、欺诈、侵权、虚假、威胁、骚扰、诽谤、淫秽、攻击性或其他不当行为。</p>
-          <h4>2. 知识产权</h4>
-          <p>2.1 本应用程序及其相关内容（包括但不限于文字、图像、音频、视频、标识、商标、服务标识等）的知识产权归属于我们或相关权利人所有。</p>
-          <p>2.2 未经我们或相关权利人明确授权，您不得复制、修改、传播、展示、使用或以其他方式侵犯知识产权的行为。</p>
-          <h4>3. 隐私保护</h4>
-          <p>3.1 我们将按照隐私政策的规定收集、使用、存储和保护您的个人信息。</p>
-          <p>3.2 您理解并同意，为了提供更好的服务，我们可能会与第三方共享您的个人信息，但我们将采取合理的措施保护您的个人信息的安全和保密性。</p>
-          <h4>4. 免责声明</h4>
-          <p>4.1 您理解并同意，您使用本应用程序的风险由您自行承担。本应用程序提供的服务仅按照现有技术和条件提供，不对服务的及时性、安全性、准确性做出任何明示或暗示的保证。</p>
-          <p>4.2 您理解并同意，我们不对由于以下原因导致的任何直接或间接损失承担责任：网络故障、计算机病毒、黑客攻击、系统不稳定、第三方服务故障等。</p>
-          <h4>5. 终止与修改</h4>
-          <p>5.1 我们有权根据实际情况，在任何时候终止或修改本应用程序的部分或全部功能。</p>
-          <p>5.2 如您违反本用户协议的任何条款，我们有权立即终止您使用本应用程序的权利。</p>
-          <h4>6. 其他条款</h4>
-          <p>6.1 本用户协议适用中华人民共和国的法律。</p>
-          <p>6.2 如本用户协议的任何条款被认定为无效或不可执行，不影响其他条款的有效性。</p>
-          <p>6.3 本用户协议构成您与我们之间的完整协议，取代您与我们之间的任何其他口头或书面协议。</p>
-          <p>请在使用本应用程序之前仔细阅读并理解以上用户协议。如您对协议内容有任何疑问，请与我们联系。感谢您的合作和支持！</p>
+          <h4>1. 服务说明</h4>
+          <p>1.1 本应用面向社区管理、物业服务与住户信息查询等场景提供相关功能与服务。</p>
+          <p>1.2 我们将持续优化服务体验，但不承诺服务在所有设备、网络环境或系统版本下均保持完全一致。</p>
+          <p>1.3 您应当按照本协议及相关法律法规使用本服务，不得利用本服务从事任何违法违规活动。</p>
+          <h4>2. 账号使用规范</h4>
+          <p>2.1 您应妥善保管账号、密码及相关验证信息，并对使用该账号产生的行为负责。</p>
+          <p>2.2 如发现账号异常、被盗用或存在安全风险，您应及时采取必要措施并联系我们处理。</p>
+          <p>2.3 您不得通过非法方式获取、转让、出租、借用或共享他人账号。</p>
+          <h4>3. 个人信息保护</h4>
+          <p>3.1 我们将按照相关法律法规及《隐私政策》的约定收集、使用、存储、传输和保护您的个人信息。</p>
+          <p>3.2 为实现身份验证、消息通知、服务优化及安全保障等目的，我们可能会在必要范围内处理您的设备信息、账户信息及使用记录。</p>
+          <p>3.3 我们将采取合理的技术和管理措施，防止信息泄露、损毁、丢失或被非法使用。</p>
+          <h4>4. 知识产权</h4>
+          <p>4.1 本应用内所含的文字、图像、界面设计、程序代码、标识、音视频及其他内容，其相关知识产权归本系统或合法权利人所有。</p>
+          <p>4.2 未经授权，您不得以任何形式复制、传播、修改、反向工程、出售或用于其他商业用途。</p>
+          <h4>5. 责任限制</h4>
+          <p>5.1 因不可抗力、网络故障、设备异常、第三方服务中断等原因导致服务受限或中断的，我们在法律允许范围内不承担超出合理控制范围的责任。</p>
+          <p>5.2 您理解并同意，本应用仅提供信息展示、辅助管理与智能分析服务，相关结果供参考使用，不构成任何法律、财务或安全承诺。</p>
+          <h4>6. 协议变更与生效</h4>
+          <p>6.1 我们有权根据法律法规变化、业务调整或产品升级对本协议进行修订，并在必要时以适当方式通知您。</p>
+          <p>6.2 若您继续使用本服务，即视为接受修订后的协议内容。</p>
+          <p>6.3 本协议的解释、效力及争议解决适用中华人民共和国法律。</p>
         </view>
       </scroll-view>
     </u-modal>
@@ -124,6 +171,14 @@ export default {
     loginApi: {
       type: String,
       required: true,
+    },
+    registerApi: {
+      type: String,
+      default: '',
+    },
+    wxRegisterApi: {
+      type: String,
+      default: '',
     },
     successUrl: {
       type: String,
@@ -144,23 +199,72 @@ export default {
   },
   data() {
     return {
+      pageTopPadding: 30,
+      mode: 'login',
       isShow: false,
       password: '',
+      confirmPassword: '',
       username: '',
+      nickname: '',
+      homeArea: '',
       checked: false,
     };
   },
+  computed: {
+    isOwnerApp() {
+      return this.appType === 'owner';
+    },
+    canRegister() {
+      return this.isOwnerApp && Boolean(this.registerApi);
+    },
+  },
+  mounted() {
+    this.updateSafeAreaPadding();
+  },
   methods: {
+    updateSafeAreaPadding() {
+      const info = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : uni.getSystemInfoSync();
+      this.pageTopPadding = (info && info.statusBarHeight) ? info.statusBarHeight + 18 : 30;
+    },
+    setMode(mode) {
+      this.mode = mode;
+      this.password = '';
+      this.confirmPassword = '';
+      this.homeArea = '';
+    },
+    goBack() {
+      const pages = getCurrentPages();
+      if (pages.length > 1) {
+        uni.navigateBack();
+        return;
+      }
+      uni.reLaunch({ url: '/pages/shared/select/index' });
+    },
     changeShow() {
       this.isShow = true;
     },
-    jump() {
+    submitAuth() {
+      if (this.mode === 'register') {
+        this.registerOwner();
+        return;
+      }
+      this.jump();
+    },
+    ensureAgreed(actionText) {
       if (!this.checked) {
         uni.showToast({
-          title: '请仔细阅读并勾选用户协议与隐私政策',
+          title: `请先阅读并勾选协议后再${actionText}`,
           duration: 2000,
           icon: 'none',
         });
+        return false;
+      }
+      return true;
+    },
+    jump() {
+      if (!this.ensureAgreed('登录')) return;
+      if (!this.username || !this.password) {
+        uni.showToast({ title: '请输入用户名和密码', icon: 'none' });
         return;
       }
 
@@ -181,30 +285,7 @@ export default {
             uni.$showMsg(data.message || '登录失败');
             return;
           }
-
-          const userData = data.data || {};
-          uni.setStorageSync('phone', this.username);
-          uni.setStorageSync('username', userData.name || this.username);
-          uni.setStorageSync('userId', userData.id || '');
-          uni.setStorageSync('token', userData.token || '');
-          uni.setStorageSync('appType', this.appType);
-
-          if (this.enableWebsocket && userData.id) {
-            websocket.connect(userData.id);
-          }
-
-          uni.showToast({
-            title: '登录成功',
-            duration: 1200,
-            icon: 'success',
-            success: () => {
-              if (this.useSwitchTab) {
-                uni.switchTab({ url: this.successUrl });
-                return;
-              }
-              uni.reLaunch({ url: this.successUrl });
-            },
-          });
+          this.handleAuthSuccess(data.data || {}, '登录成功');
         })
         .catch(() => {
           uni.showToast({
@@ -216,6 +297,160 @@ export default {
           uni.hideLoading();
         });
     },
+    registerOwner() {
+      if (!this.ensureAgreed('注册')) return;
+      if (!this.registerApi) {
+        uni.showToast({ title: '注册暂未开放', icon: 'none' });
+        return;
+      }
+      if (!this.username || !this.password) {
+        uni.showToast({ title: '请输入用户名和密码', icon: 'none' });
+        return;
+      }
+      if (this.password !== this.confirmPassword) {
+        uni.showToast({ title: '两次密码不一致', icon: 'none' });
+        return;
+      }
+      if (!this.homeArea.trim()) {
+        uni.showToast({ title: '请填写所属区域', icon: 'none' });
+        return;
+      }
+
+      const payload = {
+        username: this.username,
+        userName: this.username,
+        password: this.password,
+        name: this.nickname || this.username,
+        homeArea: this.homeArea.trim(),
+        role: 1,
+      };
+
+      uni.showLoading({ title: '注册中...' });
+      uni.$http
+        .post(this.registerApi, payload)
+        .then(({ data }) => {
+          if (data.code !== '00000') {
+            uni.$showMsg(data.message || '注册失败');
+            return;
+          }
+          const userData = data.data || {};
+          if (userData.token) {
+            this.handleAuthSuccess(userData, '注册成功');
+            return;
+          }
+          this.autoLoginAfterRegister();
+        })
+        .catch(() => {
+          uni.showToast({ title: '网络请求失败，请稍后重试', icon: 'none' });
+        })
+        .finally(() => {
+          uni.hideLoading();
+        });
+    },
+    autoLoginAfterRegister() {
+      if (!this.username || !this.password) {
+        uni.showToast({ title: '注册成功，请手动登录', icon: 'none' });
+        this.setMode('login');
+        return;
+      }
+      uni.showLoading({ title: '自动登录中...' });
+      uni.$http
+        .post(this.loginApi, {
+          userName: this.username,
+          password: this.password,
+        })
+        .then(({ data }) => {
+          if (data.code !== '00000') {
+            uni.$showMsg(data.message || '自动登录失败，请手动登录');
+            this.setMode('login');
+            return;
+          }
+          this.handleAuthSuccess(data.data || {}, '注册成功');
+        })
+        .catch(() => {
+          uni.$showMsg('自动登录失败，请手动登录');
+          this.setMode('login');
+        })
+        .finally(() => {
+          uni.hideLoading();
+        });
+    },
+    registerByWechat() {
+      if (!this.ensureAgreed('注册')) return;
+      if (!this.wxRegisterApi) {
+        uni.showToast({ title: '微信注册即将开放', icon: 'none' });
+        return;
+      }
+      if (typeof uni.login !== 'function') {
+        uni.showToast({ title: '当前环境暂不支持微信注册', icon: 'none' });
+        return;
+      }
+      uni.login({
+        provider: 'weixin',
+        success: (loginRes) => {
+          uni.showLoading({ title: '注册中...' });
+          uni.$http
+            .post(this.wxRegisterApi, { code: loginRes.code })
+            .then(({ data }) => {
+              if (data.code !== '00000') {
+                uni.$showMsg(data.message || '微信注册失败');
+                return;
+              }
+              this.handleAuthSuccess(data.data || {}, '注册成功');
+            })
+            .catch(() => {
+              uni.showToast({ title: '网络请求失败，请稍后重试', icon: 'none' });
+            })
+            .finally(() => {
+              uni.hideLoading();
+            });
+        },
+        fail: () => {
+          uni.showToast({ title: '微信授权未完成', icon: 'none' });
+        },
+      });
+    },
+    handleAuthSuccess(userData, title) {
+      const expectedRole = this.appType === 'owner' ? 1 : 0;
+      if (userData && userData.role !== undefined && Number(userData.role) !== expectedRole) {
+        uni.showToast({
+          title: this.appType === 'owner' ? '请使用业主端账号登录' : '请使用管理端账号登录',
+          icon: 'none',
+        });
+        return;
+      }
+      uni.setStorageSync('phone', this.username);
+      uni.setStorageSync('username', userData.name || this.nickname || this.username);
+      uni.setStorageSync('userId', userData.id || '');
+      uni.setStorageSync('token', userData.token || '');
+      uni.setStorageSync('appType', this.appType);
+      uni.setStorageSync('homeArea', userData.homeArea || this.homeArea || '');
+      uni.setStorageSync('avatarUrl', userData.avatarUrl || '');
+      uni.setStorageSync('notifyEnabled', userData.notifyEnabled !== false);
+
+      if (this.enableWebsocket && userData.id) {
+        websocket.connect(userData.id);
+      }
+
+      uni.showToast({
+        title,
+        duration: 1200,
+        icon: 'success',
+        success: () => {
+          setTimeout(() => {
+              if (this.successUrl === '/pages/manage/controls/controls') {
+                uni.reLaunch({ url: this.successUrl });
+                return;
+              }
+              if (this.useSwitchTab) {
+                uni.switchTab({ url: this.successUrl });
+                return;
+              }
+              uni.reLaunch({ url: this.successUrl });
+          }, 320);
+        },
+      });
+    },
   },
 };
 </script>
@@ -224,255 +459,296 @@ export default {
 .loginBox {
   min-height: 100vh;
   width: 100vw;
-  background: transparent;
+  background:
+    radial-gradient(circle at 12% 2%, rgba(56, 164, 255, 0.2) 0, rgba(56, 164, 255, 0) 260rpx),
+    radial-gradient(circle at 88% 18%, rgba(20, 112, 216, 0.14) 0, rgba(20, 112, 216, 0) 300rpx),
+    linear-gradient(180deg, #eaf6ff 0%, #f8fbff 52%, #ffffff 100%);
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding: 0 28rpx 42rpx;
+  display: flex;
+}
+
+.bg-shape {
+  position: absolute;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.shape-1 {
+  width: 360rpx;
+  height: 360rpx;
+  background: rgba(0, 122, 255, 0.14);
+  top: -120rpx;
+  left: -130rpx;
+}
+
+.shape-2 {
+  width: 420rpx;
+  height: 420rpx;
+  background: rgba(0, 210, 255, 0.1);
+  right: -170rpx;
+  bottom: -150rpx;
+}
+
+.top-nav,
+.login-container {
+  position: relative;
+  z-index: 1;
+}
+
+.login-shell {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+  flex: 0 0 auto;
+}
+
+.back-btn,
+.top-nav-placeholder {
+  width: 66rpx;
+  height: 66rpx;
+}
+
+.back-btn {
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1rpx solid rgba(37, 99, 235, 0.1);
+  box-shadow: 0 8rpx 20rpx rgba(32, 74, 126, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.top-nav-title {
+  color: #17314c;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 710rpx;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rpx 0 12rpx;
+  min-height: 0;
+}
+
+.mode-switch + .card-title {
+  margin-top: 0;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30rpx;
+  width: 100%;
+}
+
+.title {
+  color: #17314c;
+  font-size: 62rpx;
+  font-weight: 900;
+  letter-spacing: 6rpx;
+  display: block;
+  line-height: 1.1;
+}
+
+.mainTitle {
+  margin-top: 16rpx;
+  color: #5a74ab;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.glass-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1rpx solid rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16rpx 46rpx rgba(57, 96, 156, 0.12);
+  border-radius: 34rpx;
+  padding: 32rpx 30rpx 38rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mode-switch {
+  width: 100%;
+  padding: 6rpx;
+  border-radius: 999rpx;
+  background: #eaf4ff;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  box-sizing: border-box;
+  margin-bottom: 24rpx;
+}
+
+.mode-item {
+  height: 58rpx;
+  border-radius: 999rpx;
+  color: #64748b;
+  font-size: 25rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-item.active {
+  background: #fff;
+  color: #1470d8;
+  box-shadow: 0 6rpx 18rpx rgba(20, 112, 216, 0.12);
+}
+
+.card-title {
+  color: #17314c;
+  font-size: 36rpx;
+  font-weight: 900;
+  margin-bottom: 8rpx;
+}
+
+.card-subtitle {
+  color: #64748b;
+  font-size: 23rpx;
+  margin-bottom: 28rpx;
+}
+
+.form-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 26rpx;
+}
+
+.mode-switch ~ .form-group {
+  gap: 20rpx;
+}
+
+.input-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 90rpx;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 20rpx;
+  overflow: hidden;
+  border: 1rpx solid rgba(0, 122, 255, 0.11);
+}
+
+.input-item:focus-within {
+  border-color: rgba(0, 122, 255, 0.42);
+  box-shadow: 0 0 0 4rpx rgba(0, 122, 255, 0.06);
+}
+
+.iconBox {
+  width: 86rpx;
+  height: 100%;
+  display: flex;
   justify-content: center;
   align-items: center;
-  box-sizing: border-box;
-  padding: 56rpx 0;
+}
 
-  .bg-shape {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(88px);
-    z-index: 0;
-    opacity: 0.28;
-    animation: floating 11s infinite ease-in-out alternate;
-  }
-  .shape-1 {
-    width: 620rpx;
-    height: 620rpx;
-    background: rgba(0, 122, 255, 0.26);
-    top: -16%;
-    left: -22%;
-  }
-  .shape-2 {
-    width: 560rpx;
-    height: 560rpx;
-    background: rgba(0, 210, 255, 0.2);
-    bottom: 4%;
-    right: -18%;
-    animation-delay: -3s;
-  }
-  .shape-3 {
-    width: 430rpx;
-    height: 430rpx;
-    background: rgba(100, 150, 255, 0.16);
-    top: 56%;
-    left: 32%;
-    animation-delay: -6s;
-  }
+.custom-input {
+  flex: 1;
+  height: 100%;
+  font-size: 28rpx;
+  color: #17314c;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding-right: 24rpx;
+}
 
-  .login-container {
-    width: 90%;
-    max-width: 710rpx;
-    z-index: 2;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    margin: 80rpx auto auto;
-    animation: fade-up 380ms ease forwards;
-  }
+.submit-wrap {
+  width: 100%;
+  margin-top: 12rpx;
+}
 
-  .header {
-    text-align: center;
-    margin-bottom: 54rpx;
-    width: 100%;
-    transform: translateY(-30rpx);
+.modern-btn {
+  width: 100%;
+  height: 92rpx;
+  background: linear-gradient(90deg, #1470d8 0%, #05b5ff 100%);
+  color: #ffffff;
+  font-size: 31rpx;
+  font-weight: 900;
+  letter-spacing: 2rpx;
+  border-radius: 46rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 10rpx 26rpx rgba(20, 112, 216, 0.22);
+}
 
-    .title {
-      color: #1A2A3A;
-      font-size: 74rpx;
-      font-weight: 900;
-      letter-spacing: 8rpx;
-      text-shadow: 0 6rpx 20rpx rgba(0, 122, 255, 0.08);
-      display: block;
-      line-height: 1.1;
-    }
+.modern-btn:active {
+  opacity: 0.92;
+}
 
-    .mainTitle {
-      margin-top: 20rpx;
-      color: #5a74ab;
-      font-size: 24rpx;
-      letter-spacing: 1rpx;
-      font-weight: 600;
-      position: relative;
-      display: inline-block;
-      padding: 0 24rpx;
+.modern-btn::after {
+  border: none;
+}
 
-      &::before,
-      &::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        width: 34rpx;
-        height: 1px;
-        background: rgba(0, 122, 255, 0.2);
-      }
-      &::before {
-        left: -16rpx;
-      }
-      &::after {
-        right: -16rpx;
-      }
-    }
-  }
+.wx-register {
+  width: 100%;
+  height: 84rpx;
+  border-radius: 42rpx;
+  background: #f0fdf4;
+  border: 1rpx solid #bbf7d0;
+  color: #16a34a;
+  font-size: 28rpx;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-  .glass-card {
-    width: 100%;
-    background: rgba(255, 255, 255, 0.58);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.86);
-    box-shadow: 0 16rpx 60rpx rgba(57, 96, 156, 0.12);
-    border-radius: 38rpx;
-    padding: 54rpx 42rpx;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: relative;
-    overflow: hidden;
+.term-box {
+  display: flex;
+  justify-content: center;
+  margin-top: 10rpx;
+}
 
-    &::before {
-      content: '';
-      position: absolute;
-      width: 360rpx;
-      height: 360rpx;
-      right: -180rpx;
-      top: -220rpx;
-      background: radial-gradient(circle, rgba(86, 150, 255, 0.16) 0%, rgba(86, 150, 255, 0) 68%);
-      pointer-events: none;
-    }
+.deal-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-    .card-title {
-      color: #1A2A3A;
-      font-size: 42rpx;
-      font-weight: bold;
-      letter-spacing: 5rpx;
-      margin-bottom: 42rpx;
-    }
+.deal {
+  font-size: 22rpx;
+  color: rgba(26, 42, 58, 0.72);
+  margin-left: 6rpx;
+  line-height: 1.5;
+}
 
-    .form-group {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 28rpx;
-    }
-
-    .input-item {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      height: 96rpx;
-      background: rgba(255, 255, 255, 0.9);
-      border-radius: 20rpx;
-      transition: all 0.3s ease;
-      overflow: hidden;
-      border: 1px solid rgba(0, 122, 255, 0.11);
-
-      &:focus-within {
-        border-color: rgba(0, 122, 255, 0.56);
-        box-shadow: 0 0 0 4rpx rgba(0, 122, 255, 0.07);
-      }
-
-      .iconBox {
-        width: 90rpx;
-        height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-
-      .custom-input {
-        flex: 1;
-        height: 100%;
-        font-size: 29rpx;
-        color: #1A2A3A;
-        border: none;
-        outline: none;
-        background: transparent;
-        padding-right: 30rpx;
-      }
-
-      .svg-icon {
-        width: 34rpx;
-        height: 34rpx;
-      }
-    }
-
-    .modern-btn {
-      width: 100%;
-      height: 94rpx;
-      background: linear-gradient(90deg, #007aff 0%, #00d2ff 100%);
-      color: #ffffff;
-      font-size: 32rpx;
-      font-weight: bold;
-      letter-spacing: 3rpx;
-      border-radius: 47rpx;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-shadow: 0 10rpx 30rpx rgba(0, 122, 255, 0.24);
-      transition: transform 0.1s;
-
-      &:active {
-        transform: scale(0.98);
-      }
-      &::after {
-        border: none;
-      }
-    }
-
-    .term-box {
-      margin-top: -6rpx;
-    }
-    .deal-wrapper {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .deal {
-      font-size: 23rpx;
-      color: #1A2A3A;
-      margin-left: 8rpx;
-      opacity: 0.74;
-
-      .link {
-        color: #007aff;
-        font-weight: bold;
-        text-decoration: underline;
-        margin: 0 4rpx;
-      }
-    }
-  }
-
-  .footer-more {
-    margin-top: 48rpx;
-    width: 100%;
-
-    .text-line {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 20rpx;
-
-      .line {
-        height: 1px;
-        width: 60rpx;
-        background-color: rgba(0, 122, 255, 0.1);
-      }
-      .word {
-        font-size: 19rpx;
-        color: rgba(26, 42, 58, 0.4);
-        letter-spacing: 1.5rpx;
-      }
-    }
-  }
+.link {
+  color: #1470d8;
+  font-weight: 800;
+  margin: 0 4rpx;
 }
 
 .modal-content {
@@ -480,37 +756,17 @@ export default {
   color: #333333;
   line-height: 1.6;
   font-size: 28rpx;
-
-  h4 {
-    font-size: 32rpx;
-    font-weight: bold;
-    color: #007aff;
-    margin: 30rpx 0 15rpx 0;
-  }
-
-  p {
-    margin-bottom: 16rpx;
-    text-align: justify;
-  }
 }
 
-@keyframes floating {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  100% {
-    transform: translate(30rpx, 50rpx) rotate(15deg);
-  }
+.modal-content h4 {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #007aff;
+  margin: 30rpx 0 15rpx 0;
 }
 
-@keyframes fade-up {
-  0% {
-    opacity: 0;
-    transform: translateY(16rpx);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.modal-content p {
+  margin-bottom: 16rpx;
+  text-align: justify;
 }
 </style>

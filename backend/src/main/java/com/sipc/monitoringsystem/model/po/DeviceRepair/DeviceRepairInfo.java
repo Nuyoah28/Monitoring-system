@@ -29,6 +29,9 @@ public class DeviceRepairInfo {
 
     private String publisher;
 
+    @TableField("owner_user_id")
+    private Integer ownerUserId;
+
     public Integer getId() {
         return id;
     }

@@ -7,31 +7,37 @@
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
       </view>
-      <view class="top-title">物业通知</view>
+      <view class="top-title">社区提醒</view>
       <view class="ghost-btn" @tap="loadNotices">刷新</view>
     </view>
 
     <view class="panel">
-      <view class="panel-title">最新公告</view>
-      <view v-if="!list.length" class="empty">当前暂无公告。</view>
-      <view v-for="item in list" :key="item.id" class="notice-card" @tap="openNotice(item)">
-        <view class="notice-title">{{ item.message || '未命名公告' }}</view>
-        <view class="notice-time">发布时间：{{ formatTime(item.timestamp) }}</view>
+      <view class="panel-title">最新提醒</view>
+      <view v-if="!list.length" class="empty">当前暂无社区提醒。</view>
+      <view v-for="item in list" :key="noticeKey(item)" class="notice-card" :class="{ read: item.isRead }" @tap="openNotice(item)">
+        <view class="notice-head">
+          <view class="notice-title">{{ item.message || '未命名提醒' }}</view>
+          <view class="read-pill" :class="{ read: item.isRead }">{{ item.isRead ? '已读' : '未读' }}</view>
+        </view>
+        <view class="notice-time">提醒时间：{{ formatTime(item.timestamp) }}</view>
       </view>
     </view>
 
     <u-popup :show="showDetail" mode="bottom" @close="showDetail = false" round="20">
       <view class="detail-wrap">
-        <view class="detail-head">通知详情</view>
+        <view class="detail-head">提醒详情</view>
         <view class="detail-content">{{ active.message || '--' }}</view>
-        <view class="detail-time">发布时间：{{ formatTime(active.timestamp) }}</view>
-        <view class="close-btn" @tap="showDetail = false">我知道了</view>
+        <view class="detail-time">提醒时间：{{ formatTime(active.timestamp || active.createTime) }}</view>
+        <view class="close-btn" @tap="closeDetail">我知道了</view>
       </view>
     </u-popup>
   </view>
 </template>
 
 <script>
+import { OWNER_DEMO_FALLBACK_ENABLED, createOwnerDemoNotices } from '@/common/owner-demo-data.js';
+import { applyOwnerNoticeReadState, getOwnerNoticeKey, markOwnerNoticeRead } from '@/common/owner-notice-read.js';
+
 const SUCCESS_CODE = '00000';
 
 export default {
@@ -63,25 +69,60 @@ export default {
       return `${value}`;
     },
     async loadNotices() {
+      let shouldUseFallback = false;
       try {
         const { data: res } = await uni.$http.get('/api/v1/system/message/getMessage');
         if (!this.isSuccess(res)) {
-          uni.$showMsg(res.message || '加载通知失败');
+          shouldUseFallback = true;
+        } else {
+          const arr = Array.isArray(res.data) ? res.data : [];
+          shouldUseFallback = !arr.length && OWNER_DEMO_FALLBACK_ENABLED;
+          this.list = this.normalizeNotices(shouldUseFallback ? createOwnerDemoNotices() : arr);
           return;
         }
-        const arr = Array.isArray(res.data) ? res.data : [];
-        this.list = arr.sort((a, b) => {
-          const ta = new Date(a.timestamp || 0).getTime();
-          const tb = new Date(b.timestamp || 0).getTime();
-          return tb - ta;
-        });
       } catch (e) {
-        uni.$showMsg('网络异常，请稍后重试');
+        shouldUseFallback = true;
       }
+
+      if (shouldUseFallback && OWNER_DEMO_FALLBACK_ENABLED) {
+        this.list = this.normalizeNotices(createOwnerDemoNotices());
+        return;
+      }
+
+      uni.$showMsg('网络异常，请稍后重试');
+    },
+    normalizeNotices(list = []) {
+      const sorted = [...list].sort((a, b) => {
+        const ta = new Date(a.timestamp || a.createTime || 0).getTime();
+        const tb = new Date(b.timestamp || b.createTime || 0).getTime();
+        return tb - ta;
+      });
+      return applyOwnerNoticeReadState(sorted);
+    },
+    noticeKey(item) {
+      return getOwnerNoticeKey(item);
     },
     openNotice(item) {
       this.active = item || {};
       this.showDetail = true;
+      this.saveNoticeAck(this.active);
+    },
+    closeDetail() {
+      this.saveNoticeAck(this.active);
+      this.showDetail = false;
+    },
+    saveNoticeAck(item = null) {
+      const target = item && (item.timestamp || item.createTime) ? item : this.list[0];
+      if (!target) return;
+      const targetKey = this.noticeKey(target);
+      markOwnerNoticeRead(target);
+      this.list = this.list.map(notice => ({
+        ...notice,
+        isRead: this.noticeKey(notice) === targetKey ? true : notice.isRead,
+      }));
+      if (this.active && this.noticeKey(this.active) === targetKey) {
+        this.active = { ...this.active, isRead: true };
+      }
     },
   },
 };
@@ -94,7 +135,7 @@ export default {
   box-sizing: border-box;
   background: linear-gradient(180deg, #eef7ff 0%, #f9fbff 54%, #ffffff 100%);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .bg-shape {
@@ -193,11 +234,45 @@ export default {
   margin-bottom: 12rpx;
 }
 
+.notice-card.read {
+  background: #fbfdff;
+  border-color: #e8f0fa;
+  opacity: 0.78;
+}
+
+.notice-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
 .notice-title {
+  flex: 1;
+  min-width: 0;
   font-size: 28rpx;
   color: #17314c;
   font-weight: 700;
   line-height: 1.5;
+}
+
+.read-pill {
+  flex-shrink: 0;
+  height: 40rpx;
+  padding: 0 14rpx;
+  border-radius: 999rpx;
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  font-size: 21rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.read-pill.read {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
 }
 
 .notice-time {

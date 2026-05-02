@@ -95,7 +95,7 @@ class HospitalAlarmSystemApplicationTests {
 //
 //    @Test
 //    void Te() {
-//        System.out.println(ossConfig.cosClient().generatePresignedUrl("hospital-alarm-1318141347",
+//        System.out.println(ossConfig.cosClient().generatePresignedUrl(ossConfig.getBucketName(),
 //                "fake.mp4",
 //                new Date(System.currentTimeMillis() + (long) 365 * 24 * 60 * 60 * 1000),
 //                HttpMethodName.GET).toString());

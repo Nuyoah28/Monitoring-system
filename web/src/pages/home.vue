@@ -82,11 +82,25 @@ const goAgent = () => {
   cursor: pointer;
   min-width: 140px;
   justify-content: center;
+  border-color: rgba(126, 197, 255, 0.36);
+  background:
+    linear-gradient(180deg, rgba(22, 56, 89, 0.96), rgba(12, 34, 57, 0.92));
+  color: #eef8ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 22px rgba(4, 12, 20, 0.14);
+  font-weight: 600;
 }
 
 .action-pill-primary {
-  border-color: rgba(126, 232, 255, 0.44);
-  background: linear-gradient(180deg, rgba(33, 94, 143, 0.96), rgba(18, 55, 88, 0.92));
+  border-color: rgba(255, 141, 141, 0.54);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 141, 141, 0.22), transparent 38%),
+    linear-gradient(180deg, rgba(132, 44, 58, 0.98), rgba(78, 22, 35, 0.94));
+  color: #fff1f3;
+  box-shadow:
+    0 0 0 1px rgba(255, 141, 141, 0.16),
+    0 12px 24px rgba(255, 78, 102, 0.14);
 }
 
 .grid.single {
@@ -121,9 +135,9 @@ const goAgent = () => {
   justify-content: center;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(75, 230, 168, 0.28);
-  background: rgba(75, 230, 168, 0.12);
-  color: #9ef4c7;
+  border: 1px solid rgba(126, 232, 255, 0.3);
+  background: rgba(126, 232, 255, 0.12);
+  color: #c8f4ff;
   font-size: 12px;
   letter-spacing: 0.06em;
 }
@@ -158,9 +172,12 @@ const goAgent = () => {
   gap: 12px;
   align-items: center;
   padding: 12px 14px;
-  border: 1px solid rgba(126, 197, 255, 0.16);
+  border: 1px solid rgba(126, 197, 255, 0.22);
   border-radius: 18px;
-  background: rgba(12, 30, 50, 0.52);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(126, 232, 255, 0.08), transparent 30%),
+    rgba(12, 30, 50, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .info-row span {
@@ -182,11 +199,13 @@ const goAgent = () => {
   position: relative;
   padding: 12px;
   border-radius: 28px;
-  border: 1px solid rgba(126, 197, 255, 0.18);
+  border: 1px solid rgba(126, 232, 255, 0.26);
   background:
-    radial-gradient(circle at 18% 12%, rgba(126, 197, 255, 0.14), transparent 28%),
-    linear-gradient(180deg, rgba(13, 33, 56, 0.88), rgba(9, 23, 39, 0.94));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    radial-gradient(circle at 18% 12%, rgba(126, 232, 255, 0.18), transparent 28%),
+    linear-gradient(180deg, rgba(13, 33, 56, 0.9), rgba(9, 23, 39, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 30px rgba(4, 12, 20, 0.14);
 }
 
 .portrait-frame::after {
@@ -196,7 +215,7 @@ const goAgent = () => {
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(126, 197, 255, 0.22), transparent 72%);
+  background: radial-gradient(circle, rgba(126, 232, 255, 0.24), transparent 72%);
   filter: blur(8px);
 }
 
@@ -206,7 +225,7 @@ const goAgent = () => {
   height: 300px;
   border-radius: 20px;
   object-fit: cover;
-  border: 1px solid rgba(126, 197, 255, 0.22);
+  border: 1px solid rgba(126, 232, 255, 0.28);
   position: relative;
   z-index: 1;
 }

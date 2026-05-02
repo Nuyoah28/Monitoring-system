@@ -1,195 +1,150 @@
 <template>
-  <view style="height: 100vh; width: 100vw; position: relative">
-    <view class="warnBox" id="warnBox" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="title">
-        <view class="back-btn" @tap="goBack">
-          <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
-        </view>
-        <view class="topNav">
-          <view
-            class="left"
-            :class="choosen === 0 ? 'choosen' : ''"
-            @click="switchTab(0)"
-          >
-            <span>待处理</span>
-          </view>
-          <view
-            class="right"
-            :class="choosen === 1 ? 'choosen' : ''"
-            @click="switchTab(1)"
-          >
-            <span>历史事件</span>
-          </view>
-        </view>
-        <view class="setting-btn" @click="jump">
-          <u-icon name="setting" color="#666" size="44rpx"></u-icon>
-        </view>
-      </view>
-      <view class="second">
-        <view class="options">
-          <view class="selector" @tap="showFilter = true">
-            <view class="icon">
-              <image
-                src="../../../static/7d163ad9-885d-47cb-a29e-043e5a9933ac.png"
-                mode="aspectFit"
-                class="img"
-              ></image>
-            </view>
-            <view class="timeText">
-              {{
-                filterIndex !== null
-                  ? filters[0][filterIndex]
-                  : "请选择事件名称"
-              }}
-            </view>
-          </view>
-          <view class="selector" @tap="showStatus = true">
-            <view class="icon">
-              <image
-                src="../../../static/5de7d537-e96d-4269-ad0a-684f3443643d.png"
-                mode="aspectFit"
-                class="img"
-              ></image>
-            </view>
-            <view class="timeText">
-              {{
-                statusIndex !== null ? status[0][statusIndex] : "请选择警报级别"
-              }}
-            </view>
-          </view>
-        </view>
-        <view class="icons" @click="reset">
-          <u-icon 
-            name="reload" 
-            color="#007AFF" 
-            size="44rpx" 
-            :class="{ 'rotate-anim': isRefreshing }"
-          ></u-icon>
-        </view>
-      </view>
-      <scroll-view
-        class="content"
-        scroll-y="true"
-        :scroll-top="scrollTop"
-        :style="{ height: scrollHeight + 'px' }"
-        @scrolltolower="getMore"
-        @scroll="getTop"
-      >
-        <view
-          class="box"
-          v-for="(item, index) in choosen === 0 ? warnData : historyData"
-          :key="item.id"
-          @touchstart="startMove($event, item)"
-          @touchmove="moving($event, item)"
-          @touchend="stopMove($event, item)"
-          :style="{ transform: 'translateX(' + item.moveX + 'px)' }"
-        >
-          <view class="details" :class="item.moveX === 0 ? 'bor' : ''" @tap.stop="openDetail(item)">
-            <view class="deviceName">
-              {{ item.name }}
-            </view>
-            <view class="happen">
-              <view class="event">
-                {{ item.eventName }}
-              </view>
-              <view v-for="l in item.level" :key="l" class="stars">
-                <image src="../../../static/start.png" mode="aspectFit"></image>
-              </view>
-            </view>
-            <view class="positonAndtime">
-              <view class="time">
-                {{ item.date }}
-              </view>
-              <view class="position">
-                {{ item.department }}
-              </view>
-            </view>
-            <view
-              class="buttons"
-              v-show="item.deal === '未处理'"
-              @click="alert(index)"
-            >
-              <image src="../../../static/alert.png" mode="aspectFit"></image>
-            </view>
-            <view :class="item.deal === '已处理' ? 'isDealt' : 'unDealt'">
-              <span>{{ item.deal }}</span>
-              <view class="img">
-                <image
-                  :src="item.deal === '已处理' ? dealIcon[0] : dealIcon[1]"
-                  mode="aspectFit"
-                  class="image"
-                ></image>
-              </view>
-            </view>
-          </view>
-          <view class="deleteBox">
-            <view class="edit" @tap="check(index)">
-              查看<image
-                src="../../../static/watch.png"
-                mode="aspectFit"
-              ></image>
-            </view>
-            <view class="deal" @tap="deal(index)">
-              处理<image
-                src="../../../static/pencil.png"
-                mode="aspectFit"
-              ></image>
-            </view>
-            <view class="delete" @tap="deleteItem(index)" v-show="!choosen">
-              删除<image
-                src="../../../static/white-rubbish.png"
-                mode="aspectFit"
-              ></image>
-            </view>
-            <view class="finish" @tap="deleteItem(index)" v-show="choosen">
-              完成<image
-                src="../../../static/finish.png"
-                mode="aspectFit"
-              ></image>
-            </view>
-          </view>
-        </view>
-        <u-loadmore :status="statusList"></u-loadmore>
-      </scroll-view>
-      <u-modal
-        style="position: absolute"
-        :show="showDeal"
-        :closeOnClickOverlay="true"
-        @close="showDeal = false"
-        @confirm="sendDeal"
-        showCancelButton
-        @cancel="showDeal = false"
-        width="348px"
-      >
-        <edit
-          v-if="showDeal"
-          @getContent="setContent"
-          :warnData="choosen === 0 ? warnData[index] : historyData[index]"
-        ></edit>
-      </u-modal>
+  <view class="alarm-page" :style="{ paddingTop: statusBarHeight + 'px' }">
+    <view class="bg-orb bg-orb--one"></view>
+    <view class="bg-orb bg-orb--two"></view>
 
-      <!-- 弹窗选择器独立放置，避免父级 transform/relative 干扰定位 -->
-      <u-picker
-        :show="showFilter"
-        :columns="filters"
-        @confirm="setFilter"
-        @cancel="showFilter = false"
-      ></u-picker>
-      <u-picker
-        :show="showStatus"
-        :columns="status"
-        @confirm="setStatus"
-        @cancel="showStatus = false"
-      ></u-picker>
+    <view class="top-nav">
+      <view class="back-btn" @tap="goBack">
+        <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
+      </view>
+      <text class="top-title">告警中心</text>
     </view>
+
+    <view class="header-card">
+      <view class="header-copy">
+        <view class="eyebrow">社区安全事件</view>
+        <view class="title">{{ choosen === 0 ? '待处理告警' : '已处理记录' }}</view>
+        <view class="subtitle">
+          {{ choosen === 0 ? '优先处理高风险和最新告警，处理后会自动归档' : '查看已经完成处理的历史事件' }}
+        </view>
+      </view>
+      <view class="header-stat" :class="choosen === 0 ? 'is-danger' : 'is-success'">
+        <text class="stat-num">{{ currentList.length }}</text>
+        <text class="stat-label">{{ choosen === 0 ? '待处理' : '已处理' }}</text>
+      </view>
+    </view>
+
+    <view class="section-card filter-card">
+      <view class="tab-row">
+        <view class="tab-item" :class="choosen === 0 ? 'is-active' : ''" @tap="switchTab(0)">待处理</view>
+        <view class="tab-item" :class="choosen === 1 ? 'is-active' : ''" @tap="switchTab(1)">已处理</view>
+      </view>
+      <view class="filter-row">
+        <view class="filter-chip" @tap="showFilter = true">
+          <text>{{ filterIndex !== null ? filters[0][filterIndex] : '事件类型' }}</text>
+          <u-icon name="arrow-down" color="#64748b" size="22rpx"></u-icon>
+        </view>
+        <view class="filter-chip" @tap="showStatus = true">
+          <text>{{ statusIndex !== null ? status[0][statusIndex] : '告警等级' }}</text>
+          <u-icon name="arrow-down" color="#64748b" size="22rpx"></u-icon>
+        </view>
+        <view class="refresh-btn" :class="{ 'is-refreshing': isRefreshing }" @tap="reset">
+          <u-icon name="reload" color="#1470d8" size="32rpx"></u-icon>
+        </view>
+      </view>
+    </view>
+
+    <scroll-view
+      class="alarm-list"
+      scroll-y="true"
+      :scroll-top="scrollTop"
+      @scrolltolower="getMore"
+      @scroll="getTop"
+    >
+      <view
+        class="alarm-card"
+        v-for="(item, index) in currentList"
+        :key="item.id"
+        @tap="openDetail(item)"
+      >
+        <view class="card-top">
+          <view class="camera-info">
+            <view class="camera-name">{{ item.name || '未命名摄像头' }}</view>
+            <view class="camera-area">{{ item.department || '未标注区域' }}</view>
+          </view>
+          <view class="level-pill" :class="levelClass(item.level)">{{ levelText(item.level) }}</view>
+        </view>
+
+        <view class="event-row">
+          <view class="event-dot" :class="levelClass(item.level)"></view>
+          <view class="event-name">{{ item.eventName || '异常事件' }}</view>
+          <view class="deal-pill" :class="item.deal === '已处理' ? 'is-done' : 'is-pending'">{{ item.deal }}</view>
+        </view>
+
+        <view class="meta-row">
+          <text>{{ item.date || '--' }}</text>
+          <text>ID {{ item.id }}</text>
+        </view>
+
+        <view class="content-note" v-if="item.content && item.deal === '已处理'">
+          处理说明：{{ item.content }}
+        </view>
+
+        <view class="action-row" @tap.stop>
+          <view class="action-btn action-btn--ghost" @tap="openDetail(item)">查看详情</view>
+          <view class="action-btn action-btn--call" v-if="item.deal === '未处理'" @tap="alert(index)">联系</view>
+          <view class="action-btn action-btn--primary" v-if="item.deal === '未处理'" @tap="deal(index)">处理告警</view>
+          <view class="action-btn action-btn--ghost" v-else @tap="openDetail(item)">处理记录</view>
+        </view>
+      </view>
+
+      <view class="empty-state" v-if="!currentList.length && statusList !== 'loading'">
+        <view class="empty-title">{{ choosen === 0 ? '暂无待处理告警' : '暂无已处理记录' }}</view>
+        <view class="empty-desc">{{ choosen === 0 ? '当前社区运行平稳' : '处理完成后会在这里归档' }}</view>
+      </view>
+      <u-loadmore :status="statusList"></u-loadmore>
+    </scroll-view>
+
+    <u-modal
+      :show="showDeal"
+      :closeOnClickOverlay="true"
+      @close="closeDealModal"
+      @confirm="sendDeal"
+      showCancelButton
+      @cancel="closeDealModal"
+      confirmText="确认处理"
+      cancelText="取消"
+      width="650rpx"
+    >
+      <view class="deal-modal" v-if="showDeal">
+        <view class="deal-title">处理告警</view>
+        <view class="deal-subtitle">{{ activeDealItem.eventName || '异常事件' }} · {{ activeDealItem.department || '未标注区域' }}</view>
+        <view class="quick-title">常用处理结果</view>
+        <view class="quick-result-row">
+          <view class="quick-result" v-for="text in quickDealTexts" :key="text" @tap="content = text">{{ text }}</view>
+        </view>
+        <textarea
+          class="deal-textarea"
+          v-model="content"
+          placeholder="请填写现场核实结果或处理说明"
+          :adjust-position="false"
+        />
+      </view>
+    </u-modal>
+
+    <u-picker
+      :show="showFilter"
+      :columns="filters"
+      @confirm="setFilter"
+      @cancel="showFilter = false"
+    ></u-picker>
+    <u-picker
+      :show="showStatus"
+      :columns="status"
+      @confirm="setStatus"
+      @cancel="showStatus = false"
+    ></u-picker>
+
+    <manage-tabbar current="alarm" :hidden="showDeal || showFilter || showStatus" />
   </view>
 </template>
 
 <script>
-import edit from "./components/edit.vue";
+import ManageTabbar from '@/components/navigation/manage-tabbar.vue';
+
 export default {
   components: {
-    edit,
+    ManageTabbar,
   },
   data() {
     return {
@@ -234,9 +189,18 @@ export default {
       content: "",
       id: null,
       index: 0,
-	  dataFetchInterval: null, // 定时器ID
-	  isRefreshing: false, // 正在刷新状态
+      quickDealTexts: ["已到现场核实，风险已解除", "已通知负责人跟进", "误报，现场无异常"],
+      dataFetchInterval: null, // 定时器ID
+      isRefreshing: false, // 正在刷新状态
     };
+  },
+  computed: {
+    currentList() {
+      return this.choosen === 0 ? this.warnData : this.historyData;
+    },
+    activeDealItem() {
+      return this.currentList[this.index] || {};
+    },
   },
   onLoad() {
     const info = uni.getWindowInfo();
@@ -305,39 +269,29 @@ export default {
     isPendingAlarmVisible(item) {
       return this.isVisibleAlarm(item) && this.isPendingAlarm(item);
     },
-		updateScrollHeight() {
-	  const query = uni.createSelectorQuery().in(this);
-	  query.select("#warnBox").boundingClientRect();
-	  query.select(".content").boundingClientRect();
-	  query.exec((res) => {
-		const box = res && res[0];
-		const content = res && res[1];
-		if (!box || !content) return;
-		const height = box.height - (content.top - box.top);
-		this.scrollHeight = Math.max(220, height);
-	  });
-	},
-	// startDataFetch() {
-	// 	this.dataFetchInterval = setInterval(() => {
-
-	// 	  const data = {
-	// 		pageNum: this.pageNum,
-	// 		pageSize: this.pageSize,
-	// 		status: 0,
-	// 	  };
-
-	// 	  uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
-	// 		  if(this.warnData1&&this.warnData1!=data.data.alarmList){
-	// 			  this.warnData1 = data.data.alarmList;
-	// 			  uni.showModal({
-	// 			  	content: '您有一条报警新消息',
-	// 			  	showCancel: false
-	// 			  });
-	// 			  this.getRealList()
-	// 		  }
-	// 	  });
-	// 	}, 1000); // 每秒执行
-	//   },
+    isProcessedAlarm(item) {
+      if (!item) return false;
+      const status = Number(item.status);
+      return status === 1 || item.deal === "已处理";
+    },
+    isProcessedAlarmVisible(item) {
+      return this.isVisibleAlarm(item) && this.isProcessedAlarm(item);
+    },
+    levelClass(level) {
+      const num = Number(level);
+      if (num >= 3) return 'is-high';
+      if (num === 2) return 'is-mid';
+      return 'is-low';
+    },
+    levelText(level) {
+      const num = Number(level);
+      if (num >= 3) return '高风险';
+      if (num === 2) return '中风险';
+      return '低风险';
+    },
+    updateScrollHeight() {
+      this.scrollHeight = 0;
+    },
     alert(index) {
 		console.log(this.warnData[index].phone)
       uni.makePhoneCall({
@@ -387,7 +341,7 @@ export default {
         }
         uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
 			console.log('data',data)
-          const filteredList = data.data.alarmList.filter(this.isVisibleAlarm);
+          const filteredList = data.data.alarmList.filter(this.isProcessedAlarmVisible);
           this.historyData.push(...filteredList);
           if (data.data.count < this.pageSize) {
 			  // console.log(data.data.count)
@@ -477,7 +431,7 @@ export default {
         data.warningLevel = this.warningLevel;
       }
       uni.$http.get("/api/v1/alarm/query", data).then(({ data }) => {
-        this.historyData = data.data.alarmList.filter(this.isVisibleAlarm);
+        this.historyData = data.data.alarmList.filter(this.isProcessedAlarmVisible);
 		if(!this.historyData.length) this.statusList = 'nomore'
         if (data.data.count < this.pageSize) {
           this.hisIsAll = true;
@@ -506,16 +460,11 @@ export default {
         this.getRealList();
       }
     },
-    jump() {
-      uni.navigateTo({
-        url: "/pages/manage/personal/setting/setting",
-      });
-    },
     goBack() {
       if (getCurrentPages().length > 1) {
         uni.navigateBack();
       } else {
-        uni.switchTab({ url: "/pages/manage/controls/controls" });
+        uni.reLaunch({ url: "/pages/manage/controls/controls" });
       }
     },
     startMove(e, item) {
@@ -552,13 +501,15 @@ export default {
     },
     deal(index) {
       this.index = index;
+      const item = this.currentList[index] || {};
+      this.id = item.id || null;
+      this.content = item.content || '';
       this.showDeal = true;
       this.resetX(index);
     },
     resetX(index) {
-      if (this.choosen) {
-        this.historyData[index].moveX = 0;
-      } else this.warnData[index].moveX = 0;
+      const target = this.choosen ? this.historyData[index] : this.warnData[index];
+      if (target) this.$set(target, 'moveX', 0);
     },
     deleteItem(index) {
       this.resetX(index);
@@ -586,31 +537,42 @@ export default {
       this.content = val;
       this.id = id;
     },
+    closeDealModal() {
+      this.showDeal = false;
+      this.content = "";
+      this.id = null;
+    },
     async sendDeal() {
-      if (this.content === "") {
+      const content = String(this.content || '').trim();
+      if (!content) {
         uni.showToast({
-          title: "内容不能为空",
+          title: "请填写处理说明",
           duration: 2000,
           icon: "none",
         });
         return;
       }
       const data = {
-        id: this.id,
+        id: this.id || (this.activeDealItem && this.activeDealItem.id),
         status: 1,
-        processingContent: this.content,
+        processingContent: content,
       };
-      await uni.$http.put("/api/v1/alarm/update", data).then(({ data }) => {
-        // console.log(data);
+      if (!data.id) {
+        uni.showToast({ title: "告警ID缺失", icon: "none" });
+        return;
+      }
+      await uni.$http.put("/api/v1/alarm/update", data).then(() => {
+        uni.showToast({ title: "已处理", icon: "success" });
+        this.pageNum = 1;
+        this.hisIsAll = false;
+        this.warnIsAll = false;
         if (this.choosen) {
           this.getHistoryList();
         } else {
           this.getRealList();
         }
       });
-      this.showDeal = false;
-      this.content = "";
-      this.id = null;
+      this.closeDealModal();
     },
   },
   watch: {
@@ -636,327 +598,457 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.warnBox {
-  position: absolute;
-  bottom: 0;
-  padding: 20rpx 32rpx;
+.alarm-page {
+  min-height: 100vh;
   box-sizing: border-box;
-  width: 100%;
-  height: 100%;
+  padding: 0 24rpx calc(128rpx + env(safe-area-inset-bottom));
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: transparent;
+  background:
+    radial-gradient(circle at 12% 6%, rgba(56, 164, 255, 0.14) 0, rgba(56, 164, 255, 0) 250rpx),
+    radial-gradient(circle at 88% 16%, rgba(220, 38, 38, 0.08) 0, rgba(220, 38, 38, 0) 280rpx),
+    linear-gradient(180deg, #edf7ff 0%, #f5fbff 46%, #fbfdff 100%);
+}
 
-    .title {
-      width: 100%;
-      position: relative;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 16rpx;
-      margin-bottom: 5rpx;
-      padding-bottom: 0rpx;
-      height: 100rpx;
-    
-    .topNav {
-      display: flex;
-      background: rgba(0, 122, 255, 0.05);
-      padding: 6rpx;
-      border-radius: 20rpx;
-      gap: 4rpx;
-      
-      .left, .right {
-        padding: 10rpx 28rpx;
-        border-radius: 16rpx;
-        transition: all 0.3s ease;
-        cursor: pointer;
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
 
-        span {
-          font-size: 28rpx;
-          color: rgba(26, 42, 58, 0.5);
-          font-weight: 500;
-        }
-      }
-      
-      .choosen {
-        background: #FFFFFF;
-        box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.1);
-        
-        span {
-          color: #007AFF !important;
-          font-weight: 700;
-        }
-      }
-    }
-    
-    .setting-btn {
-      width: 60rpx;
-      height: 60rpx;
-      position: absolute;
-      right: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      background: rgba(0, 0, 0, 0.05);
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-    }
+.bg-orb--one {
+  width: 210rpx;
+  height: 210rpx;
+  right: -75rpx;
+  top: 180rpx;
+  background: rgba(56, 164, 255, 0.12);
+}
 
-    .back-btn {
-      width: 60rpx;
-      height: 60rpx;
-      position: absolute;
-      left: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      background: rgba(255, 255, 255, 0.85);
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.08);
-      cursor: pointer;
-    }
+.bg-orb--two {
+  width: 170rpx;
+  height: 170rpx;
+  left: -55rpx;
+  top: 560rpx;
+  background: rgba(220, 38, 38, 0.06);
+}
 
-  }
+.top-nav {
+  height: 76rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
 
-  /* 筛选器区域：亮色玻璃感 */
-  .second {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 30rpx;
-    
-    .options {
-      display: flex;
-      gap: 20rpx;
-      flex: 1;
-      
-      .selector {
-        flex: 1;
-        height: 80rpx;
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(0, 122, 255, 0.1);
-        border-radius: 20rpx;
-        display: flex;
-        align-items: center;
-        padding: 0 20rpx;
-        position: relative;
-        
-        .icon {
-          width: 32rpx;
-          height: 32rpx;
-          margin-right: 12rpx;
-          opacity: 0.6;
-          display: flex;
-          align-items: center;
-          
-          .img {
-            width: 100%;
-            height: 100%;
-          }
-        }
-        
-        .timeText {
-          font-size: 26rpx;
-          color: #1A2A3A;
-          font-weight: 500;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-      }
-    }
-    
-    .icons {
-      width: 80rpx;
-      height: 80rpx;
-      margin-left: 20rpx;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #FFFFFF;
-      box-shadow: 0 4rpx 16rpx rgba(0, 122, 255, 0.1);
-      border-radius: 20rpx;
-      cursor: pointer;
-      transition: all 0.3s ease;
+.back-btn,
+.setting-btn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6rpx 16rpx rgba(30, 88, 150, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-      &:active {
-        transform: scale(0.9);
-      }
+.top-title {
+  color: #102033;
+  font-size: 32rpx;
+  font-weight: 900;
+}
 
-      .rotate-anim {
-        animation: rotateReload 0.8s cubic-bezier(0.45, 0.05, 0.55, 0.95);
-      }
-    }
-  }
+.header-card {
+  margin-top: 8rpx;
+  padding: 24rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #1470d8, #38a4ff);
+  box-shadow: 0 14rpx 34rpx rgba(20, 112, 216, 0.22);
+  color: #fff;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
 
-  @keyframes rotateReload {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
+.header-copy {
+  min-width: 0;
+}
 
-  /* 警报列表：呼吸感白玻璃卡片 */
-  .content {
-    flex: 1;
-    width: 100%;
-    padding: 0 16rpx;
-    padding-top: 16rpx;
-    padding-bottom: 120rpx; /* 紧贴 TabBar 上方，减少冗余留白 */
-    box-sizing: border-box;
-    
-    .box {
-      width: 100%;
-      margin-bottom: 24rpx;
-      position: relative;
-      background: transparent;
-      overflow: visible; /* 允许侧滑展开显示 */
+.eyebrow {
+  font-size: 22rpx;
+  font-weight: 800;
+  opacity: 0.82;
+}
 
-      .details {
-        width: 100%;
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 1);
-        border-radius: 40rpx;
-        padding: 32rpx;
-        box-sizing: border-box;
-        box-shadow: 0 12rpx 48rpx rgba(26, 42, 58, 0.12);
-        display: flex;
-        flex-direction: column;
-        gap: 16rpx;
-        transition: all 0.3s ease;
+.title {
+  margin-top: 8rpx;
+  font-size: 40rpx;
+  font-weight: 900;
+  line-height: 1.1;
+}
 
-        &.bor {
-          /* 未移动状态的边角样式 */
-        }
+.subtitle {
+  margin-top: 10rpx;
+  font-size: 23rpx;
+  opacity: 0.86;
+  line-height: 1.45;
+}
 
-        .deviceName {
-          color: rgba(26, 42, 58, 0.5);
-          font-size: 24rpx;
-          font-weight: 600;
-          letter-spacing: 1rpx;
-        }
+.header-stat {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.96);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
 
-        .happen {
-          display: flex;
-          align-items: center;
-          gap: 12rpx;
-          margin: 4rpx 0;
-          
-          .event {
-            color: #1A2A3A;
-            font-size: 40rpx;
-            font-weight: 900;
-          }
-          
-          .stars {
-            display: flex;
-            align-items: center;
-            width: 32rpx;
-            height: 32rpx;
-            
-            image {
-              width: 100%;
-              height: 100%;
-            }
-          }
-        }
+.stat-num {
+  font-size: 38rpx;
+  font-weight: 900;
+  line-height: 1;
+}
 
-        .positonAndtime {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          
-          .time, .position {
-            font-size: 24rpx;
-            color: rgba(26, 42, 58, 0.6);
-            font-weight: 500;
-          }
-        }
+.stat-label {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+}
 
-        /* 状态标记：精致小胶囊 */
-        .isDealt, .unDealt {
-          margin-top: 10rpx;
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 8rpx;
-          font-size: 24rpx;
-          font-weight: bold;
-          
-          .img {
-            width: 32rpx;
-            height: 32rpx;
-            
-            .image {
-              width: 100%;
-              height: 100%;
-            }
-          }
-        }
-        
-        .isDealt { color: #07C160; }
-        .unDealt { color: #FA9D3B; }
+.header-stat.is-danger { color: #dc2626; }
+.header-stat.is-success { color: #16a34a; }
 
-        /* 电话报警按钮 */
-        .buttons {
-          position: absolute;
-          top: 30rpx;
-          right: 30rpx;
-          width: 80rpx;
-          height: 80rpx;
-          background: rgba(255, 77, 77, 0.1);
-          border-radius: 50%;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          
-          image {
-            width: 44rpx;
-            height: 44rpx;
-          }
-        }
-      }
+.section-card {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(37, 99, 235, 0.10);
+  box-shadow: 0 10rpx 28rpx rgba(30, 88, 150, 0.10);
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
 
-      /* 侧滑操作区 */
-      .deleteBox {
-        border-radius: 0 32rpx 32rpx 0;
-        overflow: hidden;
-        height: 100%;
-        width: 100px;
-        display: flex;
-        position: absolute;
-        right: -100px;
-        top: 0;
-        z-index: -1; /* 初始隐藏在后面 */
-        
-        .edit, .deal, .finish, .delete {
-          flex: 1;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          color: #fff;
-          font-size: 28rpx;
-          
-          image {
-            width: 40rpx;
-            height: 40rpx;
-          }
-        }
-        
-        .edit { background: #007AFF; }
-        .deal { background: #FA9D3B; }
-        .finish { background: #07C160; }
-        .delete { background: #FF4D4F; }
-      }
-    }
-  }
+.tab-row {
+  display: flex;
+  gap: 10rpx;
+  padding: 6rpx;
+  border-radius: 18rpx;
+  background: #f8fbff;
+  border: 1rpx solid #dcebfa;
+}
+
+.tab-item {
+  flex: 1;
+  height: 58rpx;
+  border-radius: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.tab-item.is-active {
+  background: #1470d8;
+  color: #fff;
+  box-shadow: 0 8rpx 18rpx rgba(20, 112, 216, 0.18);
+}
+
+.filter-row {
+  margin-top: 14rpx;
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+
+.filter-chip {
+  flex: 1;
+  min-width: 0;
+  height: 62rpx;
+  padding: 0 18rpx;
+  border-radius: 16rpx;
+  background: #f8fbff;
+  border: 1rpx solid #dcebfa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+  color: #475569;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.filter-chip text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.refresh-btn {
+  width: 62rpx;
+  height: 62rpx;
+  border-radius: 16rpx;
+  background: #edf6ff;
+  border: 1rpx solid #dcebfa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.refresh-btn.is-refreshing {
+  animation: rotateReload 0.8s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+}
+
+@keyframes rotateReload {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.alarm-list {
+  flex: 1;
+  min-height: 0;
+  margin-top: 18rpx;
+  padding-bottom: 10rpx;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+}
+
+.alarm-card {
+  padding: 22rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1rpx solid rgba(37, 99, 235, 0.10);
+  box-shadow: 0 10rpx 28rpx rgba(30, 88, 150, 0.08);
+  margin-bottom: 16rpx;
+}
+
+.card-top,
+.event-row,
+.meta-row,
+.action-row {
+  display: flex;
+  align-items: center;
+}
+
+.card-top {
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.camera-name {
+  color: #102033;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.camera-area {
+  margin-top: 8rpx;
+  color: #64748b;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.level-pill,
+.deal-pill {
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 21rpx;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.level-pill.is-high {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.10);
+}
+
+.level-pill.is-mid {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.level-pill.is-low {
+  color: #1470d8;
+  background: rgba(20, 112, 216, 0.10);
+}
+
+.event-row {
+  margin-top: 18rpx;
+  gap: 10rpx;
+}
+
+.event-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.event-dot.is-high { background: #dc2626; }
+.event-dot.is-mid { background: #f59e0b; }
+.event-dot.is-low { background: #1470d8; }
+
+.event-name {
+  flex: 1;
+  min-width: 0;
+  color: #102033;
+  font-size: 32rpx;
+  font-weight: 900;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.deal-pill.is-pending {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.deal-pill.is-done {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.10);
+}
+
+.meta-row {
+  justify-content: space-between;
+  margin-top: 14rpx;
+  color: #64748b;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.content-note {
+  margin-top: 14rpx;
+  padding: 14rpx;
+  border-radius: 16rpx;
+  background: #f8fbff;
+  border: 1rpx solid #dcebfa;
+  color: #475569;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.action-row {
+  margin-top: 18rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.action-btn {
+  min-width: 112rpx;
+  padding: 10rpx 16rpx;
+  border-radius: 14rpx;
+  font-size: 21rpx;
+  font-weight: 900;
+  text-align: center;
+  box-sizing: border-box;
+  margin-right: 4rpx;
+}
+
+.action-btn--primary {
+  background: linear-gradient(135deg, #1470d8, #38a4ff);
+  color: #fff;
+}
+
+.action-btn--ghost {
+  background: rgba(37, 99, 235, 0.10);
+  color: #1470d8;
+}
+
+.action-btn--call {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.empty-state {
+  margin-top: 50rpx;
+  padding: 48rpx 20rpx;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.empty-title {
+  color: #475569;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.empty-desc {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+}
+
+.deal-modal {
+  width: 100%;
+  padding: 8rpx 0 4rpx;
+}
+
+.deal-title {
+  color: #102033;
+  font-size: 32rpx;
+  font-weight: 900;
+  text-align: center;
+}
+
+.deal-subtitle {
+  margin-top: 10rpx;
+  color: #64748b;
+  font-size: 22rpx;
+  text-align: center;
+}
+
+.quick-title {
+  margin-top: 22rpx;
+  color: #475569;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.quick-result-row {
+  margin-top: 12rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.quick-result {
+  padding: 10rpx 14rpx;
+  border-radius: 999rpx;
+  background: #edf6ff;
+  color: #1470d8;
+  font-size: 21rpx;
+  font-weight: 800;
+}
+
+.deal-textarea {
+  margin-top: 16rpx;
+  width: 100%;
+  min-height: 180rpx;
+  padding: 18rpx;
+  box-sizing: border-box;
+  border-radius: 18rpx;
+  background: #f8fbff;
+  border: 1rpx solid #dcebfa;
+  color: #102033;
+  font-size: 24rpx;
+  line-height: 1.5;
 }
 </style>

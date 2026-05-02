@@ -835,7 +835,20 @@ export default {
   background: #dcebf8;
 }
 
+.map-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 36%),
+    linear-gradient(135deg, rgba(219, 234, 254, 0.42), rgba(241, 248, 255, 0.08));
+  pointer-events: none;
+  z-index: 0;
+}
+
 .map-native {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
 }
@@ -971,6 +984,10 @@ export default {
   animation: fallback-pulse 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
 }
 
+.map-fallback .fallback-point--alert .fallback-pin image {
+  animation: fallback-pin-breathe 1.8s ease-in-out infinite;
+}
+
 .fallback-badge {
   position: absolute;
   z-index: 4;
@@ -993,6 +1010,21 @@ export default {
   0% { transform: scale(0.72); opacity: 0.9; }
   68% { transform: scale(1.72); opacity: 0; }
   100% { transform: scale(1.72); opacity: 0; }
+}
+
+@keyframes fallback-pin-breathe {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 6rpx 12rpx rgba(37, 99, 235, 0.24));
+  }
+  50% {
+    transform: scale(1.06);
+    filter: drop-shadow(0 8rpx 16rpx rgba(239, 68, 68, 0.24));
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 6rpx 12rpx rgba(37, 99, 235, 0.24));
+  }
 }
 
 /* #ifdef H5 */

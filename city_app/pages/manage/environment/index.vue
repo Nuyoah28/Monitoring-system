@@ -1,5 +1,5 @@
 <template>
-  <scroll-view scroll-y class="env-page" :style="{ paddingTop: statusBarHeight + 'px' }">
+  <scroll-view scroll-y class="env-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="title-row">
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
@@ -52,7 +52,15 @@
 
     <view class="grid">
       <view class="metric-card" :class="'metric-card--' + temperatureState.type">
-        <view class="metric-icon metric-icon--temperature">温</view>
+        <view class="metric-icon metric-icon--temperature">
+          <view class="metric-symbol metric-symbol--sun">
+            <view class="sun-ray sun-ray--vertical"></view>
+            <view class="sun-ray sun-ray--horizontal"></view>
+            <view class="sun-ray sun-ray--slash"></view>
+            <view class="sun-ray sun-ray--backslash"></view>
+            <view class="sun-core"></view>
+          </view>
+        </view>
         <view class="metric-title-row">
           <text class="metric-name">温度</text>
           <text class="metric-status">{{ temperatureState.text }}</text>
@@ -62,7 +70,9 @@
       </view>
 
       <view class="metric-card" :class="'metric-card--' + humidityState.type">
-        <view class="metric-icon metric-icon--humidity">湿</view>
+        <view class="metric-icon metric-icon--humidity">
+          <view class="metric-symbol metric-symbol--drop"></view>
+        </view>
         <view class="metric-title-row">
           <text class="metric-name">湿度</text>
           <text class="metric-status">{{ humidityState.text }}</text>
@@ -72,7 +82,13 @@
       </view>
 
       <view class="metric-card" :class="'metric-card--' + aqiState.type">
-        <view class="metric-icon metric-icon--aqi">空</view>
+        <view class="metric-icon metric-icon--aqi">
+          <view class="metric-symbol metric-symbol--air">
+            <view class="air-line air-line--one"></view>
+            <view class="air-line air-line--two"></view>
+            <view class="air-dot"></view>
+          </view>
+        </view>
         <view class="metric-title-row">
           <text class="metric-name">空气指数</text>
           <text class="metric-status">{{ aqiState.text }}</text>
@@ -82,7 +98,14 @@
       </view>
 
       <view class="metric-card" :class="'metric-card--' + pm25State.type">
-        <view class="metric-icon metric-icon--pm25">PM</view>
+        <view class="metric-icon metric-icon--pm25">
+          <view class="metric-symbol metric-symbol--particles">
+            <view class="particle particle--one"></view>
+            <view class="particle particle--two"></view>
+            <view class="particle particle--three"></view>
+            <view class="particle particle--four"></view>
+          </view>
+        </view>
         <view class="metric-title-row">
           <text class="metric-name">PM2.5</text>
           <text class="metric-status">{{ pm25State.text }}</text>
@@ -172,6 +195,9 @@ export default {
     };
   },
   computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
     monitorNames() {
       return this.monitors.map((item) => item.name || item.department || `监测点${item.id}`);
     },
@@ -324,7 +350,7 @@ export default {
       if (getCurrentPages().length > 1) {
         uni.navigateBack();
       } else {
-        uni.switchTab({ url: '/pages/manage/controls/controls' });
+        uni.reLaunch({ url: '/pages/manage/controls/controls' });
       }
     },
     clearTimer() {
@@ -405,10 +431,11 @@ export default {
 }
 
 .title-row {
-  margin: 10rpx 0 24rpx;
+  margin: 18rpx 0 30rpx;
   display: flex;
   align-items: center;
   gap: 16rpx;
+  min-height: 72rpx;
 }
 
 .back-btn {
@@ -679,8 +706,6 @@ export default {
   margin-bottom: 8rpx;
   border-radius: 18rpx;
   color: #ffffff;
-  font-size: 24rpx;
-  font-weight: 900;
 }
 
 .metric-icon--temperature {
@@ -697,6 +722,128 @@ export default {
 
 .metric-icon--pm25 {
   background: linear-gradient(135deg, #5bd59d, #38b987);
+}
+
+.metric-symbol {
+  position: relative;
+  width: 34rpx;
+  height: 34rpx;
+  color: currentColor;
+}
+
+.metric-symbol--sun {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sun-core {
+  width: 17rpx;
+  height: 17rpx;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4rpx rgba(255, 255, 255, 0.18);
+}
+
+.sun-ray {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4rpx;
+  height: 34rpx;
+  margin-left: -2rpx;
+  margin-top: -17rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+}
+
+.sun-ray--horizontal { transform: rotate(90deg); }
+.sun-ray--slash { transform: rotate(45deg); opacity: 0.76; }
+.sun-ray--backslash { transform: rotate(-45deg); opacity: 0.76; }
+
+.metric-symbol--drop {
+  width: 22rpx;
+  height: 30rpx;
+  margin-top: 2rpx;
+  border-radius: 50% 50% 50% 8rpx;
+  background: currentColor;
+  transform: rotate(45deg);
+  box-shadow: -4rpx -4rpx 0 rgba(255, 255, 255, 0.16);
+}
+
+.metric-symbol--air {
+  width: 36rpx;
+  height: 30rpx;
+}
+
+.air-line {
+  position: absolute;
+  right: 0;
+  height: 5rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+}
+
+.air-line--one {
+  top: 6rpx;
+  width: 34rpx;
+}
+
+.air-line--two {
+  top: 20rpx;
+  width: 24rpx;
+}
+
+.air-dot {
+  position: absolute;
+  left: 2rpx;
+  bottom: 5rpx;
+  width: 7rpx;
+  height: 7rpx;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.68;
+}
+
+.metric-symbol--particles {
+  width: 34rpx;
+  height: 34rpx;
+}
+
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.particle--one {
+  left: 3rpx;
+  top: 7rpx;
+  width: 9rpx;
+  height: 9rpx;
+}
+
+.particle--two {
+  right: 4rpx;
+  top: 4rpx;
+  width: 6rpx;
+  height: 6rpx;
+  opacity: 0.76;
+}
+
+.particle--three {
+  left: 12rpx;
+  bottom: 4rpx;
+  width: 14rpx;
+  height: 14rpx;
+}
+
+.particle--four {
+  right: 2rpx;
+  bottom: 10rpx;
+  width: 7rpx;
+  height: 7rpx;
+  opacity: 0.86;
 }
 
 .metric-title-row {

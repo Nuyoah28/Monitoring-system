@@ -30,13 +30,21 @@ public class RequestFlaskServiceImpl implements RequestFlaskService {
         if (area == null || area.isEmpty()) {
             return false;
         }
+        boolean validArea = area.size() >= 4
+                && area.get(0) != null
+                && area.get(1) != null
+                && area.get(2) != null
+                && area.get(3) != null;
+        if (!validArea) {
+            return false;
+        }
         Map<String,Object> mp = new HashMap<>();
         mp.put("areaList",area);
         ObjectMapper objectMapper = new ObjectMapper();
         String json = objectMapper.writeValueAsString(mp);
         String response = HttpUtils.postJson("https://"+ip+"/api/v1/monitor-device/area",json,FLASK_TOKEN);
         updateMonitorAreaRes res = JacksonUtils.json2pojo(response, updateMonitorAreaRes.class);
-        return res.getMsg().equals("success");
+        return res != null && "success".equals(res.getMsg());
     }
 
     @Override
@@ -50,7 +58,7 @@ public class RequestFlaskServiceImpl implements RequestFlaskService {
         String json = objectMapper.writeValueAsString(mp);
         String response = HttpUtils.postJson("https://"+ip+"/api/v1/monitor-device/type",json,FLASK_TOKEN);
         updateMonitorAreaRes res = JacksonUtils.json2pojo(response, updateMonitorAreaRes.class);
-        return res.getMsg().equals("success");
+        return res != null && "success".equals(res.getMsg());
     }
 
     @Override

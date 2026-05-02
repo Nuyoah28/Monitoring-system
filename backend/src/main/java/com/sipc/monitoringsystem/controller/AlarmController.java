@@ -113,8 +113,8 @@ public class AlarmController {
             }
         }
 
-        // 3. 同区域居民推送（新增）
-        Set<Integer> residentIds = collectResidentTargets(monitor);
+        // 3. 同区域居民推送：只把烟雾/明火这类真正影响住户安全的警情推给附近业主。
+        Set<Integer> residentIds = shouldPushToResidents(caseType) ? collectResidentTargets(monitor) : new LinkedHashSet<>();
         if (!residentIds.isEmpty()) {
             Map<String, Object> residentSocketMessage = new HashMap<>();
             residentSocketMessage.put("type", "NEW_ALARM");
@@ -345,6 +345,10 @@ public class AlarmController {
             targetIds.add(resident.getId());
         }
         return targetIds;
+    }
+
+    private boolean shouldPushToResidents(Integer caseType) {
+        return Integer.valueOf(2).equals(caseType) || Integer.valueOf(5).equals(caseType);
     }
 
     private String buildResidentMessage(SqlGetAlarm alarm, Monitor monitor) {

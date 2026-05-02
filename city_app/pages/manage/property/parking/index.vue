@@ -1,5 +1,5 @@
 <template>
-  <scroll-view scroll-y class="feature-page">
+  <scroll-view scroll-y class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="top-bar">
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
@@ -43,6 +43,40 @@
           <text class="stat-label">空闲</text>
           <text class="stat-value free">{{ parkingSummary.free }}</text>
         </view>
+      </view>
+    </view>
+
+    <view class="traffic-card panel">
+      <view class="panel-head">
+        <view>
+          <view class="panel-title">车流量检测</view>
+          <view class="sub-text">算法上报入口、出口与净流入</view>
+        </view>
+        <view class="traffic-badge">{{ trafficSourceLabel }}</view>
+      </view>
+      <view class="traffic-main">
+        <view class="traffic-total">
+          <text class="traffic-label">今日总车流</text>
+          <text class="traffic-value">{{ trafficSummary.todayTotalFlow }}</text>
+        </view>
+        <view class="traffic-side">
+          <view class="traffic-mini">
+            <text>入口</text>
+            <strong>{{ trafficSummary.todayInCount }}</strong>
+          </view>
+          <view class="traffic-mini">
+            <text>出口</text>
+            <strong>{{ trafficSummary.todayOutCount }}</strong>
+          </view>
+          <view class="traffic-mini">
+            <text>净流入</text>
+            <strong>{{ trafficSummary.todayNetFlow }}</strong>
+          </view>
+        </view>
+      </view>
+      <view class="traffic-footer">
+        <text>最近一批</text>
+        <text>入 {{ trafficSummary.latestInCount }} · 出 {{ trafficSummary.latestOutCount }}</text>
       </view>
     </view>
 
@@ -110,17 +144,21 @@
 </template>
 
 <script>
+import { DEMO_FALLBACK_ENABLED, createDemoParkingRealtime, createDemoParkingTraffic } from '@/common/owner-demo-data.js';
+
 const SUCCESS_CODE = '00000';
-const PARKING_DATA_SOURCE = 'mock';
+const PARKING_DATA_SOURCE = 'real';
 const DEFAULT_MONITOR_ID = 1;
 const AUTO_REFRESH_MS = 12000;
 
 export default {
   data() {
     return {
+      statusBarHeight: 0,
       monitorId: DEFAULT_MONITOR_ID,
       dataSource: PARKING_DATA_SOURCE,
       realtimeData: null,
+      trafficData: null,
       updateTime: '',
       isLoading: false,
       refreshTimer: null,
@@ -130,8 +168,12 @@ export default {
     };
   },
   computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
     statusTitle() {
       if (this.isLoading && !this.hasLoaded) return '正在获取车位状态';
+      if (this.dataSource === 'mock' || this.dataSource === 'local-demo') return '演示车位检测数据已更新';
       if (this.silentFailCount > 0) return '车位状态待更新';
       return '车位检测运行中';
     },
@@ -193,6 +235,25 @@ export default {
       if (!this.parkingAreas.length) return this.emptyArea('暂无空闲区域');
       return [...this.parkingAreas].sort((a, b) => b.free - a.free)[0];
     },
+    trafficSummary() {
+      const data = this.trafficData || {};
+      return {
+        todayInCount: Number(data.todayInCount || 0),
+        todayOutCount: Number(data.todayOutCount || 0),
+        todayNetFlow: Number(data.todayNetFlow || 0),
+        todayTotalFlow: Number(data.todayTotalFlow || 0),
+        latestInCount: Number(data.latestInCount || 0),
+        latestOutCount: Number(data.latestOutCount || 0),
+      };
+    },
+    trafficSourceLabel() {
+      const source = this.trafficData && this.trafficData.source;
+      return source === 'mock' || source === 'local-demo' ? '演示' : '实时';
+    },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   onShow() {
     this.startAutoRefresh();
@@ -266,34 +327,94 @@ export default {
         uni.navigateBack();
         return;
       }
-      uni.switchTab({ url: '/pages/manage/controls/controls' });
+      uni.reLaunch({ url: '/pages/manage/controls/controls' });
     },
     async loadRealtimeParking(showLoading = true) {
       if (this.requestLock) return;
       this.requestLock = true;
       if (showLoading && !this.hasLoaded) this.isLoading = true;
       try {
-        const { data: res } = await uni.$http.get('/api/v1/parking/realtime', {
+        const realtime = await this.fetchRealtimeParking({
           monitorId: this.monitorId,
-          source: this.dataSource,
-        }, { silent: !showLoading || this.hasLoaded });
-        if (!this.isSuccess(res)) {
-          if (!this.hasLoaded) uni.$showMsg(res.message || '加载车位检测数据失败');
-          this.silentFailCount += 1;
+        }, !showLoading || this.hasLoaded);
+
+        if (this.hasParkingData(realtime)) {
+          this.applyRealtimeParking(realtime);
+          await this.loadTrafficSummary(true);
           return;
         }
-        this.realtimeData = res.data || null;
-        this.dataSource = (this.realtimeData && this.realtimeData.source) || this.dataSource;
-        this.updateTime = this.normalizeUpdateTime(this.realtimeData && this.realtimeData.updateTime);
-        this.hasLoaded = true;
-        this.silentFailCount = 0;
+
+        if (DEMO_FALLBACK_ENABLED) {
+          const mockRealtime = await this.fetchRealtimeParking({
+            monitorId: this.monitorId,
+            source: 'mock',
+          }, true);
+          this.applyRealtimeParking(this.hasParkingData(mockRealtime) ? mockRealtime : createDemoParkingRealtime(this.monitorId));
+          await this.loadTrafficSummary(true);
+          return;
+        }
+
+        if (!this.hasLoaded) uni.$showMsg('加载车位检测数据失败');
+        this.silentFailCount += 1;
       } catch (e) {
+        if (DEMO_FALLBACK_ENABLED) {
+          this.applyRealtimeParking(createDemoParkingRealtime(this.monitorId));
+          this.applyTrafficSummary(createDemoParkingTraffic(this.monitorId));
+          return;
+        }
         if (!this.hasLoaded) uni.$showMsg('网络异常，车位检测数据加载失败');
         this.silentFailCount += 1;
       } finally {
         this.isLoading = false;
         this.requestLock = false;
       }
+    },
+    async fetchRealtimeParking(params, silent = false) {
+      try {
+        const { data: res } = await uni.$http.get('/api/v1/parking/realtime', params, { silent });
+        if (!this.isSuccess(res)) return null;
+        return res.data || null;
+      } catch (e) {
+        return null;
+      }
+    },
+    hasParkingData(data) {
+      return Boolean(data && (Number(data.totalSpaces) > 0 || (Array.isArray(data.zones) && data.zones.length)));
+    },
+    applyRealtimeParking(data) {
+      this.realtimeData = data || null;
+      this.dataSource = (this.realtimeData && this.realtimeData.source) || this.dataSource;
+      this.updateTime = this.normalizeUpdateTime(this.realtimeData && this.realtimeData.updateTime);
+      this.hasLoaded = true;
+      this.silentFailCount = 0;
+    },
+    async loadTrafficSummary(silent = true) {
+      const traffic = await this.fetchTrafficSummary({
+        monitorId: this.monitorId,
+      }, silent);
+      if (traffic) {
+        this.applyTrafficSummary(traffic);
+        return;
+      }
+      if (DEMO_FALLBACK_ENABLED) {
+        const mockTraffic = await this.fetchTrafficSummary({
+          monitorId: this.monitorId,
+          source: 'mock',
+        }, true);
+        this.applyTrafficSummary(mockTraffic || createDemoParkingTraffic(this.monitorId));
+      }
+    },
+    async fetchTrafficSummary(params, silent = false) {
+      try {
+        const { data: res } = await uni.$http.get('/api/v1/parking/traffic/summary', params, { silent });
+        if (!this.isSuccess(res)) return null;
+        return res.data || null;
+      } catch (e) {
+        return null;
+      }
+    },
+    applyTrafficSummary(data) {
+      this.trafficData = data || null;
     },
   },
 };
@@ -302,7 +423,7 @@ export default {
 <style lang="scss" scoped>
 .feature-page {
   min-height: 100vh;
-  padding: 26rpx 24rpx 34rpx;
+  padding: 0 24rpx 34rpx;
   box-sizing: border-box;
   background: linear-gradient(180deg, #dceefa 0%, #f6fbff 58%, #ffffff 100%);
 }
@@ -311,7 +432,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18rpx;
+  min-height: 82rpx;
+  margin: 18rpx 0 26rpx;
 }
 
 .back-btn {
@@ -522,6 +644,86 @@ export default {
 
 .stat-value.free {
   color: #15aa72;
+}
+
+.traffic-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(238, 250, 255, 0.94));
+}
+
+.traffic-badge {
+  height: 48rpx;
+  min-width: 74rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  background: rgba(58, 132, 255, 0.12);
+  color: #2f70d8;
+  font-size: 22rpx;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.traffic-main {
+  margin-top: 20rpx;
+  display: grid;
+  grid-template-columns: 0.9fr 1.4fr;
+  gap: 14rpx;
+}
+
+.traffic-total {
+  border-radius: 18rpx;
+  background: #f3f9ff;
+  padding: 18rpx;
+}
+
+.traffic-label {
+  display: block;
+  color: #66809b;
+  font-size: 22rpx;
+}
+
+.traffic-value {
+  display: block;
+  margin-top: 10rpx;
+  color: #17314c;
+  font-size: 42rpx;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.traffic-side {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10rpx;
+}
+
+.traffic-mini {
+  min-width: 0;
+  border-radius: 18rpx;
+  background: #f8fcff;
+  padding: 16rpx 10rpx;
+}
+
+.traffic-mini text,
+.traffic-footer {
+  color: #66809b;
+  font-size: 22rpx;
+}
+
+.traffic-mini strong {
+  display: block;
+  margin-top: 8rpx;
+  color: #17314c;
+  font-size: 32rpx;
+  line-height: 1;
+}
+
+.traffic-footer {
+  margin-top: 16rpx;
+  display: flex;
+  justify-content: space-between;
+  gap: 12rpx;
 }
 
 .focus-grid {

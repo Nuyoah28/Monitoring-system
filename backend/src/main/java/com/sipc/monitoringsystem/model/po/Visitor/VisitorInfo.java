@@ -25,6 +25,9 @@ public class VisitorInfo {
     @TableField("plate_number")
     private String plateNumber;
 
+    @TableField("owner_user_id")
+    private Integer ownerUserId;
+
     public Integer getId() {
         return id;
     }

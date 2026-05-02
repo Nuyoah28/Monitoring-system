@@ -93,5 +93,6 @@ public class GetMonitorListRes {
     private String streamUrl;
     private String video;
     private List<MonitorAbility> ability;
+    private Boolean recognitionRuleConfigured;
 
 }

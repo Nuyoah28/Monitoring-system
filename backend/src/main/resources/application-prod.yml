@@ -41,8 +41,11 @@ spring:
       use-key-prefix: true
 
 oss:
-  id:
-  pass:
+  id: ${COS_SECRET_ID:}
+  pass: ${COS_SECRET_KEY:}
+  region: ${COS_REGION:ap-beijing}
+  bucket: ${COS_BUCKET:my-server-1397492316}
+  base-url: ${COS_BASE_URL:https://my-server-1397492316.cos.ap-beijing.myqcloud.com}
 
 agent:
   api:

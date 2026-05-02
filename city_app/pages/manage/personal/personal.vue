@@ -1,106 +1,82 @@
 <template>
-  <view class="page-wrap">
-    <view class="mainBox" :style="{ height: safeHeight + 'px' }">
-      <view class="backImg">
-        <view class="title" :style="{ paddingTop: statusBarHeight + 'px' }">
-          <h2>个人中心</h2>
+  <view class="page-wrap" :style="{ paddingTop: (statusBarHeight + 18) + 'px' }">
+    <view class="bg-orb bg-orb--one"></view>
+    <view class="bg-orb bg-orb--two"></view>
+
+    <view class="top-bar">
+      <view>
+        <view class="top-title">个人中心</view>
+        <view class="top-subtitle">账号资料与常用服务</view>
+      </view>
+      <view class="top-badge">管理端</view>
+    </view>
+
+    <view class="panel profile-card">
+      <view class="profile-head">
+        <view class="profile-avatar-wrap">
+          <image class="profile-avatar-img" src="../../../static/avatar.png" mode="aspectFit"></image>
+        </view>
+        <view class="profile-main">
+          <view class="profile-name">{{ username || '管理员' }}</view>
+          <view class="profile-desc">UID：{{ uid || '--' }}</view>
         </view>
       </view>
+    </view>
 
-      <view class="content">
-        <view class="inform">
-          <view class="avatar">
-            <image
-              src="../../../static/avatar.png"
-              mode="aspectFit"
-            ></image>
+    <view class="panel section-card">
+      <view class="section-head">
+        <view>
+          <view class="section-title">快捷入口</view>
+          <view class="section-sub">常用管理功能一键进入</view>
+        </view>
+      </view>
+      <view class="menu-list">
+        <view class="menu-row" @tap="jump('/pages/manage/personal/edit/edit')">
+          <view class="menu-copy">
+            <view class="menu-title">修改个人信息</view>
           </view>
-          <view class="user">
-            <view class="name">
-              {{ username }}
-            </view>
-            <view class="phone">
-              uid: {{ uid || '--' }}
-            </view>
+          <view class="menu-arrow">
+            <image src="../../../static/arrow-right.png" mode="aspectFit"></image>
           </view>
         </view>
-        <view class="command">
-          <view class="items" @tap="jump('/pages/manage/personal/edit/edit')">
-            <view class="left">
-              <view class="img">
-                <image
-                  src="../../../static/f810fcf9-a1b3-43f2-b2c4-55a7ce72c064.png"
-                  mode="aspectFit"
-                ></image>
-              </view>
-              <view class="text"> 修改个人信息 </view>
-            </view>
-            <view class="img">
-              <image
-                src="../../../static/arrow-right.png"
-                mode="aspectFit"
-              ></image>
-            </view>
+        <view class="menu-row" @tap="showAbout">
+          <view class="menu-copy">
+            <view class="menu-title">关于</view>
           </view>
-          <view class="items" @tap="showAbout">
-            <view class="left">
-              <view class="img">
-                <image
-                  src="../../../static/warn-none.png"
-                  mode="aspectFit"
-                ></image>
-              </view>
-              <view class="text"> 关于 </view>
-            </view>
-            <view class="img">
-              <image
-                src="../../../static/arrow-right.png"
-                mode="aspectFit"
-              ></image>
-            </view>
+          <view class="menu-arrow">
+            <image src="../../../static/arrow-right.png" mode="aspectFit"></image>
           </view>
-          <view class="items" @tap="clearCache">
-            <view class="left">
-              <view class="img">
-                <image
-                  src="../../../static/rubbish-none.png"
-                  mode="aspectFit"
-                ></image>
-              </view>
-              <view class="text"> 清理缓存 </view>
-            </view>
-            <view class="img">
-              <image
-                src="../../../static/arrow-right.png"
-                mode="aspectFit"
-              ></image>
-            </view>
+        </view>
+        <view class="menu-row" @tap="clearCache">
+          <view class="menu-copy">
+            <view class="menu-title">清理缓存</view>
           </view>
-          <view class="items" @tap="logout">
-            <view class="left">
-              <view class="img">
-                <image
-                  src="../../../static/exit.png"
-                  mode="aspectFit"
-                ></image>
-              </view>
-              <view class="text"> 退出登录 </view>
-            </view>
-            <view class="img">
-              <image
-                src="../../../static/arrow-right.png"
-                mode="aspectFit"
-              ></image>
-            </view>
+          <view class="menu-arrow">
+            <image src="../../../static/arrow-right.png" mode="aspectFit"></image>
+          </view>
+        </view>
+        <view class="menu-row menu-row--danger" @tap="logout">
+          <view class="menu-copy">
+            <view class="menu-title">退出登录</view>
+          </view>
+          <view class="menu-arrow">
+            <image src="../../../static/arrow-right.png" mode="aspectFit"></image>
           </view>
         </view>
       </view>
     </view>
+
+    <manage-tabbar current="personal" />
   </view>
 </template>
 
 <script>
+import ManageTabbar from '@/components/navigation/manage-tabbar.vue';
+
 export default {
+  components: {
+    ManageTabbar,
+  },
   data() {
     return {
       safeHeight: 0,
@@ -123,6 +99,14 @@ export default {
     this.username = uni.getStorageSync("username");
   },
   methods: {
+    goBack() {
+      const pages = getCurrentPages();
+      if (pages.length > 1) {
+        uni.navigateBack();
+        return;
+      }
+      uni.reLaunch({ url: '/pages/manage/controls/controls' });
+    },
     jump(url) {
       // console.log(url);
       uni.navigateTo({
@@ -168,173 +152,206 @@ export default {
 
 <style lang="scss" scoped>
 .page-wrap {
-  height: 100vh;
+  min-height: 100vh;
   width: 100vw;
   position: relative;
-  background: radial-gradient(1200rpx 520rpx at 10% -10%, rgba(81, 150, 255, 0.16) 0%, rgba(81, 150, 255, 0) 62%),
-    radial-gradient(1000rpx 500rpx at 100% 12%, rgba(91, 206, 255, 0.14) 0%, rgba(91, 206, 255, 0) 64%);
+  padding: 26rpx 24rpx 180rpx;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #eef7ff 0%, #f9fbff 54%, #ffffff 100%);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.mainBox {
+.bg-orb {
   position: absolute;
+  border-radius: 999rpx;
+  filter: blur(66rpx);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bg-orb--one {
+  width: 360rpx;
+  height: 360rpx;
+  background: rgba(0, 198, 255, 0.20);
+  right: -140rpx;
+  top: -110rpx;
+}
+
+.bg-orb--two {
+  width: 420rpx;
+  height: 420rpx;
+  background: rgba(73, 121, 255, 0.14);
+  left: -160rpx;
+  bottom: -170rpx;
+}
+
+.top-bar,
+.panel {
+  position: relative;
+  z-index: 2;
+}
+
+.top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+}
+
+.top-title {
+  font-size: 38rpx;
+  color: #18304b;
+  font-weight: 800;
+}
+
+.top-subtitle {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: rgba(24, 48, 75, 0.62);
+}
+
+.top-badge {
+  height: 54rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.88);
+  color: #2b5b99;
+  font-size: 22rpx;
+  box-shadow: 0 8rpx 20rpx rgba(40, 92, 150, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+
+.panel {
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10rpx 28rpx rgba(40, 92, 150, 0.08);
+  padding: 24rpx;
+}
+
+.profile-card {
+  margin-bottom: 18rpx;
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.profile-avatar-wrap {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 28rpx;
+  overflow: hidden;
+  background: linear-gradient(180deg, #edf5ff, #ffffff);
+  box-shadow: 0 12rpx 26rpx rgba(40, 92, 150, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  flex-shrink: 0;
+}
+
+.profile-avatar-img {
   width: 100%;
-  bottom: 0;
-  background-color: transparent; /* 透出全局背景 */
-  
-  .backImg {
-    position: absolute;
-    width: 100%;
-    
-      .title {
-        position: absolute;
-        top: 0;
-        z-index: 999;
-        color: #1A2A3A; /* 深色文字 */
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100vw;
-        padding: 0 40rpx;
-        box-sizing: border-box;
-        height: 100rpx;
-        margin-top: 8rpx;
+  height: 100%;
+}
 
-      h2 {
-        font-weight: bold;
-        font-size: 40rpx;
-        letter-spacing: 2rpx;
-      }
-    }
-  }
-  
-  .content {
-    width: 90%;
-    box-sizing: border-box;
-    padding: 54rpx 40rpx;
-    padding-bottom: 80rpx;
-    border-radius: 32rpx;
-    /* 核心毛玻璃效果 */
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 1);
-    box-shadow: 0 16rpx 48rpx rgba(26, 42, 58, 0.08);
-    position: absolute;
-    top: 22%;
-    left: 50%;
-    transform: translate(-50%);
-    
-    .inform {
-      display: flex;
-      justify-content: flex-start;
-      align-items: flex-end;
-      padding-bottom: 40rpx;
-      margin-bottom: 60rpx;
-      border-bottom: 1px solid rgba(26, 42, 58, 0.1);
-      
-      .avatar {
-        background-color: #fff;
-        width: 120rpx;
-        height: 120rpx;
-        border: 2px solid #FFFFFF;
-        box-shadow: 0 8rpx 24rpx rgba(0, 122, 255, 0.15);
-        border-radius: 20rpx;
-        overflow: hidden;
-        flex-shrink: 0;
-        image {
-          width: 100%;
-          height: 100%;
-        }
-      }
-      
-      .user {
-        margin-left: 30rpx;
-        color: #1A2A3A;
-        font-weight: bold;
-        
-        .name {
-          margin-bottom: 12rpx;
-          font-size: 40rpx;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-          max-width: 420rpx;
-          overflow: hidden;
-          white-space: nowrap;
-          text-overflow: ellipsis;
-        }
-        
-        .phone {
-          font-size: 24rpx;
-          color: rgba(26, 42, 58, 0.6);
-          font-weight: 500;
-        }
-      }
-    }
-    
-    .command {
-      width: 100%;
-      
-      .items {
-        background: rgba(255, 255, 255, 0.9);
-        height: 110rpx;
-        width: 100%;
-        margin-top: 30rpx;
-        border-radius: 24rpx;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 30rpx;
-        box-sizing: border-box;
-        box-shadow: 0 4rpx 16rpx rgba(100, 150, 200, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        transition: transform 0.2s, box-shadow 0.2s;
-        position: relative;
+.profile-main {
+  min-width: 0;
+}
 
-        &::after {
-          content: "";
-          position: absolute;
-          left: 72rpx;
-          right: 72rpx;
-          bottom: 0;
-          height: 1px;
-          background: linear-gradient(90deg, rgba(40, 98, 182, 0), rgba(40, 98, 182, 0.12), rgba(40, 98, 182, 0));
-          opacity: 0;
-          transition: opacity 0.2s;
-        }
-        
-        &:active {
-          transform: scale(0.98);
-          box-shadow: 0 2rpx 8rpx rgba(100, 150, 200, 0.05);
+.profile-name {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #15283e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-          &::after {
-            opacity: 1;
-          }
-        }
-        
-        .left {
-          display: flex;
-          width: 80%;
-          align-items: center;
-          
-          .text {
-            margin-left: 20rpx;
-            color: #1A2A3A;
-            font-weight: 600;
-            font-size: 30rpx;
-            display: flex;
-            align-items: center;
-          }
-        }
-        
-        .img {
-          height: 40rpx;
-          width: 40rpx;
-          image {
-            height: 100%;
-            width: 100%;
-          }
-        }
-      }
-    }
-  }
+.profile-desc {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #5b7087;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  color: #1d2f44;
+  font-weight: 700;
+}
+
+.section-sub {
+  margin-top: 6rpx;
+  color: rgba(29, 47, 68, 0.55);
+  font-size: 22rpx;
+}
+
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.menu-row {
+  min-height: 96rpx;
+  border-radius: 22rpx;
+  padding: 0 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background:
+    linear-gradient(90deg, rgba(20, 112, 216, 0.08), rgba(20, 112, 216, 0) 34%),
+    rgba(255, 255, 255, 0.92);
+  border: 1rpx solid rgba(205, 223, 245, 0.92);
+  box-shadow: 0 8rpx 18rpx rgba(40, 92, 150, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.menu-row:active {
+  transform: scale(0.985);
+  box-shadow: 0 4rpx 12rpx rgba(40, 92, 150, 0.05);
+}
+
+.menu-row--danger {
+  background:
+    linear-gradient(90deg, rgba(244, 63, 94, 0.08), rgba(244, 63, 94, 0) 34%),
+    rgba(255, 255, 255, 0.92);
+}
+
+.menu-copy {
+  min-width: 0;
+}
+
+.menu-title {
+  color: #1d2f44;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.menu-row--danger .menu-title {
+  color: #be123c;
+}
+
+.menu-arrow {
+  width: 34rpx;
+  height: 34rpx;
+  opacity: 0.58;
+  flex-shrink: 0;
+}
+
+.menu-arrow image {
+  width: 100%;
+  height: 100%;
 }
 </style>

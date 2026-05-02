@@ -4,6 +4,7 @@ import com.sipc.monitoringsystem.aop.Pass;
 import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.param.iot.ReportEnvironmentParam;
 import com.sipc.monitoringsystem.model.dto.param.iot.ReportParkingParam;
+import com.sipc.monitoringsystem.model.dto.param.iot.ReportParkingTrafficFlowParam;
 import com.sipc.monitoringsystem.service.EnvironmentDataService;
 import com.sipc.monitoringsystem.service.ParkingDataService;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,5 +40,14 @@ public class IotDataController {
             return CommonResult.fail("monitorId不能为空");
         }
         return CommonResult.success(parkingDataService.report(param));
+    }
+
+    @PostMapping("/parking/traffic/report")
+    @Pass
+    public CommonResult<Integer> reportParkingTrafficFlow(@RequestBody ReportParkingTrafficFlowParam param) {
+        if (param == null || param.getMonitorId() == null) {
+            return CommonResult.fail("monitorId不能为空");
+        }
+        return CommonResult.success(parkingDataService.reportTrafficFlow(param));
     }
 }

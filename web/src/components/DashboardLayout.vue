@@ -154,11 +154,14 @@ watch(
   height: 42px;
   flex: 0 0 42px;
   border-radius: 14px;
-  border: 1px solid rgba(126, 232, 255, 0.26);
-  background: linear-gradient(135deg, rgba(19, 47, 78, 0.92), rgba(8, 24, 43, 0.86));
+  border: 1px solid rgba(126, 232, 255, 0.48);
+  background:
+    radial-gradient(circle at 28% 24%, rgba(126, 232, 255, 0.28), transparent 46%),
+    linear-gradient(135deg, rgba(25, 70, 112, 0.98), rgba(8, 24, 43, 0.94));
   box-shadow:
-    0 12px 24px rgba(60, 138, 255, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    0 14px 26px rgba(60, 138, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -169,8 +172,10 @@ watch(
   height: 34px;
   display: block;
   object-fit: contain;
-  opacity: 0.95;
-  filter: drop-shadow(0 0 10px rgba(126, 232, 255, 0.24));
+  opacity: 1;
+  filter:
+    drop-shadow(0 0 12px rgba(126, 232, 255, 0.34))
+    drop-shadow(0 0 4px rgba(255, 255, 255, 0.12));
 }
 
 .pill-weather,
@@ -197,6 +202,13 @@ watch(
   appearance: none;
   width: auto;
   text-align: left;
+  border-color: rgba(126, 232, 255, 0.38);
+  background:
+    radial-gradient(circle at 20% 18%, rgba(126, 232, 255, 0.1), transparent 36%),
+    linear-gradient(180deg, rgba(22, 56, 89, 0.96), rgba(10, 28, 46, 0.92));
+  box-shadow:
+    0 10px 22px rgba(4, 12, 20, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .user-entry .meta {
@@ -206,13 +218,13 @@ watch(
 }
 
 .user-entry .meta strong {
-  color: #f3f8ff;
+  color: #f7fcff;
   font-size: 13px;
   font-weight: 600;
 }
 
 .user-entry .meta span {
-  color: var(--sub);
+  color: rgba(214, 230, 255, 0.78);
   font-size: 11px;
 }
 
@@ -229,10 +241,20 @@ watch(
   height: 32px;
   font-size: 10px;
   border-radius: 10px;
+  border: 1px solid rgba(126, 232, 255, 0.36);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(126, 232, 255, 0.72), rgba(35, 85, 126, 0.86)),
+    linear-gradient(180deg, rgba(37, 98, 146, 0.96), rgba(18, 58, 92, 0.96));
+  box-shadow:
+    0 0 12px rgba(126, 232, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .user-entry:hover {
-  border-color: rgba(126, 232, 255, 0.42);
+  border-color: rgba(126, 232, 255, 0.72);
+  box-shadow:
+    0 14px 24px rgba(31, 135, 206, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
 }
 

@@ -3,11 +3,16 @@ package com.sipc.monitoringsystem.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sipc.monitoringsystem.dao.ParkingAreaRecordDao;
 import com.sipc.monitoringsystem.dao.ParkingAreaStatusDao;
+import com.sipc.monitoringsystem.dao.ParkingTrafficFlowRecordDao;
 import com.sipc.monitoringsystem.model.dto.param.iot.ReportParkingParam;
+import com.sipc.monitoringsystem.model.dto.param.iot.ReportParkingTrafficFlowParam;
 import com.sipc.monitoringsystem.model.dto.res.parking.ParkingRealtimeRes;
+import com.sipc.monitoringsystem.model.dto.res.parking.ParkingTrafficFlowSummaryRes;
+import com.sipc.monitoringsystem.model.dto.res.parking.ParkingTrafficFlowTrendPointRes;
 import com.sipc.monitoringsystem.model.dto.res.parking.ParkingTrendPointRes;
 import com.sipc.monitoringsystem.model.po.Parking.ParkingAreaRecord;
 import com.sipc.monitoringsystem.model.po.Parking.ParkingAreaStatus;
+import com.sipc.monitoringsystem.model.po.Parking.ParkingTrafficFlowRecord;
 import com.sipc.monitoringsystem.service.ParkingDataService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,10 +36,14 @@ public class ParkingDataServiceImpl implements ParkingDataService {
 
     private final ParkingAreaStatusDao parkingAreaStatusDao;
     private final ParkingAreaRecordDao parkingAreaRecordDao;
+    private final ParkingTrafficFlowRecordDao parkingTrafficFlowRecordDao;
 
-    public ParkingDataServiceImpl(ParkingAreaStatusDao parkingAreaStatusDao, ParkingAreaRecordDao parkingAreaRecordDao) {
+    public ParkingDataServiceImpl(ParkingAreaStatusDao parkingAreaStatusDao,
+                                  ParkingAreaRecordDao parkingAreaRecordDao,
+                                  ParkingTrafficFlowRecordDao parkingTrafficFlowRecordDao) {
         this.parkingAreaStatusDao = parkingAreaStatusDao;
         this.parkingAreaRecordDao = parkingAreaRecordDao;
+        this.parkingTrafficFlowRecordDao = parkingTrafficFlowRecordDao;
     }
 
     @Override
@@ -88,6 +97,24 @@ public class ParkingDataServiceImpl implements ParkingDataService {
     }
 
     @Override
+    public Integer reportTrafficFlow(ReportParkingTrafficFlowParam param) {
+        ParkingTrafficFlowRecord record = new ParkingTrafficFlowRecord();
+        int inCount = Math.max(param.getInCount() == null ? 0 : param.getInCount(), 0);
+        int outCount = Math.max(param.getOutCount() == null ? 0 : param.getOutCount(), 0);
+        record.setMonitorId(param.getMonitorId());
+        record.setDeviceCode(param.getDeviceCode());
+        record.setBatchNo(param.getBatchNo() == null || param.getBatchNo().isBlank()
+                ? UUID.randomUUID().toString().replace("-", "")
+                : param.getBatchNo());
+        record.setInCount(inCount);
+        record.setOutCount(outCount);
+        record.setNetFlow(inCount - outCount);
+        record.setTotalFlow(inCount + outCount);
+        parkingTrafficFlowRecordDao.insert(record);
+        return record.getId();
+    }
+
+    @Override
     public ParkingRealtimeRes getRealtime(Integer monitorId) {
         List<ParkingAreaStatus> zones = parkingAreaStatusDao.selectList(
                 new LambdaQueryWrapper<ParkingAreaStatus>()
@@ -127,6 +154,42 @@ public class ParkingDataServiceImpl implements ParkingDataService {
     }
 
     @Override
+    public ParkingTrafficFlowSummaryRes getTrafficFlowSummary(Integer monitorId) {
+        List<ParkingTrafficFlowRecord> todayRecords = parkingTrafficFlowRecordDao.selectList(
+                new LambdaQueryWrapper<ParkingTrafficFlowRecord>()
+                        .eq(ParkingTrafficFlowRecord::getMonitorId, monitorId)
+                        .ge(ParkingTrafficFlowRecord::getCreateTime, todayStartTimestamp())
+                        .orderByAsc(ParkingTrafficFlowRecord::getCreateTime)
+        );
+        if (todayRecords.isEmpty()) {
+            return null;
+        }
+
+        ParkingTrafficFlowSummaryRes res = new ParkingTrafficFlowSummaryRes();
+        res.setMonitorId(monitorId);
+        res.setSource("real");
+        int todayIn = 0;
+        int todayOut = 0;
+        int todayTotal = 0;
+        for (ParkingTrafficFlowRecord item : todayRecords) {
+            todayIn += defaultInt(item.getInCount());
+            todayOut += defaultInt(item.getOutCount());
+            todayTotal += defaultInt(item.getTotalFlow());
+        }
+        ParkingTrafficFlowRecord latest = todayRecords.get(todayRecords.size() - 1);
+        res.setTodayInCount(todayIn);
+        res.setTodayOutCount(todayOut);
+        res.setTodayNetFlow(todayIn - todayOut);
+        res.setTodayTotalFlow(todayTotal);
+        res.setLatestInCount(defaultInt(latest.getInCount()));
+        res.setLatestOutCount(defaultInt(latest.getOutCount()));
+        res.setLatestNetFlow(defaultInt(latest.getNetFlow()));
+        res.setLatestTotalFlow(defaultInt(latest.getTotalFlow()));
+        res.setUpdateTime(latest.getCreateTime());
+        return res;
+    }
+
+    @Override
     public List<ParkingTrendPointRes> getTrend(Integer monitorId, String range) {
         String scopedRange = normalizeRange(range);
         List<ParkingAreaRecord> records = parkingAreaRecordDao.selectList(
@@ -142,6 +205,24 @@ public class ParkingDataServiceImpl implements ParkingDataService {
             return buildDayTrend(records);
         }
         return buildDateAggregateTrend(records, scopedRange);
+    }
+
+    @Override
+    public List<ParkingTrafficFlowTrendPointRes> getTrafficFlowTrend(Integer monitorId, String range) {
+        String scopedRange = normalizeRange(range);
+        List<ParkingTrafficFlowRecord> records = parkingTrafficFlowRecordDao.selectList(
+                new LambdaQueryWrapper<ParkingTrafficFlowRecord>()
+                        .eq(ParkingTrafficFlowRecord::getMonitorId, monitorId)
+                        .ge(ParkingTrafficFlowRecord::getCreateTime, new Timestamp(resolveStartMillis(scopedRange)))
+                        .orderByAsc(ParkingTrafficFlowRecord::getCreateTime)
+        );
+        if (records.isEmpty()) {
+            return new ArrayList<>();
+        }
+        if ("day".equals(scopedRange)) {
+            return buildTrafficFlowDayTrend(records);
+        }
+        return buildTrafficFlowDateTrend(records, scopedRange);
     }
 
     private List<ParkingTrendPointRes> buildDayTrend(List<ParkingAreaRecord> records) {
@@ -186,6 +267,50 @@ public class ParkingDataServiceImpl implements ParkingDataService {
         return result;
     }
 
+    private List<ParkingTrafficFlowTrendPointRes> buildTrafficFlowDayTrend(List<ParkingTrafficFlowRecord> records) {
+        int fromIndex = Math.max(records.size() - 24, 0);
+        List<ParkingTrafficFlowRecord> sliced = records.subList(fromIndex, records.size());
+        SimpleDateFormat format = new SimpleDateFormat("HH:mm");
+        List<ParkingTrafficFlowTrendPointRes> result = new ArrayList<>();
+        for (ParkingTrafficFlowRecord item : sliced) {
+            result.add(new ParkingTrafficFlowTrendPointRes(
+                    format.format(item.getCreateTime()),
+                    defaultInt(item.getInCount()),
+                    defaultInt(item.getOutCount()),
+                    defaultInt(item.getTotalFlow())
+            ));
+        }
+        return result;
+    }
+
+    private List<ParkingTrafficFlowTrendPointRes> buildTrafficFlowDateTrend(List<ParkingTrafficFlowRecord> records, String range) {
+        Map<LocalDate, List<ParkingTrafficFlowRecord>> grouped = new LinkedHashMap<>();
+        for (ParkingTrafficFlowRecord item : records) {
+            LocalDate date = Instant.ofEpochMilli(item.getCreateTime().getTime())
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate();
+            grouped.computeIfAbsent(date, key -> new ArrayList<>()).add(item);
+        }
+        List<Map.Entry<LocalDate, List<ParkingTrafficFlowRecord>>> entries = new ArrayList<>(grouped.entrySet());
+        entries.sort(Map.Entry.comparingByKey());
+        int keep = "week".equals(range) ? 7 : 8;
+        int fromIndex = Math.max(entries.size() - keep, 0);
+        List<ParkingTrafficFlowTrendPointRes> result = new ArrayList<>();
+        for (Map.Entry<LocalDate, List<ParkingTrafficFlowRecord>> entry : entries.subList(fromIndex, entries.size())) {
+            int inCount = 0;
+            int outCount = 0;
+            int totalFlow = 0;
+            for (ParkingTrafficFlowRecord item : entry.getValue()) {
+                inCount += defaultInt(item.getInCount());
+                outCount += defaultInt(item.getOutCount());
+                totalFlow += defaultInt(item.getTotalFlow());
+            }
+            String label = entry.getKey().getMonthValue() + "/" + String.format("%02d", entry.getKey().getDayOfMonth());
+            result.add(new ParkingTrafficFlowTrendPointRes(label, inCount, outCount, totalFlow));
+        }
+        return result;
+    }
+
     private long resolveStartMillis(String range) {
         long now = System.currentTimeMillis();
         if ("week".equals(range)) {
@@ -202,6 +327,18 @@ public class ParkingDataServiceImpl implements ParkingDataService {
             return range.toLowerCase();
         }
         return "day";
+    }
+
+    private Timestamp todayStartTimestamp() {
+        long startMillis = LocalDate.now()
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli();
+        return new Timestamp(startMillis);
+    }
+
+    private int defaultInt(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private String defaultAreaCode(ReportParkingParam.ZoneReport zone) {

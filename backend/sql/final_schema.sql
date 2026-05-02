@@ -1,10 +1,11 @@
 -- =========================================================
--- Monitoring System 后端数据库最终建库脚本
+-- Monitoring System 后端数据库最终表结构脚本
 -- 适用: MySQL 8.0+ / Navicat
 -- 说明:
---   1. 新环境初始化可直接执行本文件。
---   2. 已有数据库不要直接执行本文件，请执行 migrate_case_type_warning_level.sql。
---   3. 告警等级以 case_type_info.warning_level 为默认配置，alarm_info.warning_level 保存发生时快照。
+--   1. 本文件只负责建库、建表、索引和外键，不写入演示数据。
+--   2. 新环境初始化先执行本文件，再执行 final_seed_data.sql。
+--   3. 本文件会 DROP 旧表；已有数据库不要直接执行，请使用 migrate_*.sql 增量迁移。
+--   4. 告警等级以 case_type_info.warning_level 为默认配置，alarm_info.warning_level 保存发生时快照。
 -- =========================================================
 
 CREATE DATABASE IF NOT EXISTS `SweatPear`
@@ -18,11 +19,13 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS `alarm_push_record`;
 DROP TABLE IF EXISTS `system_message`;
+DROP TABLE IF EXISTS `parking_traffic_flow_record`;
 DROP TABLE IF EXISTS `parking_area_record`;
 DROP TABLE IF EXISTS `parking_area_status`;
 DROP TABLE IF EXISTS `environment_sensor_record`;
 DROP TABLE IF EXISTS `weather_info`;
 DROP TABLE IF EXISTS `weather_region_config`;
+DROP TABLE IF EXISTS `monitor_recognition_rule`;
 DROP TABLE IF EXISTS `alarm_info`;
 DROP TABLE IF EXISTS `visitor_info`;
 DROP TABLE IF EXISTS `parking_space_info`;
@@ -38,6 +41,7 @@ CREATE TABLE `user_info` (
   `user_name` VARCHAR(255) NOT NULL COMMENT '用户名',
   `password` VARCHAR(255) NOT NULL COMMENT '密码MD5值',
   `phone` VARCHAR(255) DEFAULT NULL COMMENT '手机号',
+  `avatar_url` VARCHAR(255) DEFAULT NULL COMMENT '头像地址',
   `role` INT NOT NULL COMMENT '角色: 0管理员, 1普通用户',
   `is_resident` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否居民用户',
   `home_area` VARCHAR(50) DEFAULT NULL COMMENT '常驻区域',
@@ -86,6 +90,23 @@ CREATE TABLE `monitor` (
   KEY `idx_monitor_running` (`running`),
   KEY `idx_monitor_area` (`area`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='监控设备表';
+
+CREATE TABLE `monitor_recognition_rule` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '识别规则ID',
+  `monitor_id` INT NOT NULL COMMENT '关联监控点ID',
+  `name` VARCHAR(100) NOT NULL COMMENT '规则名称/事件名称',
+  `prompt` TEXT NOT NULL COMMENT '关注内容描述',
+  `translated_prompt` TEXT DEFAULT NULL COMMENT '算力节点返回的识别描述',
+  `risk_level` TINYINT NOT NULL DEFAULT 2 COMMENT '风险等级：1低，2中，3高',
+  `alert_hint` VARCHAR(255) DEFAULT '请及时查看现场情况' COMMENT '告警提示',
+  `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用：1启用，0停用',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_monitor_recognition_rule_monitor_id` (`monitor_id`),
+  KEY `idx_monitor_recognition_rule_enabled` (`enabled`),
+  CONSTRAINT `fk_monitor_recognition_rule_monitor` FOREIGN KEY (`monitor_id`) REFERENCES `monitor` (`id`) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='摄像头自定义识别规则表';
 
 CREATE TABLE `alarm_info` (
   `id` INT NOT NULL AUTO_INCREMENT COMMENT '告警ID',
@@ -180,6 +201,22 @@ CREATE TABLE `parking_area_record` (
   CONSTRAINT `fk_parking_record_monitor` FOREIGN KEY (`monitor_id`) REFERENCES `monitor` (`id`) ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='停车区域历史记录表';
 
+CREATE TABLE `parking_traffic_flow_record` (
+  `id` INT NOT NULL AUTO_INCREMENT COMMENT '车流量记录ID',
+  `monitor_id` INT NOT NULL COMMENT '关联监控点ID',
+  `device_code` VARCHAR(64) DEFAULT NULL COMMENT '设备编号',
+  `batch_no` VARCHAR(64) DEFAULT NULL COMMENT '上报批次号',
+  `in_count` INT NOT NULL DEFAULT 0 COMMENT '入口车辆数',
+  `out_count` INT NOT NULL DEFAULT 0 COMMENT '出口车辆数',
+  `net_flow` INT NOT NULL DEFAULT 0 COMMENT '净流入车辆数',
+  `total_flow` INT NOT NULL DEFAULT 0 COMMENT '总车流量',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_parking_flow_monitor_time` (`monitor_id`, `create_time`),
+  KEY `idx_parking_flow_batch` (`batch_no`),
+  CONSTRAINT `fk_parking_flow_monitor` FOREIGN KEY (`monitor_id`) REFERENCES `monitor` (`id`) ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='停车车流量记录表';
+
 CREATE TABLE `weather_region_config` (
   `id` INT NOT NULL AUTO_INCREMENT COMMENT '天气区域配置ID',
   `monitor_id` INT NOT NULL COMMENT '关联监控点ID',
@@ -221,8 +258,11 @@ CREATE TABLE `device_repair_info` (
   `report_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '报修时间',
   `repair_detail` TEXT NOT NULL COMMENT '报修信息详情',
   `publisher` VARCHAR(50) NOT NULL COMMENT '发布者',
+  `owner_user_id` INT DEFAULT NULL COMMENT '业主用户ID',
   PRIMARY KEY (`id`),
-  KEY `idx_device_repair_report_time` (`report_time`)
+  KEY `idx_device_repair_report_time` (`report_time`),
+  KEY `idx_device_repair_owner_user_id` (`owner_user_id`),
+  CONSTRAINT `fk_device_repair_owner` FOREIGN KEY (`owner_user_id`) REFERENCES `user_info` (`id`) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='设备报修信息表';
 
 CREATE TABLE `parking_space_info` (
@@ -238,90 +278,9 @@ CREATE TABLE `visitor_info` (
   `visitor_name` VARCHAR(50) NOT NULL COMMENT '访客姓名',
   `visit_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '到访时间',
   `plate_number` VARCHAR(20) DEFAULT NULL COMMENT '车牌号',
+  `owner_user_id` INT DEFAULT NULL COMMENT '业主用户ID',
   PRIMARY KEY (`id`),
-  KEY `idx_visitor_visit_time` (`visit_time`)
+  KEY `idx_visitor_visit_time` (`visit_time`),
+  KEY `idx_visitor_owner_user_id` (`owner_user_id`),
+  CONSTRAINT `fk_visitor_owner` FOREIGN KEY (`owner_user_id`) REFERENCES `user_info` (`id`) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='访客表';
-
-INSERT INTO `user_info`
-  (`id`, `user_name`, `password`, `phone`, `role`, `is_resident`, `home_area`, `notify_enabled`, `push_cid`)
-VALUES
-  (1, 'root', '42f641872ae4070ed059696b1df93394', '000000', 0, 0, NULL, 1, NULL),
-  (2, 'zbw',  '42f641872ae4070ed059696b1df93394', '111111', 1, 0, NULL, 1, NULL),
-  (3, 'aaa',  '42f641872ae4070ed059696b1df93394', '13800138000', 1, 1, '小区东门街道', 1, NULL),
-  (4, 'bbb',  '42f641872ae4070ed059696b1df93394', '13900139000', 1, 0, NULL, 1, NULL);
-
-INSERT INTO `case_type_info` (`id`, `case_type_name`, `warning_level`, `enabled`) VALUES
-  (1, '进入危险区域', 2, 1),
-  (2, '烟雾', 3, 1),
-  (3, '区域停留', 1, 1),
-  (4, '摔倒', 3, 1),
-  (5, '明火', 3, 1),
-  (6, '吸烟', 1, 0),
-  (7, '打架', 3, 1),
-  (8, '垃圾乱放', 1, 1),
-  (9, '冰面', 1, 0),
-  (10, '电动车进楼', 2, 1),
-  (11, '载具占用车道', 2, 1),
-  (12, '挥手呼救', 3, 1);
-
-INSERT INTO `monitor`
-  (`id`, `name`, `area`, `leader`, `alarm_cnt`, `stream_link`, `running`, `danger_area`, `fall`, `flame`, `smoke`, `punch`, `rubbish`, `ice`, `ebike`, `vehicle`, `wave`, `left_x`, `left_y`, `right_x`, `right_y`, `latitude`, `longitude`)
-VALUES
-  (1, '小区东门街道摄像头', '小区东门街道', 'aaa', 3, 'rtmp://example.com/street1', 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 100, 100, 500, 500, 39.904200, 116.407400),
-  (2, '小区西门街道摄像头', '小区西门街道', 'bbb', 1, 'rtmp://example.com/street2', 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 150, 150, 550, 550, 39.904800, 116.401900),
-  (3, '3号楼1单元门口摄像头', '3号楼1单元门口', 'aaa', 1, 'rtmp://example.com/entrance1', 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 200, 200, 600, 600, 39.903600, 116.409000),
-  (4, '5号楼2单元门口摄像头', '5号楼2单元门口', 'aaa', 5, 'rtmp://example.com/entrance2', 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 250, 250, 650, 650, 39.902900, 116.410500),
-  (5, '2号楼电梯内摄像头', '2号楼电梯内', 'aaa', 1, 'rtmp://example.com/elevator1', 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 300, 300, 700, 700, 39.905300, 116.406500),
-  (6, '4号楼楼道摄像头', '4号楼楼道', 'bbb', 0, 'rtmp://example.com/hallway1', 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 350, 350, 750, 750, 39.906000, 116.408100),
-  (7, '7号楼南门摄像头', '7号楼南门', 'aaa', 0, 'http://172.20.10.2:8848/video/003.flv', 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 100, 100, 500, 500, 39.901800, 116.405200);
-
-INSERT INTO `alarm_info`
-  (`id`, `clip_link`, `monitor_id`, `case_type`, `warning_level`, `create_time`, `status`, `processing_content`)
-VALUES
-  (1,  'xS5hpPA89A',       4, 3, 1, '2023-09-22 22:38:12', 0, NULL),
-  (3,  '4okMFqZteg',       4, 3, 1, '2023-09-22 17:23:09', 0, NULL),
-  (4,  '4Sh0DzFWvt',       3, 2, 3, '2023-09-18 12:39:12', 0, NULL),
-  (5,  'gtmDGU1EZ7',       2, 4, 3, '2023-09-26 12:53:10', 0, NULL),
-  (6,  'iOMh3u4g6z',       5, 5, 3, '2023-09-26 10:52:19', 0, NULL),
-  (7,  'Yq3CDS3jx0',       4, 5, 3, '2023-09-28 13:30:29', 1, '已处理'),
-  (8,  'dla6wJbiEF',       1, 2, 3, '2023-09-13 12:16:12', 0, NULL),
-  (9,  'ECgrl1Sivu',       4, 5, 3, '2023-09-15 03:39:28', 0, NULL),
-  (10, 'MeaDx5or3F',       4, 3, 1, '2023-09-25 23:06:03', 1, '已经解决'),
-  (11, 'test123',          1, 5, 3, '2026-04-25 11:46:06', 1, '已经处理'),
-  (12, 'test-1777465117',  1, 5, 3, '2026-04-29 20:18:37', 0, NULL);
-
-INSERT INTO `system_message` (`id`, `message`, `receiver_user_id`, `timestamp`) VALUES
-  (1, '【小区东门街道】发生明火，请注意安全并留意物业通知。', 3, '2026-04-25 11:46:06'),
-  (2, '【小区东门街道】发生明火，请注意安全并留意物业通知。', 3, '2026-04-29 20:18:38');
-
-INSERT INTO `weather_info`
-  (`id`, `monitor_id`, `region_name`, `temperature`, `humidity`, `wind_speed`, `latitude`, `longitude`, `source`, `weather`, `weather_code`, `create_time`)
-VALUES
-  (1,  1, NULL, 25.5, 60, NULL, NULL, NULL, 'open-meteo', '多云', NULL, '2023-09-22 10:00:00'),
-  (2,  2, NULL, 26.0, 55, NULL, NULL, NULL, 'open-meteo', '多云', NULL, '2023-09-22 11:00:00'),
-  (3,  3, NULL, 24.8, 65, NULL, NULL, NULL, 'open-meteo', '小雨', NULL, '2023-09-22 12:00:00'),
-  (4,  4, NULL, 27.2, 50, NULL, NULL, NULL, 'open-meteo', '晴', NULL, '2023-09-22 13:00:00'),
-  (5,  5, NULL, 28.5, 45, NULL, NULL, NULL, 'open-meteo', '雷阵雨', NULL, '2023-09-22 14:00:00'),
-  (6,  1, NULL, 26.8, 58, NULL, NULL, NULL, 'open-meteo', '晴', NULL, '2023-09-22 15:00:00'),
-  (7,  2, NULL, 27.5, 52, NULL, NULL, NULL, 'open-meteo', '多云', NULL, '2023-09-22 21:00:00');
-
-ALTER TABLE `user_info` AUTO_INCREMENT = 5;
-ALTER TABLE `case_type_info` AUTO_INCREMENT = 13;
-ALTER TABLE `monitor` AUTO_INCREMENT = 8;
-ALTER TABLE `alarm_info` AUTO_INCREMENT = 13;
-ALTER TABLE `system_message` AUTO_INCREMENT = 3;
-ALTER TABLE `weather_info` AUTO_INCREMENT = 8;
-
-UPDATE `monitor` m
-LEFT JOIN (
-  SELECT `monitor_id`, COUNT(*) AS `cnt`
-  FROM `alarm_info`
-  GROUP BY `monitor_id`
-) a ON m.`id` = a.`monitor_id`
-SET m.`alarm_cnt` = COALESCE(a.`cnt`, 0);
-
-SELECT * FROM `case_type_info` ORDER BY `id`;
-SELECT `case_type`, `warning_level`, COUNT(*) AS `cnt`
-FROM `alarm_info`
-GROUP BY `case_type`, `warning_level`
-ORDER BY `case_type`, `warning_level`;

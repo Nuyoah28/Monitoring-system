@@ -3,7 +3,7 @@
     <view
       class="tab-item"
       :class="{ active: current === 'home' }"
-      @tap="go('/pages/owner/home/index')"
+      @tap.stop="go('/pages/owner/home/index')"
     >
       <image class="tab-icon" src="/static/tabBar/chart.png" mode="aspectFit" />
       <text class="tab-text">主页</text>
@@ -11,15 +11,15 @@
     <view
       class="tab-item"
       :class="{ active: current === 'ai' }"
-      @tap="go('/pages/owner/ai/index')"
+      @tap.stop="go('/pages/owner/ai/index')"
     >
       <image class="tab-icon" src="/static/tabBar/GPT.png" mode="aspectFit" />
-      <text class="tab-text">Agent</text>
+      <text class="tab-text">社区助手</text>
     </view>
     <view
       class="tab-item"
       :class="{ active: current === 'personal' }"
-      @tap="go('/pages/owner/personal/index')"
+      @tap.stop="go('/pages/owner/personal/index')"
     >
       <image class="tab-icon" src="/static/tabBar/personal.png" mode="aspectFit" />
       <text class="tab-text">个人中心</text>
@@ -29,6 +29,11 @@
 
 <script>
 export default {
+  data() {
+    return {
+      navLock: false,
+    };
+  },
   props: {
     current: {
       type: String,
@@ -36,11 +41,49 @@ export default {
     },
   },
   methods: {
+    getCurrentRoutePath() {
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      const currentPage = pages[pages.length - 1];
+      const route = currentPage && currentPage.route ? `/${currentPage.route}` : '';
+      return route.split('?')[0];
+    },
+    fallbackNavigate(path) {
+      uni.redirectTo({
+        url: path,
+        fail: () => {
+          uni.navigateTo({ url: path });
+        },
+      });
+    },
     go(url) {
-      if ((this.current === 'home' && url.includes('/home/')) || (this.current === 'ai' && url.includes('/ai/')) || (this.current === 'personal' && url.includes('/personal/'))) {
-        return;
+      const path = String(url || '');
+      const currentMap = {
+        home: '/pages/owner/home/index',
+        ai: '/pages/owner/ai/index',
+        personal: '/pages/owner/personal/index',
+      };
+      if (currentMap[this.current] === path || this.getCurrentRoutePath() === path) return;
+      if (this.navLock) return;
+
+      this.navLock = true;
+      if (typeof uni.vibrateShort === 'function') {
+        try { uni.vibrateShort(); } catch (e) {}
       }
-      uni.reLaunch({ url });
+
+      const releaseLock = () => {
+        setTimeout(() => {
+          this.navLock = false;
+        }, 500);
+      };
+
+      uni.reLaunch({
+        url: path,
+        fail: (error) => {
+          console.warn('[owner-tabbar] 页面跳转失败：', error);
+          this.fallbackNavigate(path);
+        },
+        complete: releaseLock,
+      });
     },
   },
 };
@@ -60,17 +103,20 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  z-index: 1200;
+  z-index: 9999;
+  pointer-events: auto;
 }
 
 .tab-item {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 140rpx;
-  height: 80rpx;
+  min-width: 0;
+  height: 88rpx;
   border-radius: 40rpx;
+  pointer-events: auto;
 }
 
 .tab-icon {
@@ -81,8 +127,11 @@ export default {
 
 .tab-text {
   margin-top: 4rpx;
-  font-size: 20rpx;
-  color: #94A3B8;
+  font-size: 22rpx;
+  line-height: 1.2;
+  color: #64748B;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .tab-item.active {
@@ -95,6 +144,6 @@ export default {
 
 .tab-item.active .tab-text {
   color: #2563EB;
-  font-weight: 800;
+  font-weight: 700;
 }
 </style>

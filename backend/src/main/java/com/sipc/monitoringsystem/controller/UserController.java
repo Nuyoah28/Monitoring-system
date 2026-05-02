@@ -4,9 +4,11 @@ import com.sipc.monitoringsystem.aop.Pass;
 import com.sipc.monitoringsystem.model.dto.CommonResult;
 import com.sipc.monitoringsystem.model.dto.param.user.LoginParam;
 import com.sipc.monitoringsystem.model.dto.param.user.RegisterParam;
+import com.sipc.monitoringsystem.model.dto.param.user.UpdateProfileParam;
 import com.sipc.monitoringsystem.model.dto.param.user.UpdatePasswordParam;
 import com.sipc.monitoringsystem.model.dto.res.BlankRes;
 import com.sipc.monitoringsystem.model.dto.res.User.LoginRes;
+import com.sipc.monitoringsystem.model.dto.res.User.ProfileRes;
 import com.sipc.monitoringsystem.model.po.User.User;
 import com.sipc.monitoringsystem.service.impl.UserServiceImpl;
 import com.sipc.monitoringsystem.util.JwtUtils;
@@ -38,15 +40,12 @@ public class UserController {
         }
         User user = JwtUtils.getUserByToken(token);
         user = userService.getById(user.getId());
-        LoginRes loginRes = new LoginRes();
-        loginRes.setName(user.getUserName());
-        loginRes.setPhone(user.getPhone());
-
-        loginRes.setRole(user.getRole());
-        loginRes.setToken(token);
-        loginRes.setId(user.getId());
-        return CommonResult.success(loginRes);
+        if (user == null || !Integer.valueOf(0).equals(user.getRole())) {
+            return CommonResult.fail("请使用管理端账号登录");
+        }
+        return CommonResult.success(buildLoginRes(user, token));
     }
+
     @PostMapping("/owner/login")
     @Pass
     public CommonResult<LoginRes> ownerLogin(@Valid @RequestBody LoginParam loginParam) {
@@ -56,19 +55,17 @@ public class UserController {
         }
         User user = JwtUtils.getUserByToken(token);
         user = userService.getById(user.getId());
-        LoginRes loginRes = new LoginRes();
-        loginRes.setName(user.getUserName());
-        loginRes.setPhone(user.getPhone());
-        loginRes.setRole(user.getRole());
-        loginRes.setToken(token);
-        loginRes.setId(user.getId());
-        return CommonResult.success(loginRes);
+        if (user == null || !Integer.valueOf(1).equals(user.getRole())) {
+            return CommonResult.fail("请使用业主端账号登录");
+        }
+        return CommonResult.success(buildLoginRes(user, token));
     }
 
     @Pass
     @PostMapping("/register")
     public CommonResult<BlankRes> register(@Valid @RequestBody RegisterParam registerParam) {
-        if (userService.register(registerParam.getUsername(), registerParam.getPassword(), registerParam.getRole())) {
+        if (userService.register(registerParam.getUsername(), registerParam.getPassword(), registerParam.getRole(),
+                registerParam.getHomeArea())) {
             return CommonResult.success("注册成功");
         } else {
             return CommonResult.fail("注册失败");
@@ -98,6 +95,29 @@ public class UserController {
         return CommonResult.fail("修改失败");
     }
 
+    @GetMapping("/profile")
+    public CommonResult<ProfileRes> getProfile() {
+        User tokenUser = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
+        User user = userService.getById(tokenUser.getId());
+        if (user == null) {
+            return CommonResult.fail("用户不存在");
+        }
+        return CommonResult.success(new ProfileRes(user));
+    }
+
+    @PostMapping("/profile")
+    public CommonResult<ProfileRes> updateProfile(@RequestBody UpdateProfileParam updateProfileParam) {
+        User tokenUser = JwtUtils.getUserByToken(TokenThreadLocalUtil.getInstance().getToken());
+        if (!userService.updateProfile(tokenUser.getId(), updateProfileParam)) {
+            return CommonResult.fail("修改失败");
+        }
+        User user = userService.getById(tokenUser.getId());
+        if (user == null) {
+            return CommonResult.fail("用户不存在");
+        }
+        return CommonResult.success(new ProfileRes(user));
+    }
+
     /**
      * Token刷新接口
      * 如果token即将过期（剩余时间少于7天），可以调用此接口获取新token
@@ -105,10 +125,10 @@ public class UserController {
     @Pass
     @PostMapping("/refresh")
     public CommonResult<LoginRes> refreshToken(@RequestHeader(value = "Authorization", required = false) String authHeader) {
-        // 从Header中提取token（格式：Bearer xxx）
+        // 兼容 App 端的裸 token 和 Web 端常见的 Bearer token。
         String token = null;
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
+        if (authHeader != null && !authHeader.isBlank()) {
+            token = authHeader.startsWith("Bearer ") ? authHeader.substring(7).trim() : authHeader.trim();
         }
         
         if (token == null || token.isEmpty()) {
@@ -132,19 +152,23 @@ public class UserController {
             // 生成新token
             String newToken = JwtUtils.signUser(user);
             
-            // 构建响应
-            LoginRes loginRes = new LoginRes();
-            loginRes.setName(user.getUserName());
-            loginRes.setPhone(user.getPhone());
-            loginRes.setRole(user.getRole());
-            loginRes.setToken(newToken);
-            loginRes.setId(user.getId());
-            
-            return CommonResult.success(loginRes);
+            return CommonResult.success(buildLoginRes(user, newToken));
         } catch (Exception e) {
             return CommonResult.fail("Token刷新失败: " + e.getMessage());
         }
     }
 
+    private LoginRes buildLoginRes(User user, String token) {
+        LoginRes loginRes = new LoginRes();
+        loginRes.setId(user.getId());
+        loginRes.setName(user.getUserName());
+        loginRes.setPhone(user.getPhone());
+        loginRes.setRole(user.getRole());
+        loginRes.setAvatarUrl(user.getAvatarUrl());
+        loginRes.setHomeArea(user.getHomeArea());
+        loginRes.setNotifyEnabled(user.getNotifyEnabled());
+        loginRes.setToken(token);
+        return loginRes;
+    }
 
 }
