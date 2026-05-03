@@ -304,6 +304,7 @@ def chat_voice():
     
     请求方式一：multipart/form-data，字段 audio 为 WAV 文件
     请求方式二：JSON  body: { "audio_base64": "base64编码的WAV", "return_tts": true }
+    可选：recognize_only=true 时只返回识别文本，前端可继续走流式文本问答
     
     响应：{ "code", "message", "data": { "question", "answer", "audio_base64"? } }
     """
@@ -313,6 +314,7 @@ def chat_voice():
     import base64
     audio_bytes = None
     return_tts = False
+    recognize_only = False
     user_token = None
 
     if request.content_type and 'multipart/form-data' in request.content_type:
@@ -321,6 +323,8 @@ def chat_voice():
             return jsonify({"code": "A1000", "message": "请上传 audio 文件", "data": None}), 400
         audio_bytes = f.read()
         return_tts = request.form.get('return_tts', 'false').lower() == 'true'
+        recognize_only = request.form.get('recognize_only', 'false').lower() == 'true'
+        user_token = _get_user_token(request, {})
         current_time = _parse_client_time(request.form.get('client_time') or request.form.get('current_time'))
     elif request.json:
         data = request.json
@@ -332,6 +336,7 @@ def chat_voice():
         except Exception as e:
             return jsonify({"code": "A1000", "message": f"base64 解码失败: {e}", "data": None}), 400
         return_tts = data.get('return_tts', False)
+        recognize_only = data.get('recognize_only', False)
         user_token = _get_user_token(request, data)
         current_time = _parse_client_time(data.get('client_time') or data.get('current_time'))
     else:
@@ -347,6 +352,16 @@ def chat_voice():
         return jsonify({"code": "A1000", "message": question or "语音识别失败", "data": None}), 400
     if not question.strip():
         return jsonify({"code": "A1000", "message": "未识别到有效语音", "data": None}), 400
+
+    if recognize_only:
+        return jsonify({
+            "code": "00000",
+            "message": "请求正常",
+            "data": {
+                "question": question.strip(),
+                "answer": ""
+            }
+        })
 
     conversation_key = _build_conversation_key(request, user_token)
     try:
