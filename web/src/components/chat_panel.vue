@@ -263,22 +263,6 @@ const emitAssistantPreview = (text: string): void => {
 const PUBLIC_AGENT_ERROR_MESSAGE = '抱歉，智能助手暂时不可用，请稍后重试。';
 const PUBLIC_VOICE_ERROR_MESSAGE = '抱歉，语音服务暂时不可用，请稍后重试。';
 
-const getCurrentUserToken = (): string => {
-  const userStore = useUserStore();
-  userStore.hydrateFromSessionStorage();
-  return userStore.token || '';
-};
-
-const getClientTimePayload = () => new Date().toISOString();
-
-const isRemoteInsecureContext = (): boolean => {
-  if (typeof window === 'undefined' || window.isSecureContext) {
-    return false;
-  }
-  const host = window.location.hostname;
-  return !['localhost', '127.0.0.1', '::1'].includes(host);
-};
-
 const cleanupRecording = (): void => {
   if (processor) {
     processor.disconnect();
@@ -473,7 +457,26 @@ const handleSsePayload = (assistantMessage: ChatMessage, payload: any): void => 
   }
 };
 
-const streamAssistantAnswer = async (text: string, assistantMessage: ChatMessage, token: string): Promise<void> => {
+const sendQuestion = async (draftQuestion?: string, options: SendQuestionOptions = {}): Promise<void> => {
+  const text = (typeof draftQuestion === 'string' ? draftQuestion : question.value).trim();
+  if (!text || isStreaming.value) {
+    return;
+  }
+
+  stopTtsPlayback(false);
+  if (isRealtimeListening.value) {
+    stopRealtimeRecognition(false);
+  }
+
+  const userStore = useUserStore();
+  userStore.hydrateFromSessionStorage();
+  const token = userStore.token;
+  appendMessage({ role: 'user', content: text });
+  emit('user-submit', text);
+  question.value = '';
+  const assistantMessage = appendMessage({ role: 'assistant', content: '' });
+  setStreaming(true);
+
   abortController = new AbortController();
   try {
     const response = await fetch(`${agentBaseUrl}/chat/stream`, {
@@ -482,7 +485,7 @@ const streamAssistantAnswer = async (text: string, assistantMessage: ChatMessage
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ question: text, client_time: getClientTimePayload() }),
+      body: JSON.stringify({ question: text }),
       signal: abortController.signal,
     });
 
@@ -537,27 +540,6 @@ const streamAssistantAnswer = async (text: string, assistantMessage: ChatMessage
     setStreaming(false);
     abortController = null;
   }
-};
-
-const sendQuestion = async (draftQuestion?: string, options: SendQuestionOptions = {}): Promise<void> => {
-  const text = (typeof draftQuestion === 'string' ? draftQuestion : question.value).trim();
-  if (!text || isStreaming.value) {
-    return;
-  }
-
-  stopTtsPlayback(false);
-  if (isRealtimeListening.value) {
-    stopRealtimeRecognition(false);
-  }
-
-  const token = getCurrentUserToken();
-  appendMessage({ role: 'user', content: text });
-  emit('user-submit', text);
-  question.value = '';
-  const assistantMessage = appendMessage({ role: 'assistant', content: '' });
-  setStreaming(true);
-
-  await streamAssistantAnswer(text, assistantMessage, token);
 
   if ((options.autoSpeak || isRealtimeConversationActive.value) && assistantMessage.content.trim()) {
     await speakText(assistantMessage.content, options.fromRealtime || isRealtimeConversationActive.value);
@@ -603,72 +585,59 @@ const encodeWav = (samples: Int16Array, rate: number): Blob => {
 const sendVoiceToAgent = async (wavBlob: Blob): Promise<void> => {
   stopTtsPlayback(false);
   updateVoiceState('idle');
-  const token = getCurrentUserToken();
+  const userStore = useUserStore();
+  userStore.hydrateFromSessionStorage();
+  const token = userStore.token;
   const recognizedMessage = appendMessage({ role: 'user', content: '正在识别语音...', pending: true });
   setStreaming(true);
 
   const formData = new FormData();
   formData.append('audio', wavBlob, 'voice.wav');
-  formData.append('recognize_only', 'true');
-  formData.append('return_tts', 'false');
-  formData.append('client_time', getClientTimePayload());
-  const voiceAbortController = new AbortController();
-  abortController = voiceAbortController;
-  const voiceTimeout = window.setTimeout(() => {
-    voiceAbortController.abort();
-  }, 45000);
+  formData.append('return_tts', 'true');
 
   try {
     const response = await fetch(`${agentBaseUrl}/chat/voice`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
-      signal: voiceAbortController.signal,
     });
-    const data = await response.json().catch(() => null);
-    if (!response.ok || data?.code !== '00000' || !data?.data) {
+    const data = await response.json();
+    if (data?.code !== '00000' || !data?.data) {
       throw new Error(data?.message || '语音请求失败');
     }
 
-    const recognizedText = String(data.data.question || '').trim();
-    if (!recognizedText) {
-      throw new Error('未识别到有效语音');
-    }
+    const recognizedText = String(data.data.question || '(语音提问)');
     recognizedMessage.content = recognizedText;
     recognizedMessage.pending = false;
     emit('user-submit', recognizedText);
 
-    const answer = String(data.data.answer || '').trim();
+    const answer = String(data.data.answer || '');
     if (answer) {
       appendMessage({ role: 'assistant', content: answer });
       emitAssistantPreview(answer);
-      setStreaming(false);
-      abortController = null;
-      await speakText(answer, false);
-      return;
-    }
-
-    if (abortController === voiceAbortController) {
-      abortController = null;
-    }
-    const assistantMessage = appendMessage({ role: 'assistant', content: '' });
-    await streamAssistantAnswer(recognizedText, assistantMessage, token);
-    if (assistantMessage.content.trim()) {
-      await speakText(assistantMessage.content, false);
-    }
-  } catch (error: any) {
-    recognizedMessage.content = error?.name === 'AbortError' ? '语音提问已停止。' : PUBLIC_VOICE_ERROR_MESSAGE;
-    recognizedMessage.pending = false;
-    if (error?.name !== 'AbortError') {
-      appendMessage({ role: 'assistant', content: '抱歉，当前无法完成语音提问，请稍后重试或改用文字输入。' });
-      emitAssistantPreview('抱歉，当前无法完成语音提问，请稍后重试或改用文字输入。');
     }
     setStreaming(false);
-  } finally {
-    window.clearTimeout(voiceTimeout);
-    if (abortController === voiceAbortController) {
-      abortController = null;
+
+    if (data.data.audio_base64) {
+      stopTtsPlayback(false);
+      currentTtsAudio = new Audio(`data:audio/mpeg;base64,${data.data.audio_base64}`);
+      isTtsPlaying.value = true;
+      updateVoiceState('speaking');
+      await new Promise<void>((resolve) => {
+        currentTtsAudio?.addEventListener('ended', resolve, { once: true });
+        currentTtsAudio?.addEventListener('error', resolve, { once: true });
+        currentTtsAudio?.play().catch(resolve);
+      });
+      currentTtsAudio = null;
+      isTtsPlaying.value = false;
+      updateVoiceState('idle');
     }
+  } catch (error: any) {
+    recognizedMessage.content = PUBLIC_VOICE_ERROR_MESSAGE;
+    recognizedMessage.pending = false;
+    appendMessage({ role: 'assistant', content: '抱歉，当前无法完成语音提问，请稍后重试或改用文字输入。' });
+    emitAssistantPreview('抱歉，当前无法完成语音提问，请稍后重试或改用文字输入。');
+    setStreaming(false);
   }
 };
 
@@ -679,12 +648,6 @@ const startRecording = async (): Promise<void> => {
 
   const AudioContextCtor =
     window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (isRemoteInsecureContext()) {
-    const message = '当前页面不是 HTTPS 安全环境，浏览器会限制麦克风。请用 HTTPS 域名访问，或先在本机 localhost 演示。';
-    appendMessage({ role: 'assistant', content: message });
-    emitAssistantPreview(message);
-    return;
-  }
   if (!AudioContextCtor || !navigator.mediaDevices?.getUserMedia) {
     appendMessage({ role: 'assistant', content: '当前浏览器不支持录音，请改用文字输入。' });
     emitAssistantPreview('当前浏览器不支持录音，请改用文字输入。');
