@@ -31,10 +31,10 @@ const getEnvList = (name: string, fallback: string[]) => {
 const trimRightSlash = (value: string) => value.replace(/\/+$/, '')
 const toWsBase = (value: string) => trimRightSlash(value).replace(/^http/i, 'ws')
 
-const defaultApiBaseUrl = 'http://localhost:10215'
-const defaultAlgorithmUrl = 'http://localhost:6006'
-const defaultAgentBaseUrl = 'http://localhost:5050'
-const defaultDemoVideoBaseUrl = 'http://localhost:8848/video'
+const defaultApiBaseUrl = 'http://172.20.10.3:10215'
+const defaultAlgorithmUrl = 'http://172.20.10.3:6006'
+const defaultAgentBaseUrl = 'http://172.20.10.3:5050'
+const defaultDemoVideoBaseUrl = 'http://172.20.10.3:8848/video'
 
 const demoVideoFileMap = {
   bike: '\u7535\u52a8\u8f66\u8fdb\u697c.mp4',
@@ -84,7 +84,7 @@ export const resolveDemoAlarmVideo = (clipIdOrType?: string) => {
 }
 
 export const defaultStreamList = [
-  'http://123.56.248.17:8080/live/raw.flv',
+  'http://172.20.10.3:8080/live/raw.flv',
   buildDemoVideoUrl(demoVideoFileMap.defaultFlv),
   buildDemoVideoUrl(demoVideoFileMap.extraFlv01),
   buildDemoVideoUrl(demoVideoFileMap.extraFlv02),

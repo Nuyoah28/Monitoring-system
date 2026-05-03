@@ -11,12 +11,19 @@ from agent_core.constants import (
     ALARM_KEYWORDS,
     ALARM_UPDATE_HINT_KEYWORDS,
     COUNT_KEYWORDS,
+    ENVIRONMENT_KEYWORDS,
     HISTORY_KEYWORDS,
     LIST_KEYWORDS,
     MONITOR_DETAIL_KEYWORDS,
     MONITOR_KEYWORDS,
     MONITOR_LIST_KEYWORDS,
+    OWNER_MESSAGE_KEYWORDS,
+    OWNER_PROFILE_KEYWORDS,
+    OWNER_REPAIR_KEYWORDS,
+    OWNER_VISITOR_KEYWORDS,
+    PARKING_KEYWORDS,
     REALTIME_KEYWORDS,
+    TRAFFIC_FLOW_KEYWORDS,
     WEATHER_KEYWORDS,
 )
 from agent_core.core.catalog import ToolCatalog
@@ -162,6 +169,15 @@ class ToolPlanner:
             tool_calls.append(("get_alarm_detail", {"alarm_id": alarm_id}))
 
         weather_requested = contains_any(question, WEATHER_KEYWORDS)
+        owner_profile_requested = contains_any(question, OWNER_PROFILE_KEYWORDS)
+        owner_message_requested = contains_any(question, OWNER_MESSAGE_KEYWORDS)
+        owner_visitor_requested = contains_any(question, OWNER_VISITOR_KEYWORDS)
+        owner_repair_requested = contains_any(question, OWNER_REPAIR_KEYWORDS)
+        parking_requested = contains_any(question, PARKING_KEYWORDS)
+        traffic_flow_requested = contains_any(question, TRAFFIC_FLOW_KEYWORDS)
+        environment_requested = contains_any(question.lower(), ENVIRONMENT_KEYWORDS)
+        if environment_requested and not contains_any(question, ["天气", "气象"]):
+            weather_requested = False
         web_requested = contains_any(
             question,
             ["网页", "网站", "联网", "搜索", "上网", "浏览器", "网址", "http", "https", "web"],
@@ -172,6 +188,32 @@ class ToolPlanner:
         history_requested = contains_any(question, HISTORY_KEYWORDS)
         realtime_requested = contains_any(question, REALTIME_KEYWORDS)
         list_requested = contains_any(question, LIST_KEYWORDS)
+
+        if owner_profile_requested:
+            tool_calls.append(("get_owner_profile", {}))
+
+        if owner_message_requested:
+            tool_calls.append(("get_owner_messages", {"limit": 8}))
+
+        if owner_visitor_requested:
+            tool_calls.append(("get_owner_visitors", {"limit": 8}))
+
+        if owner_repair_requested:
+            tool_calls.append(("get_owner_repairs", {"limit": 8}))
+
+        if parking_requested or traffic_flow_requested:
+            monitor_id = extract_monitor_id(question) or 1
+            if traffic_flow_requested:
+                tool_calls.append(("get_parking_traffic_summary", {"monitor_id": monitor_id, "source": "real"}))
+            if parking_requested or contains_any(question, ["车位", "空余", "占用率", "还有多少"]):
+                tool_calls.append(("get_parking_realtime", {"monitor_id": monitor_id, "source": "real"}))
+
+        if environment_requested and not weather_requested:
+            monitor_id = extract_monitor_id(question) or 1
+            if history_requested or contains_any(question, ["趋势", "变化", "最近", "历史"]):
+                tool_calls.append(("get_environment_trend", {"monitor_id": monitor_id, "range": "day"}))
+            else:
+                tool_calls.append(("get_environment_realtime", {"monitor_id": monitor_id}))
 
         if weather_requested:
             params: dict[str, Any] = {

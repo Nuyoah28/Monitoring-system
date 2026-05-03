@@ -99,30 +99,39 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
     @Override
     public Boolean updateMonitor(UpdateMonitorParam updateMonitorParam) {
         // TODO 改字段要改这里
-        Monitor monitor = new Monitor();
-
         Boolean dangerArea = updateMonitorParam.getLeftX() != null && updateMonitorParam.getLeftY() != null
                 && updateMonitorParam.getRightX() != null && updateMonitorParam.getRightY() != null;
-        monitor.setId(updateMonitorParam.getId());
-        monitor.setName(updateMonitorParam.getName());
-        monitor.setArea(updateMonitorParam.getArea());
-        monitor.setLeader(updateMonitorParam.getLeader());
-        monitor.setRunning(updateMonitorParam.getRunning());
-        monitor.setFall(updateMonitorParam.getFall());
-        monitor.setFlame(updateMonitorParam.getFlame());
-        monitor.setSmoke(updateMonitorParam.getSmoke());
-        monitor.setPunch(updateMonitorParam.getPunch());
-        monitor.setRubbish(updateMonitorParam.getRubbish());
-        monitor.setIce(updateMonitorParam.getIce());
-        monitor.setEbike(updateMonitorParam.getEbike());
-        monitor.setVehicle(updateMonitorParam.getVehicle());
-        monitor.setWave(updateMonitorParam.getWave());
-        monitor.setDangerArea(dangerArea);
-        monitor.setLeftX(null);
-        monitor.setLeftY(null);
-        monitor.setRightX(null);
-        monitor.setRightY(null);
-        // 更改Flask区域和能力
+
+        try {
+            LambdaUpdateWrapper<Monitor> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper
+                    .eq(Monitor::getId, updateMonitorParam.getId())
+                    .set(Monitor::getName, updateMonitorParam.getName())
+                    .set(Monitor::getArea, updateMonitorParam.getArea())
+                    .set(Monitor::getLeader, updateMonitorParam.getLeader())
+                    .set(Monitor::getFall, updateMonitorParam.getFall())
+                    .set(Monitor::getFlame, updateMonitorParam.getFlame())
+                    .set(Monitor::getSmoke, updateMonitorParam.getSmoke())
+                    .set(Monitor::getPunch, updateMonitorParam.getPunch())
+                    .set(Monitor::getRubbish, updateMonitorParam.getRubbish())
+                    .set(Monitor::getIce, updateMonitorParam.getIce())
+                    .set(Monitor::getEbike, updateMonitorParam.getEbike())
+                    .set(Monitor::getVehicle, updateMonitorParam.getVehicle())
+                    .set(Monitor::getWave, updateMonitorParam.getWave())
+                    .set(Monitor::getDangerArea, dangerArea)
+                    .set(Monitor::getLeftX, dangerArea ? updateMonitorParam.getLeftX() : null)
+                    .set(Monitor::getLeftY, dangerArea ? updateMonitorParam.getLeftY() : null)
+                    .set(Monitor::getRightX, dangerArea ? updateMonitorParam.getRightX() : null)
+                    .set(Monitor::getRightY, dangerArea ? updateMonitorParam.getRightY() : null);
+            boolean updated = update(updateWrapper);
+            if (!updated) {
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("更新监控数据库失败", e);
+            return false;
+        }
+
         try {
             String IP = getMonitorIPById(updateMonitorParam.getId());
             if (dangerArea) {
@@ -132,7 +141,7 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
                 area.add(updateMonitorParam.getRightX());
                 area.add(updateMonitorParam.getRightY());
                 if (!requestFlaskService.updateMonitorArea(IP, area)) {
-                    return false;
+                    log.warn("同步监控区域到算法节点失败 monitorId={}, area={}", updateMonitorParam.getId(), area);
                 }
             }
             List<Boolean> ability = new ArrayList<>();
@@ -152,32 +161,13 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
             ability.add(updateMonitorParam.getVehicle()); // 10: 载具占用车道 (caseType=11)
             ability.add(updateMonitorParam.getWave()); // 11: 挥手 (caseType=12)
             if (!requestFlaskService.updateMonitorAbility(IP, ability)) {
-                return false;
+                log.warn("同步监控能力到算法节点失败 monitorId={}, ability={}", updateMonitorParam.getId(), ability);
             }
-            LambdaUpdateWrapper<Monitor> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper
-                    .eq(Monitor::getId, updateMonitorParam.getId())
-                    .set(Monitor::getName, updateMonitorParam.getName())
-                    .set(Monitor::getArea, updateMonitorParam.getArea())
-                    .set(Monitor::getLeader, updateMonitorParam.getLeader())
-                    .set(Monitor::getFall, updateMonitorParam.getFall())
-                    .set(Monitor::getFlame, updateMonitorParam.getFlame())
-                    .set(Monitor::getSmoke, updateMonitorParam.getSmoke())
-                    .set(Monitor::getPunch, updateMonitorParam.getPunch())
-                    .set(Monitor::getRubbish, updateMonitorParam.getRubbish())
-                    .set(Monitor::getIce, updateMonitorParam.getIce())
-                    .set(Monitor::getEbike, updateMonitorParam.getEbike())
-                    .set(Monitor::getVehicle, updateMonitorParam.getVehicle())
-                    .set(Monitor::getDangerArea, dangerArea)
-                    .set(Monitor::getLeftX, updateMonitorParam.getLeftX())
-                    .set(Monitor::getLeftY, updateMonitorParam.getLeftY())
-                    .set(Monitor::getRightX, updateMonitorParam.getRightX())
-                    .set(Monitor::getRightY, updateMonitorParam.getRightY());
-            return update(updateWrapper);
         } catch (Exception e) {
-            log.error("更新监控失败");
-            return false;
+            log.warn("同步监控配置到算法节点异常 monitorId={}", updateMonitorParam.getId(), e);
         }
+
+        return true;
     }
 
     @Override

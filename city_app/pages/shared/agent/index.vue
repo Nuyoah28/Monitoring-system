@@ -538,16 +538,11 @@ import Vue from 'vue';
 				}
 				if (this.websocket && (this.websocket.is_open_socket || this.websocket.is_connecting)) return;
 				this.closeWs();
-				// 关于ai对话部分的，如果没有需求先不用管这一部分
-				// this.websocket = new wsRequest(`ws://8.152.219.117:10215/api/v1/gpt/ws/${token}`,5000) //服务器
 				this.websocket = new wsRequest(`${AI_WS_URL}/api/v1/gpt/ws/${token}`,5000) // Python Agent
 				if (!this.websocket || typeof this.websocket.getMessage !== 'function') {
 					console.warn('[AIPage] websocket instance invalid', this.websocket);
 					return;
 				}
-				// this.websocket = new wsRequest(`ws://localhost:10215/api/v1/gpt/ws/${token}`,5000) //本地
-				// this.websocket = new wsRequest(`ws://192.168.3.135:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接
-				// this.websocket = new wsRequest(`ws://192.168.68.31:5050/api/v1/gpt/ws/${token}`,5000) //Python Agent直接连接
 				this.websocket.getMessage(res => {
 					const payload = typeof res.data === 'string' ? res.data.trim() : res.data;
 					if (payload === 'ping' || payload === 'pong' || payload === '') return;

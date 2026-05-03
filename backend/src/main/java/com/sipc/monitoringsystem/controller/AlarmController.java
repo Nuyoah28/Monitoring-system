@@ -77,33 +77,34 @@ public class AlarmController {
             @RequestParam(value = "clipId", required = true) String clipId,
             @RequestParam(value = "occurredAt", required = false) String occurredAt) {
 
+        String receivedClipId = normalizeDemoClipId(clipId);
         boolean duplicateAlarm = alarmService.getOne(new QueryWrapper<Alarm>()
                 .eq("monitor_id", cameraId)
                 .eq("case_type", caseType)
-                .eq("clip_link", clipId)
+                .eq("clip_link", receivedClipId)
                 .last("LIMIT 1")) != null;
 
         // 1. 保存报警到数据库
-        SqlGetAlarm alarm = alarmService.receiveAlarm(cameraId, caseType, clipId, occurredAt);
+        SqlGetAlarm alarm = alarmService.receiveAlarm(cameraId, caseType, receivedClipId, occurredAt);
 
         if (alarm == null) {
             return CommonResult.fail("接收失败");
         }
         if (duplicateAlarm) {
-            log.info("重复报警补传已忽略推送: cameraId={}, caseType={}, clipId={}", cameraId, caseType, clipId);
+            log.info("重复报警补传已忽略推送: cameraId={}, caseType={}, clipId={}", cameraId, caseType, receivedClipId);
             return CommonResult.success("重复报警已确认");
         }
 
         GetAlarmRes alarmRes = new GetAlarmRes(alarm);
         Monitor monitor = monitorService.getMonitorById(cameraId);
 
-        // 2. 定向推送给负责人和管理员（现有流程）
+        // 2. 定向推送给管理端账号。业主端只走下方同区域居民推送，避免业主收到管理端处置弹窗。
         Map<String, Object> managerSocketMessage = new HashMap<>();
         managerSocketMessage.put("type", "NEW_ALARM");
         managerSocketMessage.put("message", "您有一条新的报警信息，请及时处理");
         managerSocketMessage.put("data", alarmRes);
 
-        Set<Integer> managerIds = collectManagerTargets(monitor);
+        Set<Integer> managerIds = collectManagerTargets();
         if (!managerIds.isEmpty()) {
             AlarmWebSocketServer.sendToUsers(
                     managerIds.stream().map(String::valueOf).collect(Collectors.toList()),
@@ -143,6 +144,17 @@ public class AlarmController {
         // sendUniPushNotification();
 
         return CommonResult.success("接收成功");
+    }
+
+    private String normalizeDemoClipId(String clipId) {
+        if (clipId == null) {
+            return null;
+        }
+        String value = clipId.trim();
+        if (value.startsWith("SIM_")) {
+            return value + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
+        }
+        return value;
     }
 
     /**
@@ -317,14 +329,8 @@ public class AlarmController {
         return ResponseEntity.ok().body(bytes);
     }
 
-    private Set<Integer> collectManagerTargets(Monitor monitor) {
+    private Set<Integer> collectManagerTargets() {
         Set<Integer> targetIds = new LinkedHashSet<>();
-        if (monitor != null && monitor.getLeader() != null) {
-            User leaderUser = userService.getOne(new QueryWrapper<User>().eq("user_name", monitor.getLeader()));
-            if (leaderUser != null) {
-                targetIds.add(leaderUser.getId());
-            }
-        }
         List<User> admins = userService.list(new QueryWrapper<User>().eq("role", 0));
         for (User admin : admins) {
             targetIds.add(admin.getId());

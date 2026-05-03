@@ -41,6 +41,11 @@ import { baseUrl, simulateChannelName } from '@/config/config'
 
 const channel = new BroadcastChannel(simulateChannelName)
 
+const buildDemoClipId = (baseClipId: string) => {
+  const randomSuffix = Math.random().toString(36).slice(2, 8)
+  return `${baseClipId}_${Date.now()}_${randomSuffix}`
+}
+
 const sendAlarm = async (type: string) => {
   channel.postMessage({
     action: 'trigger_alarm',
@@ -66,7 +71,7 @@ const sendAlarm = async (type: string) => {
       params: {
         cameraId: 1,
         caseType: caseType,
-        clipId: clipId
+        clipId: buildDemoClipId(clipId)
       }
     })
     ElMessage({ message: '联动指令已同步到所有设备', type: 'success' })

@@ -32,6 +32,7 @@
               :src="img.replace(/[\r\n]/g, '')"
               mode="aspectFit"
               class="snapshot"
+              @load="onSnapshotLoad"
             ></image>
             <view v-else class="snapshot placeholder">
               <text>截图加载中…</text>
@@ -58,15 +59,15 @@
             请在截图上框选需要识别的区域，框选结果会同步到算法端。
           </view>
 
-          <view class="img">
-            <canvas
-              canvas-id="myCanvas"
-              class="canvas-layer"
-              @touchstart="start"
-              @touchmove="move"
-              @touchend="stop"
-              :disable-scroll="!locked"
-            ></canvas>
+          <view class="editor-frame">
+            <view
+              class="draw-layer"
+              :class="{ 'draw-layer--locked': locked }"
+              @touchstart.stop.prevent="start"
+              @touchmove.stop.prevent="move"
+              @touchend.stop.prevent="stop"
+              @touchcancel.stop.prevent="stop"
+            ></view>
             <image
               v-if="img"
               :src="img.replace(/[\r\n]/g, '')"
@@ -139,11 +140,28 @@ export default {
         y: null,
       },
       border: [],
+      sourceBorder: null,
       borData: {},
       painting: false,
       ability: [],
       img: "",
       moveThrottle: null,
+      drawRect: {
+        left: 0,
+        top: 0,
+        width: 328,
+        height: 246,
+      },
+      sourceSize: {
+        width: 640,
+        height: 480,
+      },
+      imageRect: {
+        left: 0,
+        top: 0,
+        width: 328,
+        height: 246,
+      },
     };
   },
   computed: {
@@ -159,8 +177,8 @@ export default {
   },
   created() {
     this.moveThrottle = throttle((newPoint) => {
-      this.push(newPoint);
-    }, 80);
+      this.updateDraftBorder(newPoint);
+    }, 32);
     this.resetAbilities();
   },
   beforeDestroy() {
@@ -177,7 +195,7 @@ export default {
   },
   methods: {
     initDialog() {
-      this.locked = true;
+      this.locked = false;
       this.painting = false;
       this.startPoint = {
         x: null,
@@ -185,19 +203,78 @@ export default {
       };
       this.borData = {};
       this.img = "";
-      this.border = this.getInitialBorder();
+      this.sourceBorder = this.getInitialSourceBorder();
+      this.border = this.sourceBorder ? [this.sourceBoxToDisplayBox(this.sourceBorder)] : [];
       this.resetAbilities();
       this.applyBackendAbilities();
       this.syncDangerAreaByBorder();
       this.getImg();
+      this.queryDrawRect();
     },
-    getInitialBorder() {
+    queryDrawRect() {
+      this.$nextTick(() => {
+        setTimeout(() => {
+          uni
+            .createSelectorQuery()
+            .in(this)
+            .select(".editor-frame")
+            .boundingClientRect((rect) => {
+              if (!rect || !rect.width || !rect.height) return;
+              this.drawRect = {
+                left: Number(rect.left) || 0,
+                top: Number(rect.top) || 0,
+                width: Number(rect.width) || 328,
+                height: Number(rect.height) || 246,
+              };
+              this.updateImageRect();
+            })
+            .exec();
+        }, 80);
+      });
+    },
+    onSnapshotLoad(e) {
+      const detail = (e && e.detail) || {};
+      const width = Number(detail.width);
+      const height = Number(detail.height);
+      if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) {
+        this.sourceSize = { width, height };
+      }
+      this.updateImageRect();
+      if (!this.painting && this.sourceBorder) {
+        this.border = [this.sourceBoxToDisplayBox(this.sourceBorder)].filter(Boolean);
+      }
+    },
+    updateImageRect() {
+      const frameWidth = Number(this.drawRect.width) || 328;
+      const frameHeight = Number(this.drawRect.height) || 246;
+      const sourceWidth = Number(this.sourceSize.width) || 640;
+      const sourceHeight = Number(this.sourceSize.height) || 480;
+      const sourceRatio = sourceWidth / sourceHeight;
+      const frameRatio = frameWidth / frameHeight;
+      let width = frameWidth;
+      let height = frameHeight;
+
+      if (sourceRatio > frameRatio) {
+        height = frameWidth / sourceRatio;
+      } else {
+        width = frameHeight * sourceRatio;
+      }
+
+      this.imageRect = {
+        left: (frameWidth - width) / 2,
+        top: (frameHeight - height) / 2,
+        width,
+        height,
+      };
+    },
+    getInitialSourceBorder() {
       const data = this.currentWarnData;
       const legacyBorder = Array.isArray(data.border) ? data.border : [];
       if (legacyBorder.length) {
-        return legacyBorder
+        const firstBox = legacyBorder
           .map((item) => this.normalizeBox(item))
-          .filter(Boolean);
+          .filter(Boolean)[0];
+        return firstBox || null;
       }
 
       const leftX = Number(data.leftX);
@@ -205,11 +282,10 @@ export default {
       const rightX = Number(data.rightX);
       const rightY = Number(data.rightY);
       if ([leftX, leftY, rightX, rightY].every((value) => Number.isFinite(value))) {
-        const box = this.normalizeBox({ leftX, leftY, rightX, rightY });
-        return box ? [box] : [];
+        return this.normalizeBox({ leftX, leftY, rightX, rightY });
       }
 
-      return [];
+      return null;
     },
     normalizeBox(box) {
       if (!box) return null;
@@ -256,34 +332,37 @@ export default {
     },
     start(e) {
       if (this.locked) return;
-      const point = e.touches && e.touches[0];
+      this.queryDrawRect();
+      const point = this.getTouchPoint(e);
       if (!point) return;
-      const x = Number(point.x);
-      const y = Number(point.y);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-      this.startPoint.x = x;
-      this.startPoint.y = y;
+      this.startPoint.x = point.x;
+      this.startPoint.y = point.y;
       this.painting = true;
+      this.border = [];
       this.borData = {
-        maxX: x,
-        minX: x,
-        maxY: y,
-        minY: y,
+        maxX: point.x,
+        minX: point.x,
+        maxY: point.y,
+        minY: point.y,
       };
     },
     move(e) {
       if (this.locked || !this.painting) return;
-      const point = e.touches && e.touches[0];
+      const point = this.getTouchPoint(e);
       if (!point) return;
-      const x = Number(point.x);
-      const y = Number(point.y);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
       if (this.moveThrottle) {
-        this.moveThrottle({ x, y });
+        this.moveThrottle(point);
       }
     },
-    stop() {
+    stop(e) {
       if (this.locked) return;
+      if (this.painting && e) {
+        const point = this.getTouchPoint(e);
+        if (point) this.updateDraftBorder(point);
+      }
+      if (this.moveThrottle && this.moveThrottle.cancel) {
+        this.moveThrottle.cancel();
+      }
       this.painting = false;
       const box = this.normalizeBox({
         leftX: this.borData.minX,
@@ -292,14 +371,113 @@ export default {
         rightY: this.borData.maxY,
       });
       this.border = box ? [box] : [];
+      this.sourceBorder = box ? this.displayBoxToSourceBox(box) : null;
       this.syncDangerAreaByBorder();
       this.borData = {};
     },
-    push(newPoint) {
-      this.borData.maxX = Math.max(newPoint.x, this.borData.maxX);
-      this.borData.minX = Math.min(newPoint.x, this.borData.minX);
-      this.borData.maxY = Math.max(newPoint.y, this.borData.maxY);
-      this.borData.minY = Math.min(newPoint.y, this.borData.minY);
+    getTouchPoint(e) {
+      const touch =
+        (e && e.touches && e.touches[0]) ||
+        (e && e.changedTouches && e.changedTouches[0]) ||
+        (e && e.detail) ||
+        null;
+      if (!touch) return null;
+
+      const rect = this.drawRect || {};
+      const pickNumber = (...values) => {
+        for (const value of values) {
+          const numberValue = Number(value);
+          if (Number.isFinite(numberValue)) return numberValue;
+        }
+        return NaN;
+      };
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+      const width = Number(rect.width) || 328;
+      const height = Number(rect.height) || 246;
+      const rectLeft = Number(rect.left) || 0;
+      const rectTop = Number(rect.top) || 0;
+      const absoluteX = pickNumber(touch.clientX, touch.pageX, touch.screenX);
+      const absoluteY = pickNumber(touch.clientY, touch.pageY, touch.screenY);
+      let relativeX = pickNumber(touch.offsetX, touch.x);
+      let relativeY = pickNumber(touch.offsetY, touch.y);
+
+      if (Number.isFinite(relativeX) && (relativeX > width || relativeX < 0)) {
+        relativeX -= rectLeft;
+      }
+      if (Number.isFinite(relativeY) && (relativeY > height || relativeY < 0)) {
+        relativeY -= rectTop;
+      }
+
+      const x = Number.isFinite(absoluteX)
+        ? absoluteX - rectLeft
+        : relativeX;
+      const y = Number.isFinite(absoluteY)
+        ? absoluteY - rectTop
+        : relativeY;
+
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      return {
+        x: clamp(x, 0, width),
+        y: clamp(y, 0, height),
+      };
+    },
+    updateDraftBorder(newPoint) {
+      if (!newPoint || !Number.isFinite(Number(this.startPoint.x)) || !Number.isFinite(Number(this.startPoint.y))) {
+        return;
+      }
+      const minX = Math.min(this.startPoint.x, newPoint.x);
+      const maxX = Math.max(this.startPoint.x, newPoint.x);
+      const minY = Math.min(this.startPoint.y, newPoint.y);
+      const maxY = Math.max(this.startPoint.y, newPoint.y);
+      this.borData = { minX, maxX, minY, maxY };
+      const box = this.normalizeBox({
+        leftX: minX,
+        leftY: minY,
+        rightX: maxX,
+        rightY: maxY,
+      });
+      this.border = box ? [box] : [];
+    },
+    sourceBoxToDisplayBox(box) {
+      const normalized = this.normalizeBox(box);
+      if (!normalized) return null;
+      const sourceWidth = Number(this.sourceSize.width) || 640;
+      const sourceHeight = Number(this.sourceSize.height) || 480;
+      const imageRect = this.imageRect || {};
+      const displayLeft = Number(imageRect.left) || 0;
+      const displayTop = Number(imageRect.top) || 0;
+      const displayWidth = Number(imageRect.width) || 328;
+      const displayHeight = Number(imageRect.height) || 246;
+
+      return this.normalizeBox({
+        leftX: displayLeft + normalized.leftX / sourceWidth * displayWidth,
+        leftY: displayTop + normalized.leftY / sourceHeight * displayHeight,
+        rightX: displayLeft + normalized.rightX / sourceWidth * displayWidth,
+        rightY: displayTop + normalized.rightY / sourceHeight * displayHeight,
+      });
+    },
+    displayBoxToSourceBox(box) {
+      const normalized = this.normalizeBox(box);
+      if (!normalized) return null;
+      const sourceWidth = Number(this.sourceSize.width) || 640;
+      const sourceHeight = Number(this.sourceSize.height) || 480;
+      const imageRect = this.imageRect || {};
+      const displayLeft = Number(imageRect.left) || 0;
+      const displayTop = Number(imageRect.top) || 0;
+      const displayWidth = Number(imageRect.width) || 328;
+      const displayHeight = Number(imageRect.height) || 246;
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+      const convertX = (value) => clamp(Math.round((value - displayLeft) / displayWidth * sourceWidth), 0, sourceWidth);
+      const convertY = (value) => clamp(Math.round((value - displayTop) / displayHeight * sourceHeight), 0, sourceHeight);
+
+      return this.normalizeBox({
+        leftX: convertX(normalized.leftX),
+        leftY: convertY(normalized.leftY),
+        rightX: convertX(normalized.rightX),
+        rightY: convertY(normalized.rightY),
+      });
     },
     changeShow() {
       this.$emit("change", false);
@@ -384,6 +562,7 @@ export default {
     },
     resetBorder() {
       this.border = [];
+      this.sourceBorder = null;
       this.painting = false;
       this.borData = {};
       this.setAbilityChecked(1, false);
@@ -392,8 +571,9 @@ export default {
       return !!this.normalizeBox(this.border && this.border[0]);
     },
     buildPayload() {
-      const border = this.normalizeBox(this.border && this.border[0]);
-      const hasBorder = !!border;
+      const displayBorder = this.normalizeBox(this.border && this.border[0]);
+      const sourceBorder = displayBorder ? this.displayBoxToSourceBox(displayBorder) : null;
+      const hasBorder = !!sourceBorder;
 
       if (!hasBorder && this.isAbilityChecked(1)) {
         uni.showToast({
@@ -424,10 +604,10 @@ export default {
       };
 
       if (hasBorder) {
-        payload.leftX = Math.floor(border.leftX);
-        payload.leftY = Math.floor(border.leftY);
-        payload.rightX = Math.floor(border.rightX);
-        payload.rightY = Math.floor(border.rightY);
+        payload.leftX = Math.floor(sourceBorder.leftX);
+        payload.leftY = Math.floor(sourceBorder.leftY);
+        payload.rightX = Math.floor(sourceBorder.rightX);
+        payload.rightY = Math.floor(sourceBorder.rightY);
       }
 
       return payload;
@@ -445,10 +625,14 @@ export default {
           try {
             const { data } = await uni.$http.post("/api/v1/monitor/update", payload);
             if (data && data.code === "00000") {
+              uni.showToast({ title: "保存成功", icon: "success" });
               this.$emit("change", true);
+            } else {
+              uni.showToast({ title: (data && data.message) || "保存失败", icon: "none" });
             }
           } catch (error) {
             console.warn("[edit-area] 保存失败：", error);
+            uni.showToast({ title: "保存失败", icon: "none" });
           }
         },
       });
@@ -481,6 +665,7 @@ export default {
     background-color: rgba(red, 0.4);
     z-index: 15;
     box-sizing: border-box;
+    pointer-events: none;
   }
 
   .titleBox {
@@ -575,7 +760,7 @@ export default {
     background-color: rgba(220, 38, 38, 0.14);
   }
 
-  .img {
+  .editor-frame {
     overflow: hidden;
     width: 328px;
     max-width: 100%;
@@ -584,6 +769,7 @@ export default {
     border-radius: 16rpx;
     background: #edf6ff;
     margin: 10rpx auto 0;
+    touch-action: none;
   }
 
   .snapshot {
@@ -600,14 +786,19 @@ export default {
     background: linear-gradient(180deg, #f7fbff 0%, #eef6ff 100%);
   }
 
-  .canvas-layer {
-    margin: 0 auto;
+  .draw-layer {
     position: absolute;
     top: 0;
     left: 0;
     z-index: 10;
     width: 100%;
     height: 100%;
+    background: transparent;
+    touch-action: none;
+  }
+
+  .draw-layer--locked {
+    pointer-events: none;
   }
 
   .action-chip {

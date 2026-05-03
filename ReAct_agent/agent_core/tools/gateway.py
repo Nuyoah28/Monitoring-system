@@ -76,6 +76,30 @@ class ToolGateway:
     def update_detection_prompts(self, prompts: list[str], *, user_token: Optional[str] = None) -> Optional[dict]:
         return self.detection.update_detection_prompts(prompts=prompts, user_token=user_token)
 
+    def get_owner_profile(self, *, user_token: Optional[str] = None) -> Optional[dict]:
+        return self.backend.get_owner_profile(user_token=user_token)
+
+    def get_owner_messages(self, *, user_token: Optional[str] = None) -> Optional[list[dict]]:
+        return self.backend.get_owner_messages(user_token=user_token)
+
+    def get_owner_visitors(self, *, user_token: Optional[str] = None) -> Optional[list[dict]]:
+        return self.backend.get_owner_visitors(user_token=user_token)
+
+    def get_owner_repairs(self, *, user_token: Optional[str] = None) -> Optional[list[dict]]:
+        return self.backend.get_owner_repairs(user_token=user_token)
+
+    def get_parking_realtime(self, *, monitor_id: int = 1, source: str = "real") -> Optional[dict]:
+        return self.backend.get_parking_realtime(monitor_id=monitor_id, source=source)
+
+    def get_parking_traffic_summary(self, *, monitor_id: int = 1, source: str = "real") -> Optional[dict]:
+        return self.backend.get_parking_traffic_summary(monitor_id=monitor_id, source=source)
+
+    def get_environment_realtime(self, *, monitor_id: int = 1) -> Optional[dict]:
+        return self.backend.get_environment_realtime(monitor_id=monitor_id)
+
+    def get_environment_trend(self, *, monitor_id: int = 1, range_name: str = "day") -> Optional[list[dict]]:
+        return self.backend.get_environment_trend(monitor_id=monitor_id, range_name=range_name)
+
     def chat_cbs(
         self,
         message: str,

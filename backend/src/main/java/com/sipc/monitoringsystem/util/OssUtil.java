@@ -17,15 +17,23 @@ public class OssUtil {
      * @return {@link String}
      */
 
-    @Cacheable(value = "clipLink", key = "#clipIdOrKey")
+    @Cacheable(value = "clipLink", key = "#clipIdOrKey", condition = "#clipIdOrKey != null && !#clipIdOrKey.trim().isEmpty() && !#clipIdOrKey.trim().startsWith('SIM_')")
     public String getClipLinkByUuid(String clipIdOrKey) {
         if (clipIdOrKey == null || clipIdOrKey.trim().isEmpty()) {
             return clipIdOrKey;
+        }
+        if (isDemoClipId(clipIdOrKey)) {
+            return clipIdOrKey.trim();
         }
         String objectKey = ossConfig.normalizeObjectKey(clipIdOrKey, ".flv");
         if (objectKey.startsWith("http://") || objectKey.startsWith("https://")) {
             return objectKey;
         }
         return ossConfig.buildObjectUrl(objectKey);
+    }
+
+    private boolean isDemoClipId(String clipIdOrKey) {
+        String value = clipIdOrKey.trim();
+        return value.startsWith("SIM_");
     }
 }

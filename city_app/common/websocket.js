@@ -3,7 +3,7 @@
  * 用于接收后端实时推送的报警消息
  */
 
-import { WS_ALARM_URL } from './config.js';
+import { WS_ALARM_URL, resolveDemoAlarmVideo } from './config.js';
 
 let isConnected = false;
 let isConnecting = false;
@@ -100,6 +100,9 @@ function handleMessage(data) {
         console.log('[WebSocket] 收到新报警:', data);
 
         const alarmData = data.data || {};
+        if (alarmData.video) {
+            alarmData.video = resolveDemoAlarmVideo(alarmData.video);
+        }
         const appType = uni.getStorageSync('appType');
 
         if (appType === 'owner') {

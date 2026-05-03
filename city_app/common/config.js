@@ -4,11 +4,11 @@
  */
 
 export const NETWORK_CONFIG = {
-    IP: '192.168.68.31',
-    LOCAL_IP: '192.168.68.31',
+    IP: '172.20.10.3',
+    LOCAL_IP: '172.20.10.3',
     BACKEND_PORT: '10215',
     AI_AGENT_PORT: '5050',
-    DEMO_VIDEO_HOST: '192.168.68.31',
+    DEMO_VIDEO_HOST: '172.20.10.3',
     DEMO_VIDEO_PORT: '8848'
 };
 
@@ -19,7 +19,7 @@ export const AI_WS_URL = `ws://${NETWORK_CONFIG.LOCAL_IP}:${NETWORK_CONFIG.AI_AG
 
 export const DEMO_VIDEO_BASE_URL = `http://${NETWORK_CONFIG.DEMO_VIDEO_HOST}:${NETWORK_CONFIG.DEMO_VIDEO_PORT}/video`;
 
-const buildDemoVideoUrl = (fileName) => `${DEMO_VIDEO_BASE_URL}/${fileName}`;
+const buildDemoVideoUrl = (fileName) => `${DEMO_VIDEO_BASE_URL}/${encodeURIComponent(fileName)}`;
 
 export const DEMO_ALARM_VIDEO_MAP = {
     bike: buildDemoVideoUrl('电动车进楼.mp4'),

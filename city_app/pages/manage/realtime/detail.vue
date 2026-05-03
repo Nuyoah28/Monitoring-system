@@ -16,9 +16,11 @@
           controls
           muted
           class="video"
+          @error="onVideoError"
         ></video>
         <view v-else class="video-empty">暂无视频</view>
       </view>
+      <view class="video-hint" v-if="detail.video">{{ detail.video }}</view>
 
       <view class="table">
         <view class="row">
@@ -122,11 +124,16 @@ export default {
         
         // --- 联动视频解析逻辑 ---
         this.detail.video = resolveDemoAlarmVideo(this.detail.video);
+        console.log('[AlarmDetail] video url:', this.detail.video)
       } catch (e) {
         uni.$showMsg('网络异常，请稍后重试')
       } finally {
         this.loaded = true
       }
+    },
+    onVideoError(e) {
+      console.log('[AlarmDetail] video load error:', e, this.detail.video)
+      uni.$showMsg('视频加载失败，请确认手机和电脑在同一网络且 8848 视频服务已启动')
     },
   },
 }
@@ -203,6 +210,13 @@ export default {
 .video-empty {
   color: #5b7492;
   font-size: 24rpx;
+}
+
+.video-hint {
+  margin: -4rpx 0 14rpx;
+  color: #6a7990;
+  font-size: 20rpx;
+  word-break: break-all;
 }
 
 .table {

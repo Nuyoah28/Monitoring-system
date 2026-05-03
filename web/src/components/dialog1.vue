@@ -76,6 +76,11 @@ const withNoCache = (url: string): string => {
   return hash ? `${nextUrl}#${hash}` : nextUrl;
 };
 
+const resolvePlayableVideo = (source?: string | null): string => {
+  if (!source) return '';
+  return resolveDemoAlarmVideo(String(source));
+};
+
 // 视频错误状态
 const videoLoadError = ref<boolean>(false);
 const videoErrorMessage = ref<string>('');
@@ -117,153 +122,93 @@ const handleClose = (): void => {
 
 const userStore = useUserStore();
 
+const playVideoSource = (source?: string | null): boolean => {
+  const resolvedVideo = resolvePlayableVideo(source);
+  if (!resolvedVideo || !videoElement.value) return false;
+
+  video = resolvedVideo;
+  const playUrl = withNoCache(resolvedVideo);
+  const isMp4 = playUrl.toLowerCase().split('?')[0].endsWith('.mp4');
+
+  if (isMp4) {
+    videoElement.value.src = playUrl;
+    videoElement.value.load();
+    return true;
+  }
+
+  if (flvjs.isSupported()) {
+    try {
+      flvPlayer = flvjs.createPlayer({
+        type: 'flv',
+        url: playUrl
+      }, {
+        enableWorker: false,
+        lazyLoad: false,
+        deferLoadAfterSourceOpen: false,
+        statisticsInfoReportInterval: 600,
+        autoCleanupSourceBuffer: true,
+      } as any);
+      flvPlayer.attachMediaElement(videoElement.value);
+      flvPlayer.load();
+
+      flvPlayer.on(flvjs.Events.ERROR, (errType: any, errDetail: any) => {
+        console.error('FLV播放器错误:', errType, errDetail);
+        destroyFlvPlayer();
+        if (videoElement.value) {
+          videoElement.value.src = playUrl;
+          videoElement.value.load();
+        }
+      });
+
+      videoElement.value.addEventListener('click', () => {
+        if (flvPlayer && !flvPlayer.hasPlayerStarted()) {
+          const playPromise = flvPlayer.play();
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch((error: any) => {
+              console.log('Autoplay failed:', error);
+            });
+          }
+        }
+      }, { once: true });
+      return true;
+    } catch (error) {
+      console.error('创建FLV播放器失败:', error);
+    }
+  }
+
+  videoElement.value.src = playUrl;
+  videoElement.value.load();
+  return true;
+};
+
 const getVideoData = (): void => {
-  // 重置视频错误状态
   videoLoadError.value = false;
   videoErrorMessage.value = '';
-  
-  console.log('获取视频', props.item.video);
-
-  // 检查是否有有效的视频URL
-  if (!props.item.video) {
-    console.log('没有提供视频URL');
-    return;
-  }
-
-  // 验证URL格式
-  try {
-    new URL(props.item.video);
-  } catch (error) {
-    console.error('无效的视频URL格式:', props.item.video);
-    return;
-  }
-
-  // 确保先销毁之前的播放器实例
   destroyFlvPlayer();
 
+  console.log('获取报警视频', props.item.video);
+
+  // 报警详情优先播放报警记录中的片段。模拟推送保存的是 SIM_* 标识，这里会先转换成演示 mp4 地址。
+  if (playVideoSource(props.item.video)) {
+    return;
+  }
+
   const token = userStore.token;
-  console.log('token', userStore.token);
   axios.get('/monitor', {
     headers: {
       Authorization: token,
     },
   }).then((response: any) => {
     console.log('dialog', response?.data?.chartData);
-    
-    // 优先播放传过来的报警录像短片，如果没有再使用后台默认配置的监控通道流
-    video = props.item.video || response?.data?.chartData;
-
-    // --- 联动视频解析逻辑 ---
-    // 当后端收到 SIM_ 开头的 clipId 时，前端将其重定向到本地 8848 端口的联动视频
-    if (video && typeof video === 'string') {
-      video = resolveDemoAlarmVideo(video);
-    }
-
-    const playUrl = withNoCache(video || '');
-    const isMp4 = playUrl.toLowerCase().split('?')[0].endsWith('.mp4');
-    
-    if (isMp4) {
-      // MP4 文件使用原生 video 标签播放
-      if (videoElement.value) {
-        videoElement.value.src = playUrl;
-        videoElement.value.load();
-      }
-    } else if (flvjs.isSupported() && videoElement.value) {
-      try {
-        flvPlayer = flvjs.createPlayer({
-          type: 'flv',
-          url: playUrl
-        }, {
-          enableWorker: false,
-          lazyLoad: false, // 改为false以避免某些问题
-          deferLoadAfterSourceOpen: false,
-          statisticsInfoReportInterval: 600,
-          autoCleanupSourceBuffer: true, // 自动清理缓冲区
-        } as any);
-        flvPlayer.attachMediaElement(videoElement.value);
-        flvPlayer.load();
-        
-        // 监听播放错误
-        flvPlayer.on(flvjs.Events.ERROR, (errType: any, errDetail: any) => {
-          console.error('FLV播放器错误:', errType, errDetail);
-          // 销毁当前播放器实例
-          destroyFlvPlayer();
-          // 尝试使用原生video标签播放
-          if (videoElement.value) {
-            videoElement.value.src = playUrl;
-            videoElement.value.load();
-          }
-        });
-
-        // 使用用户交互播放视频
-        videoElement.value.addEventListener('click', () => {
-          if (flvPlayer && !flvPlayer.hasPlayerStarted()) {
-            const playPromise = flvPlayer.play();
-            if (playPromise && typeof playPromise.catch === 'function') {
-              playPromise.catch((error: any) => {
-                console.log('Autoplay failed:', error);
-              });
-            }
-          }
-        });
-      } catch (error) {
-        console.error('创建FLV播放器失败:', error);
-        // 如果flv.js创建失败，尝试使用原生video标签
-        if (videoElement.value) {
-          videoElement.value.src = playUrl;
-          videoElement.value.load();
-        }
-      }
-    } else {
-      // 如果浏览器不支持flv.js，使用原生video标签
-      if (videoElement.value) {
-        videoElement.value.src = playUrl;
-        videoElement.value.load();
-      }
+    if (!playVideoSource(response?.data?.chartData)) {
+      videoLoadError.value = true;
+      videoErrorMessage.value = '没有可播放的视频地址';
     }
   })
   .catch((error: any) => {
-      console.error('Error fetching video data:', error);
-      // 如果API调用失败，仍然尝试直接播放视频URL
-      if (flvjs.isSupported() && videoElement.value && props.item.video) {
-        try {
-          const fallbackPlayUrl = withNoCache(props.item.video);
-          flvPlayer = flvjs.createPlayer({
-            type: 'flv',
-            url: fallbackPlayUrl
-          }, {
-            enableWorker: false,
-            lazyLoad: false,
-            deferLoadAfterSourceOpen: false,
-            statisticsInfoReportInterval: 600,
-            autoCleanupSourceBuffer: true,
-          });
-          
-          flvPlayer.attachMediaElement(videoElement.value);
-          flvPlayer.load();
-          
-          flvPlayer.on(flvjs.Events.ERROR, (errType: any, errDetail: any) => {
-            console.error('FLV播放器错误:', errType, errDetail);
-            // 销毁当前播放器实例
-            destroyFlvPlayer();
-            // 最后的备选方案：使用原生video标签
-            if (videoElement.value) {
-              videoElement.value.src = fallbackPlayUrl;
-              videoElement.value.load();
-            }
-          });
-        } catch (err) {
-          console.error('直接播放视频也失败了:', err);
-          if (videoElement.value) {
-            videoElement.value.src = withNoCache(props.item.video || '');
-            videoElement.value.load();
-          }
-        }
-      } else if (videoElement.value) {
-        // 不支持flv.js的情况下，使用原生video标签
-        videoElement.value.src = withNoCache(props.item.video || '');
-        videoElement.value.load();
-      }
+    console.error('Error fetching video data:', error);
+    videoLoadError.value = true;
+    videoErrorMessage.value = '没有可播放的视频地址';
   });
 };
 

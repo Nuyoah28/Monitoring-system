@@ -66,7 +66,7 @@ public class IotAlarmIngressServiceImpl implements IotAlarmIngressService {
         managerSocketMessage.put("message", "您有一条新的报警信息，请及时处理");
         managerSocketMessage.put("data", alarmRes);
 
-        Set<Integer> managerIds = collectManagerTargets(monitor);
+        Set<Integer> managerIds = collectManagerTargets();
         if (!managerIds.isEmpty()) {
             AlarmWebSocketServer.sendToUsers(
                     managerIds.stream().map(String::valueOf).collect(Collectors.toList()),
@@ -76,7 +76,7 @@ public class IotAlarmIngressServiceImpl implements IotAlarmIngressService {
             }
         }
 
-        Set<Integer> residentIds = collectResidentTargets(monitor);
+        Set<Integer> residentIds = shouldPushToResidents(caseType) ? collectResidentTargets(monitor) : new LinkedHashSet<>();
         if (!residentIds.isEmpty()) {
             Map<String, Object> residentSocketMessage = new HashMap<>();
             residentSocketMessage.put("type", "NEW_ALARM");
@@ -103,14 +103,8 @@ public class IotAlarmIngressServiceImpl implements IotAlarmIngressService {
         return alarm;
     }
 
-    private Set<Integer> collectManagerTargets(Monitor monitor) {
+    private Set<Integer> collectManagerTargets() {
         Set<Integer> targetIds = new LinkedHashSet<>();
-        if (monitor != null && monitor.getLeader() != null) {
-            User leaderUser = userService.getOne(new QueryWrapper<User>().eq("user_name", monitor.getLeader()));
-            if (leaderUser != null) {
-                targetIds.add(leaderUser.getId());
-            }
-        }
         List<User> admins = userService.list(new QueryWrapper<User>().eq("role", 0));
         for (User admin : admins) {
             targetIds.add(admin.getId());
@@ -131,6 +125,10 @@ public class IotAlarmIngressServiceImpl implements IotAlarmIngressService {
             targetIds.add(resident.getId());
         }
         return targetIds;
+    }
+
+    private boolean shouldPushToResidents(Integer caseType) {
+        return Integer.valueOf(2).equals(caseType) || Integer.valueOf(5).equals(caseType);
     }
 
     private String buildResidentMessage(SqlGetAlarm alarm, Monitor monitor) {

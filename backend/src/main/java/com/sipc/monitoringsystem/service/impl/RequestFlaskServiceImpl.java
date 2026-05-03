@@ -6,6 +6,7 @@ import com.sipc.monitoringsystem.service.RequestFlaskService;
 import com.sipc.monitoringsystem.util.HttpUtils;
 import com.sipc.monitoringsystem.util.JacksonUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -23,12 +24,34 @@ public class RequestFlaskServiceImpl implements RequestFlaskService {
 
     private final String FLASK_TOKEN = "sipc115";
 
+    @Value("${algorithm.api.url:http://localhost:6006}")
+    private String algorithmApiUrl;
+
     private String buildFlaskUrl(String ip, String path) {
-        String host = ip == null ? "" : ip.trim();
+        String host = resolveAlgorithmHost(ip);
         if (host.startsWith("http://") || host.startsWith("https://")) {
             return host + path;
         }
         return "http://" + host + path;
+    }
+
+    private String resolveAlgorithmHost(String candidate) {
+        String fallback = algorithmApiUrl == null ? "" : algorithmApiUrl.trim();
+        String host = candidate == null ? "" : candidate.trim();
+        if (host.isEmpty() || isMediaStreamUrl(host)) {
+            return fallback;
+        }
+        return host;
+    }
+
+    private boolean isMediaStreamUrl(String value) {
+        String lower = value.toLowerCase();
+        return lower.startsWith("rtmp://")
+                || lower.startsWith("rtsp://")
+                || lower.endsWith(".flv")
+                || lower.endsWith(".mp4")
+                || lower.contains("/live/")
+                || lower.contains("/video/");
     }
 
 

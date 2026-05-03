@@ -208,3 +208,173 @@ def sort_alarms_by_time(alarms: list[dict]) -> list[dict]:
         key=lambda item: parse_alarm_display_time(item.get("date")) or datetime.min,
         reverse=True,
     )
+
+
+def _shorten(value: object, limit: int = 80) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "..."
+
+
+def _sort_items_by_text_time(items: Sequence[dict], key: str) -> list[dict]:
+    return sorted(items, key=lambda item: str(item.get(key) or ""), reverse=True)
+
+
+def _format_number(value: object, suffix: str = "") -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "未知"
+    if number.is_integer():
+        return f"{int(number)}{suffix}"
+    return f"{number:.1f}{suffix}"
+
+
+def format_owner_profile(profile: Optional[dict]) -> str:
+    if not profile:
+        return "未查到当前业主的个人资料，请确认已登录业主端账号。"
+    notify = "已开启" if profile.get("notifyEnabled") is not False else "已关闭"
+    resident = "是" if profile.get("isResident") else "否"
+    return "\n".join(
+        [
+            "当前业主个人资料：",
+            f"- 用户ID：{profile.get('id', '-')}",
+            f"- 用户名：{profile.get('name') or profile.get('userName') or '未填写'}",
+            f"- 手机号：{profile.get('phone') or '未填写'}",
+            f"- 常驻区域：{profile.get('homeArea') or '未填写'}",
+            f"- 居民身份：{resident}",
+            f"- 消息提醒：{notify}",
+        ]
+    )
+
+
+def format_owner_messages(messages: Optional[Sequence[dict]], *, limit: int = 8) -> str:
+    if not messages:
+        return "当前没有查到社区提醒。"
+    sorted_items = _sort_items_by_text_time(messages, "timestamp")
+    selected = sorted_items[:limit]
+    lines = [f"社区提醒：共 {len(messages)} 条，展示最近 {len(selected)} 条。", ""]
+    for index, item in enumerate(selected, start=1):
+        lines.append(
+            f"{index}. {_shorten(item.get('message'), 120) or '未命名提醒'}"
+            f" | 时间 {item.get('timestamp') or '未知'}"
+        )
+    return "\n".join(lines)
+
+
+def format_owner_visitors(visitors: Optional[Sequence[dict]], *, limit: int = 8) -> str:
+    if not visitors:
+        return "当前没有查到访客登记记录。"
+    sorted_items = _sort_items_by_text_time(visitors, "visitTime")
+    selected = sorted_items[:limit]
+    lines = [f"我的访客登记：共 {len(visitors)} 条，展示最近 {len(selected)} 条。", ""]
+    for index, item in enumerate(selected, start=1):
+        plate = item.get("plateNumber") or "未登记车牌"
+        lines.append(
+            f"{index}. {item.get('visitorName') or '未命名访客'}"
+            f" | 到访时间 {item.get('visitTime') or '未知'}"
+            f" | {plate}"
+        )
+    return "\n".join(lines)
+
+
+def format_owner_repairs(repairs: Optional[Sequence[dict]], *, limit: int = 8) -> str:
+    if not repairs:
+        return "当前没有查到报修记录。"
+    sorted_items = _sort_items_by_text_time(repairs, "reportTime")
+    selected = sorted_items[:limit]
+    lines = [f"我的报修记录：共 {len(repairs)} 条，展示最近 {len(selected)} 条。", ""]
+    for index, item in enumerate(selected, start=1):
+        lines.append(
+            f"{index}. {item.get('deviceName') or '未填写设备'}"
+            f" | 位置 {item.get('location') or '未填写'}"
+            f" | 时间 {item.get('reportTime') or '未知'}"
+        )
+        if item.get("repairDetail"):
+            lines.append(f"   详情：{_shorten(item.get('repairDetail'), 120)}")
+    return "\n".join(lines)
+
+
+def format_parking_realtime(data: Optional[dict]) -> str:
+    if not data:
+        return "暂无停车实时数据。"
+    total = data.get("totalSpaces") or 0
+    occupied = data.get("occupiedSpaces") or 0
+    free = data.get("freeSpaces") or 0
+    rate = data.get("occupancyRate")
+    source = data.get("source") or "real"
+    lines = [
+        "停车实时状态：",
+        f"- 数据源：{source}",
+        f"- 总车位：{total}",
+        f"- 已占用：{occupied}",
+        f"- 空余车位：{free}",
+        f"- 占用率：{rate if rate is not None else '未知'}%",
+        f"- 更新时间：{data.get('updateTime') or '未知'}",
+    ]
+    zones = data.get("zones") or []
+    if zones:
+        lines.append("")
+        lines.append("分区情况：")
+        for zone in zones[:8]:
+            zone_total = zone.get("totalSpaces") or 0
+            zone_occupied = zone.get("occupiedSpaces") or 0
+            lines.append(
+                f"- {zone.get('areaName') or zone.get('areaCode') or '未知区域'}："
+                f"{max(zone_total - zone_occupied, 0)} 空余 / {zone_total} 总数"
+            )
+    return "\n".join(lines)
+
+
+def format_parking_traffic_summary(data: Optional[dict]) -> str:
+    if not data:
+        return "暂无车流量统计数据。"
+    return "\n".join(
+        [
+            "停车场车流量统计：",
+            f"- 数据源：{data.get('source') or 'real'}",
+            f"- 今日进场：{data.get('todayInCount', 0)}",
+            f"- 今日出场：{data.get('todayOutCount', 0)}",
+            f"- 今日净流入：{data.get('todayNetFlow', 0)}",
+            f"- 今日总流量：{data.get('todayTotalFlow', 0)}",
+            f"- 最近进场：{data.get('latestInCount', 0)}",
+            f"- 最近出场：{data.get('latestOutCount', 0)}",
+            f"- 最近净流入：{data.get('latestNetFlow', 0)}",
+            f"- 更新时间：{data.get('updateTime') or '未知'}",
+        ]
+    )
+
+
+def format_environment_realtime(data: Optional[dict]) -> str:
+    if not data:
+        return "暂无实时环境数据。"
+    return "\n".join(
+        [
+            "社区实时环境：",
+            f"- 监控点ID：{data.get('monitorId') or '-'}",
+            f"- 温度：{_format_number(data.get('temperature'), '℃')}",
+            f"- 湿度：{_format_number(data.get('humidity'), '%')}",
+            f"- PM2.5：{_format_number(data.get('pm25'))}",
+            f"- 可燃气体：{_format_number(data.get('combustibleGas'), ' ppm')}",
+            f"- AQI：{data.get('aqi') if data.get('aqi') is not None else '未知'}",
+            f"- 更新时间：{data.get('createTime') or '未知'}",
+        ]
+    )
+
+
+def format_environment_trend(data: Optional[Sequence[dict]], *, range_name: str = "day") -> str:
+    if not data:
+        return "暂无环境趋势数据。"
+    label = {"day": "今日", "week": "本周", "month": "本月"}.get(range_name, range_name)
+    selected = list(data)[-8:]
+    lines = [f"社区环境趋势（{label}）：共 {len(data)} 个点，展示最近 {len(selected)} 个。", ""]
+    for item in selected:
+        lines.append(
+            f"- {item.get('label') or item.get('time') or item.get('createTime') or '未知时间'}："
+            f"湿度 {_format_number(item.get('humidity'), '%')}，"
+            f"PM2.5 {_format_number(item.get('pm25'))}，"
+            f"可燃气体 {_format_number(item.get('combustibleGas'), ' ppm')}，"
+            f"AQI {item.get('aqi') if item.get('aqi') is not None else '未知'}"
+        )
+    return "\n".join(lines)

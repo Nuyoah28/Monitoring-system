@@ -49,6 +49,13 @@ LOCAL_CAPABILITY_KEYWORDS = [
     "功能",
     "介绍一下",
 ]
+OWNER_PROFILE_KEYWORDS = ["个人信息", "个人资料", "我的资料", "我的信息", "手机号", "常驻区域", "消息提醒"]
+OWNER_MESSAGE_KEYWORDS = ["社区提醒", "系统消息", "通知", "提醒", "公告"]
+OWNER_VISITOR_KEYWORDS = ["访客", "来访", "访客登记", "访客预约"]
+OWNER_REPAIR_KEYWORDS = ["报修", "维修", "故障", "维修记录", "报修记录"]
+PARKING_KEYWORDS = ["停车", "车位", "空车位", "停车场", "地库"]
+TRAFFIC_FLOW_KEYWORDS = ["车流", "车流量", "进场", "出场", "净流入", "流量"]
+ENVIRONMENT_KEYWORDS = ["环境", "空气", "空气质量", "aqi", "pm2.5", "pm25", "温度", "湿度", "可燃气体"]
 NON_RETRYABLE_SPARK_MARKERS = [
     "appidnoautherror",
     "11200",

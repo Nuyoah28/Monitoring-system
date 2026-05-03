@@ -1,6 +1,6 @@
 {
   "backend": {
-    "base_url": "http://123.56.248.17:10215/api/v1",
+    "base_url": "http://172.20.10.3:10215/api/v1",
     "username": "root",
     "password": "123456"
   },

@@ -125,7 +125,11 @@ class SkillSupport:
             return None
         return best_monitor
 
-    def extract_time_window(self, params: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+    def extract_time_window(
+        self,
+        params: dict[str, Any],
+        request_context: Optional[RequestContext] = None,
+    ) -> tuple[Optional[str], Optional[str]]:
         time_range = params.get("time_range")
         if isinstance(time_range, dict):
             start_time = str(time_range.get("start") or "").strip() or None
@@ -136,7 +140,8 @@ class SkillSupport:
         time_text = str(params.get("time_text") or "").strip()
         if not time_text:
             return None, None
-        return extract_time_range(time_text, now=request_context.current_time)
+        now = request_context.current_time if request_context else None
+        return extract_time_range(time_text, now=now)
 
     def _normalize_int_list(self, value: Any) -> list[int]:
         if value is None:
@@ -227,7 +232,7 @@ class SkillSupport:
         case_types = self._normalize_int_list(params.get("case_types"))
         warning_levels = self._normalize_int_list(params.get("warning_levels"))
         status = safe_int(params.get("status"))
-        start_time, end_time = self.extract_time_window(params)
+        start_time, end_time = self.extract_time_window(params, request_context)
 
         alarms = self.query_alarm_union(
             request_context,
@@ -258,7 +263,7 @@ class SkillSupport:
         case_types = self._normalize_int_list(params.get("case_types"))
         warning_levels = self._normalize_int_list(params.get("warning_levels"))
         status = safe_int(params.get("status"))
-        start_time, end_time = self.extract_time_window(params)
+        start_time, end_time = self.extract_time_window(params, request_context)
 
         alarms = self.query_alarm_union(
             request_context,
@@ -382,7 +387,7 @@ class SkillSupport:
             monitor.get("id"),
             user_token=request_context.user_token,
         )
-        start_time, end_time = self.extract_time_window(params)
+        start_time, end_time = self.extract_time_window(params, request_context)
         if weather_list and (start_time or end_time):
             weather_list = [
                 item for item in weather_list
@@ -417,3 +422,72 @@ class SkillSupport:
             f"已更新 Mamba-YOLO 开放世界侦测目标：{', '.join(prompts)}。\n"
             f"算法侧翻译结果：{translated}。"
         )
+
+    def handle_get_owner_profile(self, request_context: RequestContext, params: dict[str, Any]) -> str:
+        del params
+        if not request_context.user_token:
+            return "请先登录业主端账号后再查询个人资料。"
+        profile = self.backend.get_owner_profile(user_token=request_context.user_token)
+        self.remember_tool_state(request_context, "get_owner_profile", {})
+        return formatters.format_owner_profile(profile)
+
+    def handle_get_owner_messages(self, request_context: RequestContext, params: dict[str, Any]) -> str:
+        if not request_context.user_token:
+            return "请先登录业主端账号后再查询社区提醒。"
+        limit = safe_int(params.get("limit"), 8) or 8
+        messages = self.backend.get_owner_messages(user_token=request_context.user_token)
+        self.remember_tool_state(request_context, "get_owner_messages", params)
+        return formatters.format_owner_messages(messages, limit=max(1, min(limit, 20)))
+
+    def handle_get_owner_visitors(self, request_context: RequestContext, params: dict[str, Any]) -> str:
+        if not request_context.user_token:
+            return "请先登录业主端账号后再查询访客登记。"
+        limit = safe_int(params.get("limit"), 8) or 8
+        visitors = self.backend.get_owner_visitors(user_token=request_context.user_token)
+        self.remember_tool_state(request_context, "get_owner_visitors", params)
+        return formatters.format_owner_visitors(visitors, limit=max(1, min(limit, 20)))
+
+    def handle_get_owner_repairs(self, request_context: RequestContext, params: dict[str, Any]) -> str:
+        if not request_context.user_token:
+            return "请先登录业主端账号后再查询报修记录。"
+        limit = safe_int(params.get("limit"), 8) or 8
+        repairs = self.backend.get_owner_repairs(user_token=request_context.user_token)
+        self.remember_tool_state(request_context, "get_owner_repairs", params)
+        return formatters.format_owner_repairs(repairs, limit=max(1, min(limit, 20)))
+
+    def handle_get_parking_realtime(self, request_context: RequestContext, params: dict[str, Any]) -> str:
+        del request_context
+        monitor_id = safe_int(params.get("monitor_id"), 1) or 1
+        source = str(params.get("source") or "real").strip().lower()
+        if source not in {"real", "mock"}:
+            source = "real"
+        data = self.backend.get_parking_realtime(monitor_id=monitor_id, source=source)
+        if data is None and source == "real":
+            data = self.backend.get_parking_realtime(monitor_id=monitor_id, source="mock")
+        return formatters.format_parking_realtime(data)
+
+    def handle_get_parking_traffic_summary(self, request_context: RequestContext, params: dict[str, Any]) -> str:
+        del request_context
+        monitor_id = safe_int(params.get("monitor_id"), 1) or 1
+        source = str(params.get("source") or "real").strip().lower()
+        if source not in {"real", "mock"}:
+            source = "real"
+        data = self.backend.get_parking_traffic_summary(monitor_id=monitor_id, source=source)
+        if data is None and source == "real":
+            data = self.backend.get_parking_traffic_summary(monitor_id=monitor_id, source="mock")
+        return formatters.format_parking_traffic_summary(data)
+
+    def handle_get_environment_realtime(self, request_context: RequestContext, params: dict[str, Any]) -> str:
+        del request_context
+        monitor_id = safe_int(params.get("monitor_id"), 1) or 1
+        data = self.backend.get_environment_realtime(monitor_id=monitor_id)
+        return formatters.format_environment_realtime(data)
+
+    def handle_get_environment_trend(self, request_context: RequestContext, params: dict[str, Any]) -> str:
+        del request_context
+        monitor_id = safe_int(params.get("monitor_id"), 1) or 1
+        range_name = str(params.get("range") or params.get("range_name") or "day").strip().lower()
+        if range_name not in {"day", "week", "month"}:
+            range_name = "day"
+        data = self.backend.get_environment_trend(monitor_id=monitor_id, range_name=range_name)
+        return formatters.format_environment_trend(data, range_name=range_name)

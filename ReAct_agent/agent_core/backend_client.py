@@ -257,3 +257,126 @@ class BackendClient:
                 if isinstance(value, str) and value.strip():
                     return value.strip()
         return None
+
+    def get_owner_profile(self, *, user_token: Optional[str] = None) -> Optional[dict]:
+        response = self._request(
+            "GET",
+            "/user/profile",
+            timeout=8,
+            require_auth=True,
+            user_token=user_token,
+        )
+        data = response.json()
+        if data.get("code") != "00000":
+            return None
+        return data.get("data")
+
+    def get_owner_messages(self, *, user_token: Optional[str] = None) -> Optional[list[dict]]:
+        response = self._request(
+            "GET",
+            "/system/message/getMessage",
+            timeout=8,
+            require_auth=True,
+            user_token=user_token,
+        )
+        data = response.json()
+        if data.get("code") != "00000":
+            return None
+        result = data.get("data")
+        return result if isinstance(result, list) else []
+
+    def get_owner_visitors(self, *, user_token: Optional[str] = None) -> Optional[list[dict]]:
+        response = self._request(
+            "GET",
+            "/visitor/list",
+            timeout=8,
+            require_auth=True,
+            user_token=user_token,
+        )
+        data = response.json()
+        if data.get("code") != "00000":
+            return None
+        result = data.get("data")
+        return result if isinstance(result, list) else []
+
+    def get_owner_repairs(self, *, user_token: Optional[str] = None) -> Optional[list[dict]]:
+        response = self._request(
+            "GET",
+            "/device-repair/list",
+            timeout=8,
+            require_auth=True,
+            user_token=user_token,
+        )
+        data = response.json()
+        if data.get("code") != "00000":
+            return None
+        result = data.get("data")
+        return result if isinstance(result, list) else []
+
+    def get_parking_realtime(
+        self,
+        *,
+        monitor_id: int = 1,
+        source: str = "real",
+    ) -> Optional[dict]:
+        response = self._request(
+            "GET",
+            "/parking/realtime",
+            params={"monitorId": monitor_id, "source": source},
+            timeout=8,
+        )
+        data = response.json()
+        if data.get("code") != "00000":
+            return None
+        return data.get("data")
+
+    def get_parking_traffic_summary(
+        self,
+        *,
+        monitor_id: int = 1,
+        source: str = "real",
+    ) -> Optional[dict]:
+        response = self._request(
+            "GET",
+            "/parking/traffic/summary",
+            params={"monitorId": monitor_id, "source": source},
+            timeout=8,
+        )
+        data = response.json()
+        if data.get("code") != "00000":
+            return None
+        return data.get("data")
+
+    def get_environment_realtime(
+        self,
+        *,
+        monitor_id: int = 1,
+    ) -> Optional[dict]:
+        response = self._request(
+            "GET",
+            "/env/realtime",
+            params={"monitorId": monitor_id},
+            timeout=8,
+        )
+        data = response.json()
+        if data.get("code") != "00000":
+            return None
+        return data.get("data")
+
+    def get_environment_trend(
+        self,
+        *,
+        monitor_id: int = 1,
+        range_name: str = "day",
+    ) -> Optional[list[dict]]:
+        response = self._request(
+            "GET",
+            "/env/trend",
+            params={"monitorId": monitor_id, "range": range_name},
+            timeout=8,
+        )
+        data = response.json()
+        if data.get("code") != "00000":
+            return None
+        result = data.get("data")
+        return result if isinstance(result, list) else []

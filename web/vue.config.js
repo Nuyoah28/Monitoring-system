@@ -4,7 +4,7 @@ const trimRightSlash = (value) => String(value || '').replace(/\/+$/, '')
 const proxyTarget = trimRightSlash(
   process.env.VUE_APP_DEV_PROXY_TARGET ||
   process.env.VUE_APP_API_BASE_URL ||
-  'http://172.20.10.2:10215',
+  'http://172.20.10.3:10215',
 )
 
 module.exports = defineConfig({
