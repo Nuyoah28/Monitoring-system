@@ -112,6 +112,7 @@ class ActionRecognizer:
 
         self.track_buffers = {}
         self.track_boxes = {}
+        self.track_motion = {}
         self.track_last_seen = {}
         self.track_last_probs = {}
         self.track_last_result = {}
@@ -220,7 +221,53 @@ class ActionRecognizer:
     def _box_center(box):
         return np.array([(box[0] + box[2]) * 0.5, (box[1] + box[3]) * 0.5], dtype=np.float32)
 
-    def _assign_tracks(self, bboxes, iou_threshold=0.3):
+    def _predict_track_box(self, track_id):
+        box = self.track_boxes[track_id].astype(np.float32)
+        motion = self.track_motion.get(track_id)
+        if motion is None:
+            motion = np.zeros(4, dtype=np.float32)
+        return box + motion
+
+    @staticmethod
+    def _match_score(det_box, pred_box):
+        xa1, ya1, xa2, ya2 = det_box
+        xb1, yb1, xb2, yb2 = pred_box
+        inter_x1 = max(xa1, xb1)
+        inter_y1 = max(ya1, yb1)
+        inter_x2 = min(xa2, xb2)
+        inter_y2 = min(ya2, yb2)
+        iw = max(0.0, inter_x2 - inter_x1)
+        ih = max(0.0, inter_y2 - inter_y1)
+        inter = iw * ih
+        iou = 0.0
+        if inter > 0:
+            area_a = max(0.0, xa2 - xa1) * max(0.0, ya2 - ya1)
+            area_b = max(0.0, xb2 - xb1) * max(0.0, yb2 - yb1)
+            denom = area_a + area_b - inter
+            iou = inter / denom if denom > 1e-6 else 0.0
+
+        det_center = np.array([(xa1 + xa2) * 0.5, (ya1 + ya2) * 0.5], dtype=np.float32)
+        pred_center = np.array([(xb1 + xb2) * 0.5, (yb1 + yb2) * 0.5], dtype=np.float32)
+        det_w = max(0.0, xa2 - xa1)
+        det_h = max(0.0, ya2 - ya1)
+        pred_w = max(0.0, xb2 - xb1)
+        pred_h = max(0.0, yb2 - yb1)
+        det_diag = max(float(np.hypot(det_w, det_h)), 1.0)
+        pred_diag = max(float(np.hypot(pred_w, pred_h)), 1.0)
+        center_dist = float(np.linalg.norm(det_center - pred_center))
+        center_norm = max(0.5 * (det_diag + pred_diag), 1.0)
+        center_sim = max(0.0, 1.0 - center_dist / center_norm)
+
+        det_area = det_w * det_h
+        pred_area = pred_w * pred_h
+        size_sim = 0.0
+        if det_area > 1e-6 and pred_area > 1e-6:
+            size_sim = min(det_area, pred_area) / max(det_area, pred_area)
+
+        return 0.55 * iou + 0.30 * center_sim + 0.15 * size_sim
+
+    def _assign_tracks(self, bboxes, match_threshold=0.30):
+        """Match detections to existing tracks with motion-aware scores."""
         det_count = len(bboxes)
         assigned = [-1] * det_count
         if det_count == 0:
@@ -233,9 +280,10 @@ class ActionRecognizer:
         pairs = []
         for det_idx, box in enumerate(bboxes):
             for track_id in track_ids:
-                iou = self._iou(box, self.track_boxes[track_id])
-                if iou >= iou_threshold:
-                    pairs.append((iou, det_idx, track_id))
+                pred_box = self._predict_track_box(track_id)
+                score = self._match_score(box, pred_box)
+                if score >= match_threshold:
+                    pairs.append((score, det_idx, track_id))
 
         pairs.sort(reverse=True, key=lambda item: item[0])
         used_det = set()
@@ -253,6 +301,7 @@ class ActionRecognizer:
         self.next_track_id += 1
         self.track_buffers[track_id] = deque(maxlen=self.buffer_size)
         self.track_boxes[track_id] = box.astype(np.float32)
+        self.track_motion[track_id] = np.zeros(4, dtype=np.float32)
         self.track_last_seen[track_id] = self.frame_idx
         self.track_last_probs[track_id] = np.zeros((len(self.label_order),), dtype=np.float32)
         self.track_last_result[track_id] = {
@@ -277,6 +326,7 @@ class ActionRecognizer:
             self.track_last_seen.pop(track_id, None)
             self.track_last_probs.pop(track_id, None)
             self.track_last_result.pop(track_id, None)
+            self.track_motion.pop(track_id, None)
             self.prob_hist.pop(track_id, None)
             self.fsm.pop(track_id)
 
@@ -296,6 +346,7 @@ class ActionRecognizer:
             self.track_last_seen.pop(track_id, None)
             self.track_last_probs.pop(track_id, None)
             self.track_last_result.pop(track_id, None)
+            self.track_motion.pop(track_id, None)
             self.prob_hist.pop(track_id, None)
             self.fsm.pop(track_id)
 
@@ -405,7 +456,13 @@ class ActionRecognizer:
                 track_id = self._new_track(box)
                 assigned_track_ids[det_idx] = track_id
 
-            self.track_boxes[track_id] = box
+            prev_box = self.track_boxes.get(track_id)
+            if prev_box is not None:
+                prev_motion = self.track_motion.get(track_id, np.zeros(4, dtype=np.float32))
+                delta = box.astype(np.float32) - prev_box.astype(np.float32)
+                self.track_motion[track_id] = 0.7 * prev_motion + 0.3 * delta
+
+            self.track_boxes[track_id] = box.astype(np.float32)
             self.track_last_seen[track_id] = self.frame_idx
             self.track_buffers[track_id].append(
                 self._sequence_entry(points[det_idx], frame_shape=frame_shape)
@@ -425,6 +482,9 @@ class ActionRecognizer:
             and self.frame_idx % self.infer_interval == 0
         ]
 
+        # ���� infer_interval ��Ϊ���ٿ��أ�����ȻҪ����ʵ֡�ƽ�ƽ�����ڣ�
+        # ���� FSM ��ʱ��Ż����Ƶ����ʵʱ����롣
+        frame_probs = {}
         if infer_track_ids:
             batch = []
             for track_id in infer_track_ids:
@@ -451,8 +511,20 @@ class ActionRecognizer:
                 probs = probs_tensor.detach().cpu().numpy()
 
             for idx_in_batch, track_id in enumerate(infer_track_ids):
-                self.track_last_probs[track_id] = probs[idx_in_batch]
-                self.prob_hist[track_id].append(probs[idx_in_batch])
+                prob_vec = probs[idx_in_batch]
+                self.track_last_probs[track_id] = prob_vec
+                frame_probs[track_id] = prob_vec
+
+        # �ø�����ʷ����ʵ֡ʱ���ƽ���
+        # ���������֡�������һ�θ��ʣ�����ʱ�䴰���ֿն���
+        for track_id in active_track_ids:
+            prob_vec = frame_probs.get(track_id)
+            if prob_vec is not None:
+                self.prob_hist[track_id].append(prob_vec)
+            elif self.prob_hist.get(track_id):
+                # ��һ֡û���µ����������������һ�θ��ʣ�
+                # ��ƽ����ȷ��/�ͷż�����Ȼ��֡�ƽ���
+                self.prob_hist[track_id].append(self.track_last_probs[track_id])
 
         nearby_flags = self._compute_nearby_flags(active_track_ids)
         global_result = {"fall": False, "punch": False, "wave": False}
@@ -490,3 +562,4 @@ class ActionRecognizer:
 
     def get_last_overlays(self):
         return self.last_overlays
+

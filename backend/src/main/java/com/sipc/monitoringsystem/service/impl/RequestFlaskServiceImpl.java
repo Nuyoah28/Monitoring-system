@@ -23,6 +23,14 @@ public class RequestFlaskServiceImpl implements RequestFlaskService {
 
     private final String FLASK_TOKEN = "sipc115";
 
+    private String buildFlaskUrl(String ip, String path) {
+        String host = ip == null ? "" : ip.trim();
+        if (host.startsWith("http://") || host.startsWith("https://")) {
+            return host + path;
+        }
+        return "http://" + host + path;
+    }
+
 
 
     @Override
@@ -42,7 +50,7 @@ public class RequestFlaskServiceImpl implements RequestFlaskService {
         mp.put("areaList",area);
         ObjectMapper objectMapper = new ObjectMapper();
         String json = objectMapper.writeValueAsString(mp);
-        String response = HttpUtils.postJson("https://"+ip+"/api/v1/monitor-device/area",json,FLASK_TOKEN);
+        String response = HttpUtils.postJson(buildFlaskUrl(ip, "/api/v1/monitor-device/area"), json, FLASK_TOKEN);
         updateMonitorAreaRes res = JacksonUtils.json2pojo(response, updateMonitorAreaRes.class);
         return res != null && "success".equals(res.getMsg());
     }
@@ -56,7 +64,7 @@ public class RequestFlaskServiceImpl implements RequestFlaskService {
         mp.put("typeList",ability);
         ObjectMapper objectMapper = new ObjectMapper();
         String json = objectMapper.writeValueAsString(mp);
-        String response = HttpUtils.postJson("https://"+ip+"/api/v1/monitor-device/type",json,FLASK_TOKEN);
+        String response = HttpUtils.postJson(buildFlaskUrl(ip, "/api/v1/monitor-device/type"), json, FLASK_TOKEN);
         updateMonitorAreaRes res = JacksonUtils.json2pojo(response, updateMonitorAreaRes.class);
         return res != null && "success".equals(res.getMsg());
     }
@@ -64,6 +72,6 @@ public class RequestFlaskServiceImpl implements RequestFlaskService {
     @Override
     @Cacheable(value = "MonitorImg",key = "#ip",unless = "#result==null")
     public String getMonitorImg(String ip) throws RuntimeException{
-        return HttpUtils.GetBase64("https://"+ip+"/api/v1/monitor-device/image",FLASK_TOKEN);
+        return HttpUtils.GetBase64(buildFlaskUrl(ip, "/api/v1/monitor-device/image"), FLASK_TOKEN);
     }
 }

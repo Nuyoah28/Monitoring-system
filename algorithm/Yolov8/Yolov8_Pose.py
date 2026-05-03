@@ -112,7 +112,7 @@ class LoadPoseEngine:
         scores = scores[indices]
         points = points[indices]
 
-        # 处理关节点的正确位置
+        # 处理关键点的正确位置
         for i in range(self.num_nodes):
             points[:, i * 3] = (points[:, i * 3] - self.dif_w) * self.factor
             points[:, i * 3 + 1] = (points[:, i * 3 + 1] - self.dif_h) * self.factor
@@ -120,19 +120,14 @@ class LoadPoseEngine:
         # ----
         # points shape is [N, 17, 3]
         # N is number of poses, 17 is keypoints, 3 is (x, y, confidence)
-        keypoint_conf = torch.zeros((points.shape[0], self.num_nodes))
-        for i in range(self.num_nodes):
-            keypoint_conf[:, i] = points[:, i * 3 + 2]
-        keypoint_conf_sum = keypoint_conf.sum(dim=1)
-        # print(keypoint_conf_sum)
-        valid_poses_index = np.where(keypoint_conf_sum > 10)[0]
+        keypoint_conf_sum = points[:, 2::3].sum(dim=1)
+        valid_poses_index = (keypoint_conf_sum > 10).nonzero(as_tuple=False).squeeze(1)
         bboxes = bboxes[valid_poses_index]
         scores = scores[valid_poses_index]
         points = points[valid_poses_index]
         return torch.round(bboxes), scores, points
 
     def __call__(self, img_src):
-        self._model_process(img_src)
         bboxes, scores, points = self._model_process(img_src)
         bboxes, scores, points = self._nms(bboxes, scores, points)
         return bboxes, scores, points
@@ -329,9 +324,9 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             draw_on_src(np_img, boxes1[vehicle_indices], idxs1[vehicle_indices])
             
         # ========================================================
-        # 【新增逻辑】：让前端动态传进来的自定义词汇也能被画上红框
-        # 固定业务目标顺序为 fire/smoke/overflow/garbage/garbage bin/bicycle/motorcycle，
-        # 临时 prompt 的起始 label 从前 7 个业务组之后开始。
+        # 【新增逻辑】：让前端动态传进来的自定义词汇也能被画上红框（不触发报警，只画框）。因为前端的自定义词汇可能会随时变更，所以我们不把它们固定死在某个 caseType 上了。
+        # 固定业务目标顺序为 fire/smoke/overflow/garbage/garbage bin/bicycle/motorcycle�?
+        # 临时 prompt 的起始label 从前 7 个业务组之后开始。
         # ========================================================
         group_label_ids = getattr(infer1, 'business_label_groups', None)
         if group_label_ids and len(group_label_ids) > 7:
@@ -340,7 +335,7 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
         else:
             custom_indices = np.where(idxs1 >= 7)[0]
         if len(custom_indices) > 0:
-            # 这些临时加进来的目标我们不管 TYPE_LIST 开关，强制画出来供人观看效果。
+            # 这些临时加进来的目标我们不管 TYPE_LIST 开关，强制画出来供人观看效果�?
             draw_on_src(np_img, boxes1[custom_indices], idxs1[custom_indices])
 
         # Resize output

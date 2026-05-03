@@ -513,10 +513,6 @@
 mysql -u root -p
 ```
 
-如果�?Ubuntu �?root 使用 `auth_socket`�?
-```bash
-sudo mysql
-```
 
 ### 2. 创建数据�?
 ```sql
