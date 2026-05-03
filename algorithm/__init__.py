@@ -13,6 +13,15 @@ logger = Logger.setup_logger()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(RuntimeConfig)
+
+    @app.after_request
+    def add_cors_headers(response):
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Range"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Length, Content-Range, Accept-Ranges"
+        return response
+
     print(app.config)
     config_blueprint(app)
     try:

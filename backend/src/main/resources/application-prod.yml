@@ -5,7 +5,7 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:SweatPear}?serverTimezone=GMT%2B8&rewriteBatchedStatements=true&tinyInt1isBit=false}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:123.56.248.17}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:SweatPear}?serverTimezone=GMT%2B8&rewriteBatchedStatements=true&tinyInt1isBit=false}
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:fast2005}
     druid:
@@ -33,7 +33,7 @@ spring:
           max-idle: 8
           min-idle: 0
           timeout: 10000ms
-      password: ${REDIS_PASSWORD:123456}
+      password: ${REDIS_PASSWORD:}
   cache:
     type: redis
     redis:
@@ -41,8 +41,8 @@ spring:
       use-key-prefix: true
 
 oss:
-  id: ${COS_SECRET_ID:}
-  pass: ${COS_SECRET_KEY:}
+  id: ${COS_SECRET_ID:AKID6VKzShiZDi6SggVAj6KMBrLagfS1Rjtt}
+  pass: ${COS_SECRET_KEY:pQtCH9nI8lBSYXKxZ3NcfWActDONCpLg}
   region: ${COS_REGION:ap-beijing}
   bucket: ${COS_BUCKET:my-server-1397492316}
   base-url: ${COS_BASE_URL:https://my-server-1397492316.cos.ap-beijing.myqcloud.com}

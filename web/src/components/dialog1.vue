@@ -26,7 +26,7 @@ import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import flvjs from 'flv.js';
 import { useUserStore } from '@/stores/user';
 import axios from 'axios';
-import { resolveDemoAlarmVideo } from '@/config/config';
+import { baseUrl, resolveDemoAlarmVideo } from '@/config/config';
 
 interface DialogItem {
   eventName: string;
@@ -35,7 +35,7 @@ interface DialogItem {
   level?: string;
   deal?: string;
   video?: string;
-  [key: string]: any; // 允许其他属性
+  [key: string]: any;
 }
 
 interface Props {
@@ -49,7 +49,6 @@ const props = withDefaults(defineProps<Props>(), {
   })
 });
 
-// 定义 emits
 const emit = defineEmits<{
   updateDialogVisible1: [visible: boolean];
 }>();
@@ -57,7 +56,10 @@ const emit = defineEmits<{
 const localDialogVisible = ref<boolean>(true);
 const videoElement = ref<HTMLVideoElement | null>(null);
 let video: any = null;
-let flvPlayer: any = null; // 添加全局flvPlayer引用用于销毁
+let flvPlayer: any = null;
+let clipRetryTimer: number | null = null;
+let clipRetryCount = 0;
+const maxClipRetryCount = 24;
 
 const clipSummary = computed(() => {
   const item = props.item || {};
@@ -76,31 +78,40 @@ const withNoCache = (url: string): string => {
   return hash ? `${nextUrl}#${hash}` : nextUrl;
 };
 
-const resolvePlayableVideo = (source?: string | null): string => {
-  if (!source) return '';
-  return resolveDemoAlarmVideo(String(source));
+const normalizeVideoUrl = (rawUrl: string): string => {
+  if (!rawUrl) return '';
+  const playableUrl = resolveDemoAlarmVideo(rawUrl);
+  const trimmed = playableUrl.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/')) {
+    return new URL(trimmed, `${baseUrl}/`).toString();
+  }
+  try {
+    return new URL(trimmed).toString();
+  } catch {
+    return trimmed;
+  }
 };
 
-// 视频错误状态
 const videoLoadError = ref<boolean>(false);
 const videoErrorMessage = ref<string>('');
 
 const handleVideoError = (event: Event): void => {
   console.error('视频加载错误:', event);
   videoLoadError.value = true;
-  const videoElement = event.target as HTMLVideoElement;
-  if (videoElement?.error) {
-    switch (videoElement.error.code) {
-      case videoElement.error.MEDIA_ERR_ABORTED:
+  const target = event.target as HTMLVideoElement;
+  if (target?.error) {
+    switch (target.error.code) {
+      case target.error.MEDIA_ERR_ABORTED:
         videoErrorMessage.value = '视频加载被中止';
         break;
-      case videoElement.error.MEDIA_ERR_NETWORK:
+      case target.error.MEDIA_ERR_NETWORK:
         videoErrorMessage.value = '网络错误导致视频加载失败';
         break;
-      case videoElement.error.MEDIA_ERR_DECODE:
+      case target.error.MEDIA_ERR_DECODE:
         videoErrorMessage.value = '视频解码失败';
         break;
-      case videoElement.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+      case target.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
         videoErrorMessage.value = '不支持的视频格式或来源';
         break;
       default:
@@ -112,107 +123,50 @@ const handleVideoError = (event: Event): void => {
   }
 };
 
-const handleClose = (): void => {
-  // 关闭对话框前销毁播放器实例
-  destroyFlvPlayer();
-  
-  localDialogVisible.value = false; // 处理关闭操作
-  emit('updateDialogVisible1', localDialogVisible.value); // 同时通知父组件
+const clearClipRetryTimer = (): void => {
+  if (clipRetryTimer !== null) {
+    window.clearTimeout(clipRetryTimer);
+    clipRetryTimer = null;
+  }
 };
 
-const userStore = useUserStore();
+const isLocalAlarmClip = (url: string): boolean => url.includes('/api/v1/alarm/clips/');
 
-const playVideoSource = (source?: string | null): boolean => {
-  const resolvedVideo = resolvePlayableVideo(source);
-  if (!resolvedVideo || !videoElement.value) return false;
+const waitForClipAndRetry = async (url: string): Promise<boolean> => {
+  if (!isLocalAlarmClip(url)) return true;
 
-  video = resolvedVideo;
-  const playUrl = withNoCache(resolvedVideo);
-  const isMp4 = playUrl.toLowerCase().split('?')[0].endsWith('.mp4');
-
-  if (isMp4) {
-    videoElement.value.src = playUrl;
-    videoElement.value.load();
-    return true;
-  }
-
-  if (flvjs.isSupported()) {
-    try {
-      flvPlayer = flvjs.createPlayer({
-        type: 'flv',
-        url: playUrl
-      }, {
-        enableWorker: false,
-        lazyLoad: false,
-        deferLoadAfterSourceOpen: false,
-        statisticsInfoReportInterval: 600,
-        autoCleanupSourceBuffer: true,
-      } as any);
-      flvPlayer.attachMediaElement(videoElement.value);
-      flvPlayer.load();
-
-      flvPlayer.on(flvjs.Events.ERROR, (errType: any, errDetail: any) => {
-        console.error('FLV播放器错误:', errType, errDetail);
-        destroyFlvPlayer();
-        if (videoElement.value) {
-          videoElement.value.src = playUrl;
-          videoElement.value.load();
-        }
-      });
-
-      videoElement.value.addEventListener('click', () => {
-        if (flvPlayer && !flvPlayer.hasPlayerStarted()) {
-          const playPromise = flvPlayer.play();
-          if (playPromise && typeof playPromise.catch === 'function') {
-            playPromise.catch((error: any) => {
-              console.log('Autoplay failed:', error);
-            });
-          }
-        }
-      }, { once: true });
+  try {
+    const response = await fetch(withNoCache(url), {
+      method: 'HEAD',
+      cache: 'no-store',
+    });
+    if (response.ok) {
+      clipRetryCount = 0;
       return true;
-    } catch (error) {
-      console.error('创建FLV播放器失败:', error);
     }
+    if (response.status !== 404) {
+      console.warn('Alarm clip is not ready:', response.status, url);
+    }
+  } catch (error) {
+    console.warn('Failed to probe alarm clip:', error);
   }
 
-  videoElement.value.src = playUrl;
-  videoElement.value.load();
-  return true;
-};
-
-const getVideoData = (): void => {
-  videoLoadError.value = false;
-  videoErrorMessage.value = '';
-  destroyFlvPlayer();
-
-  console.log('获取报警视频', props.item.video);
-
-  // 报警详情优先播放报警记录中的片段。模拟推送保存的是 SIM_* 标识，这里会先转换成演示 mp4 地址。
-  if (playVideoSource(props.item.video)) {
-    return;
-  }
-
-  const token = userStore.token;
-  axios.get('/monitor', {
-    headers: {
-      Authorization: token,
-    },
-  }).then((response: any) => {
-    console.log('dialog', response?.data?.chartData);
-    if (!playVideoSource(response?.data?.chartData)) {
-      videoLoadError.value = true;
-      videoErrorMessage.value = '没有可播放的视频地址';
-    }
-  })
-  .catch((error: any) => {
-    console.error('Error fetching video data:', error);
+  if (clipRetryCount >= maxClipRetryCount) {
     videoLoadError.value = true;
-    videoErrorMessage.value = '没有可播放的视频地址';
-  });
+    videoErrorMessage.value = '视频片段还未生成，请稍后重新打开';
+    return false;
+  }
+
+  clipRetryCount += 1;
+  videoLoadError.value = true;
+  videoErrorMessage.value = `视频片段生成中，请稍候...(${clipRetryCount}/${maxClipRetryCount})`;
+  clearClipRetryTimer();
+  clipRetryTimer = window.setTimeout(() => {
+    getVideoData();
+  }, 1500);
+  return false;
 };
 
-// 销毁flv播放器实例
 const destroyFlvPlayer = (): void => {
   if (flvPlayer) {
     flvPlayer.unload?.();
@@ -227,27 +181,132 @@ const destroyFlvPlayer = (): void => {
   }
 };
 
+const bindNativeVideo = (playUrl: string): void => {
+  if (!videoElement.value) return;
+  videoElement.value.src = playUrl;
+  videoElement.value.load();
+};
+
+const playVideoUrl = async (rawUrl: string): Promise<void> => {
+  const normalizedUrl = normalizeVideoUrl(rawUrl);
+  if (!normalizedUrl) return;
+
+  if (!(await waitForClipAndRetry(normalizedUrl))) {
+    return;
+  }
+
+  videoLoadError.value = false;
+  videoErrorMessage.value = '';
+  const playUrl = withNoCache(normalizedUrl);
+  const isMp4 = playUrl.toLowerCase().split('?')[0].endsWith('.mp4');
+
+  if (isMp4 || !flvjs.isSupported() || !videoElement.value) {
+    bindNativeVideo(playUrl);
+    return;
+  }
+
+  try {
+    flvPlayer = flvjs.createPlayer({
+      type: 'flv',
+      url: playUrl,
+    }, {
+      enableWorker: false,
+      lazyLoad: false,
+      deferLoadAfterSourceOpen: false,
+      statisticsInfoReportInterval: 600,
+      autoCleanupSourceBuffer: true,
+    } as any);
+    flvPlayer.attachMediaElement(videoElement.value);
+    flvPlayer.load();
+
+    flvPlayer.on(flvjs.Events.ERROR, (errType: any, errDetail: any) => {
+      console.error('FLV播放器错误:', errType, errDetail);
+      destroyFlvPlayer();
+      bindNativeVideo(playUrl);
+    });
+
+    videoElement.value.addEventListener('click', () => {
+      if (flvPlayer && !flvPlayer.hasPlayerStarted()) {
+        const playPromise = flvPlayer.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((error: any) => {
+            console.log('Autoplay failed:', error);
+          });
+        }
+      }
+    }, { once: true });
+  } catch (error) {
+    console.error('创建FLV播放器失败:', error);
+    bindNativeVideo(playUrl);
+  }
+};
+
+const handleClose = (): void => {
+  clearClipRetryTimer();
+  destroyFlvPlayer();
+  localDialogVisible.value = false;
+  emit('updateDialogVisible1', localDialogVisible.value);
+};
+
+const userStore = useUserStore();
+
+const getVideoData = async (): Promise<void> => {
+  clearClipRetryTimer();
+  videoLoadError.value = false;
+  videoErrorMessage.value = '';
+  destroyFlvPlayer();
+
+  console.log('获取报警视频', props.item.video);
+
+  const normalizedVideo = normalizeVideoUrl(props.item.video || '');
+  if (normalizedVideo) {
+    await playVideoUrl(normalizedVideo);
+    return;
+  }
+
+  const token = userStore.token;
+  axios.get('/monitor', {
+    headers: {
+      Authorization: token,
+    },
+  }).then(async (response: any) => {
+    console.log('dialog', response?.data?.chartData);
+    const fallbackVideo = normalizeVideoUrl(response?.data?.chartData || '');
+    if (fallbackVideo) {
+      await playVideoUrl(fallbackVideo);
+      return;
+    }
+    videoLoadError.value = true;
+    videoErrorMessage.value = '没有可播放的视频地址';
+  })
+  .catch((error: any) => {
+    console.error('Error fetching video data:', error);
+    videoLoadError.value = true;
+    videoErrorMessage.value = '没有可播放的视频地址';
+  });
+};
+
 onMounted(() => {
   getVideoData();
 });
 
-// 组件卸载时销毁播放器
 onUnmounted(() => {
+  clearClipRetryTimer();
   destroyFlvPlayer();
 });
 
-// 监听 dialogVisible1 的变化
 watch(
   () => props.item,
   () => {
+    clearClipRetryTimer();
+    clipRetryCount = 0;
     destroyFlvPlayer();
     getVideoData();
   },
   { deep: true }
 );
 </script>
-  
-<style lang="less" scoped>
+  <style lang="less" scoped>
 .process-modal-mask {
   position: fixed;
   inset: 0;
@@ -367,4 +426,3 @@ watch(
   }
 }
 </style>
-  

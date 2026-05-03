@@ -2,7 +2,7 @@
   <view class="informBox">
     <view class="video">
       <video
-        :src="warnData.video"
+        :src="videoSrc"
         style="width: 328px; height: 246px; transition: 1s"
       ></video>
     </view>
@@ -89,12 +89,19 @@
 </template>
 
 <script>
+import { resolveDemoAlarmVideo } from '@/common/config.js'
+
 export default {
   name: "Edit",
   props: {
     warnData: {
       required: true,
       type: Object,
+    },
+  },
+  computed: {
+    videoSrc() {
+      return resolveDemoAlarmVideo(this.warnData && this.warnData.video);
     },
   },
   data() {

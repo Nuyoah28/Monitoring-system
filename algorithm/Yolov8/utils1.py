@@ -21,25 +21,37 @@ def update_event_names(categories: list):
     event_en = list(categories)
 
 
-def draw_on_src(img_src, boxes, class_ids):
-    # 左上角x 左上角y 框宽 框高 confidence
-    boxes = boxes.astype(np.int32)
+def draw_on_src(img_src, boxes, class_ids, categories=None, scores=None):
+    boxes = np.asarray(boxes, dtype=np.int32)
+    class_ids = np.asarray(class_ids, dtype=np.int32)
+    scores = None if scores is None else np.asarray(scores, dtype=np.float32)
+    labels = categories if categories is not None else event_en
+
     for i in range(len(class_ids)):
         class_id = int(class_ids[i])
         box = boxes[i]
-        cv.rectangle(img_src, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 2)
-        # 安全取类别名：超出范围时显示 class_N 而非崩溃
-        if class_id < len(event_en):
-            text = event_en[class_id]
-        else:
-            text = f"class_{class_id}"
-        font = cv.FONT_HERSHEY_SIMPLEX
-        fontScale = 1
-        thickness = 2
-        textX = box[0]
-        textY = 22 + box[1]
-        cv.putText(img_src, text, (textX, textY), font, fontScale, (0, 0, 255), thickness)
+        text = labels[class_id] if class_id < len(labels) else f"class_{class_id}"
+        if scores is not None and i < len(scores):
+            text = f"{text} {float(scores[i]):.2f}"
 
+        color = (0, 0, 255)
+        x1, y1, x2, y2 = [int(v) for v in box]
+        cv.rectangle(img_src, (x1, y1), (x2, y2), color, 2)
+
+        font = cv.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.75
+        thickness = 2
+        text_size, baseline = cv.getTextSize(text, font, font_scale, thickness)
+        text_x = max(0, x1)
+        text_y = max(text_size[1] + 8, y1 - 6)
+        cv.rectangle(
+            img_src,
+            (text_x, text_y - text_size[1] - baseline - 4),
+            (text_x + text_size[0] + 6, text_y + baseline),
+            color,
+            -1,
+        )
+        cv.putText(img_src, text, (text_x + 3, text_y - 3), font, font_scale, (255, 255, 255), thickness)
 def to_even(number):
     if number & 1:
         return number + 1

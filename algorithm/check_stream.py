@@ -1,59 +1,60 @@
 """
-RTMP流状态检查脚本
-用于验证RTMP流是否真正可用
+RTMP stream check helper.
+
+Usage:
+    python check_stream.py
+    python check_stream.py --url rtmp://127.0.0.1:1935:1935/live/raw
 """
 
-import cv2
+from __future__ import annotations
+
+import argparse
 import time
 
-def check_rtmp_stream(stream_url):
-    """检查RTMP流是否可用"""
-    print(f"正在检查流: {stream_url}")
+import cv2
+
+
+DEFAULT_STREAM_URL = "rtmp://123.56.248.17:1935/live/raw"
     
-    # 尝试连接到流
+
+def check_rtmp_stream(stream_url: str, attempts: int = 10, delay: float = 0.5) -> bool:
+    print(f"Checking stream: {stream_url}")
     cap = cv2.VideoCapture(stream_url)
-    
-    # 设置一些参数以改善连接
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    
-    # 尝试读取几帧以确认流是活动的
+
     success_count = 0
-    max_attempts = 10  # 尝试读取10次
-    
-    for i in range(max_attempts):
+    for idx in range(attempts):
         ret, frame = cap.read()
         if ret:
             success_count += 1
-            print(f"成功读取第 {i+1} 帧 (尺寸: {frame.shape})")
+            print(f"Read frame {idx + 1} successfully, size={frame.shape}")
         else:
-            print(f"第 {i+1} 次读取失败")
-        
-        time.sleep(0.5)  # 等待0.5秒再试
-    
-    cap.release()
-    
-    print(f"\n结果: 成功读取 {success_count}/{max_attempts} 帧")
-    
-    if success_count > 0:
-        print("✓ 流可用")
-        return True
-    else:
-        print("✗ 流不可用")
-        return False
+            print(f"Read frame {idx + 1} failed")
+        time.sleep(delay)
 
-def main():
-    # 检查原始流
-    raw_stream_url = "rtmp://localhost:1935/live/raw"
+    cap.release()
+
+    print(f"Result: {success_count}/{attempts} frames read")
+    if success_count > 0:
+        print("Stream is available")
+        return True
+
+    print("Stream is unavailable")
+    return False
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Check whether an RTMP stream is readable.")
+    parser.add_argument("--url", default=DEFAULT_STREAM_URL, help="RTMP stream url")
+    parser.add_argument("--attempts", type=int, default=10, help="Number of read attempts")
+    parser.add_argument("--delay", type=float, default=0.5, help="Delay between attempts")
+    args = parser.parse_args()
+
     print("=" * 50)
-    print("RTMP流状态检查")
+    print("RTMP stream check")
     print("=" * 50)
-    
-    check_rtmp_stream(raw_stream_url)
-    
-    print("\n如果流不可用，请检查:")
-    print("1. test.py 是否正在运行并向该地址推送")
-    print("2. RTMP服务器是否正确配置")
-    print("3. 网络连接是否正常")
+    check_rtmp_stream(args.url, attempts=args.attempts, delay=args.delay)
+
 
 if __name__ == "__main__":
     main()

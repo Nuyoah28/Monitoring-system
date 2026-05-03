@@ -28,6 +28,11 @@ LIMB_COLORS = [[51, 153, 255], [51, 153, 255], [51, 153, 255], [51, 153, 255],
 
 NUM_1 = 0
 
+AREA_LOITER_STATE = {
+    "active": {},
+    "last_seen": {},
+}
+
 
 class LoadPoseEngine:
     def __init__(self, model_path, confidence=0.6, nms_thresh=0.4):
@@ -163,38 +168,163 @@ class LoadPoseEngine:
 #   - Hand-written rules: danger zone (caseType=1) - position based
 #   - Mamba-YOLO handles: fire, smoke, garbage, ice, ebike, vehicle
 # ---------------------------------------------------------#
-def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
+
+
+def _safe_bool(values, index):
+    return index < len(values) and bool(values[index])
+
+
+def _scale_area_to_frame(area_list, frame_shape, monitor_common):
+    if not area_list or len(area_list) < 2:
+        return None
+    frame_h, frame_w = frame_shape[:2]
+    x1, y1 = float(area_list[0][0]), float(area_list[0][1])
+    x2, y2 = float(area_list[1][0]), float(area_list[1][1])
+    input_w = float(getattr(monitor_common, "AREA_INPUT_WIDTH", frame_w) or frame_w)
+    input_h = float(getattr(monitor_common, "AREA_INPUT_HEIGHT", frame_h) or frame_h)
+
+    max_area_x = max(abs(x1), abs(x2))
+    max_area_y = max(abs(y1), abs(y2))
+    if input_w > 0 and input_h > 0 and max_area_x <= input_w + 2 and max_area_y <= input_h + 2:
+        x_scale = frame_w / input_w
+        y_scale = frame_h / input_h
+        x1 *= x_scale
+        x2 *= x_scale
+        y1 *= y_scale
+        y2 *= y_scale
+
+    left, right = sorted((x1, x2))
+    top, bottom = sorted((y1, y2))
+    if right - left < 2 or bottom - top < 2:
+        return None
+    return left, top, right, bottom
+
+
+def _pose_body_points(points, confidence=0.3):
+    if points is None or len(points) == 0:
+        return np.empty((0, 2), dtype=np.float32)
+
+    body_points = []
+    for kpt in points:
+        candidates = []
+        weights = []
+        for joint_idx, weight in ((15, 1.0), (16, 1.0), (13, 0.8), (14, 0.8), (11, 0.6), (12, 0.6)):
+            score = float(kpt[joint_idx * 3 + 2])
+            if score >= confidence:
+                candidates.append((float(kpt[joint_idx * 3]), float(kpt[joint_idx * 3 + 1])))
+                weights.append(weight)
+
+        if candidates:
+            coords = np.asarray(candidates, dtype=np.float32)
+            body_points.append(np.average(coords, axis=0, weights=np.asarray(weights, dtype=np.float32)))
+            continue
+
+        bbox_like = kpt.reshape(-1, 3)
+        valid = bbox_like[bbox_like[:, 2] >= confidence]
+        if len(valid) > 0:
+            body_points.append(np.mean(valid[:, :2], axis=0))
+        else:
+            body_points.append((np.nan, np.nan))
+
+    if not body_points:
+        return np.empty((0, 2), dtype=np.float32)
+    return np.asarray(body_points, dtype=np.float32)
+
+
+def _indices_in_area(points, area_box):
+    if points is None or len(points) == 0 or area_box is None:
+        return np.asarray([], dtype=np.int32)
+    left, top, right, bottom = area_box
+    return np.where(
+        (points[:, 0] >= left) & (points[:, 0] <= right) &
+        (points[:, 1] >= top) & (points[:, 1] <= bottom)
+    )[0].astype(np.int32)
+
+
+def _update_loiter_state(bboxes, body_points, inside_indices, now_time, threshold_seconds, grace_seconds):
+    active = AREA_LOITER_STATE["active"]
+    last_seen = AREA_LOITER_STATE["last_seen"]
+    current_ids = set()
+    alarm_indices = []
+
+    for index in inside_indices:
+        index = int(index)
+        if bboxes is not None and index < len(bboxes):
+            box = bboxes[index]
+            foot = body_points[index] if index < len(body_points) else (0, 0)
+            track_id = (
+                int(round(float(foot[0]) / 40.0)),
+                int(round(float(foot[1]) / 40.0)),
+                int(round((float(box[2]) - float(box[0])) / 40.0)),
+                int(round((float(box[3]) - float(box[1])) / 40.0)),
+            )
+        else:
+            foot = body_points[index] if index < len(body_points) else (0, 0)
+            track_id = (int(round(float(foot[0]) / 40.0)), int(round(float(foot[1]) / 40.0)))
+
+        current_ids.add(track_id)
+        active.setdefault(track_id, now_time)
+        last_seen[track_id] = now_time
+        if now_time - active[track_id] >= threshold_seconds:
+            alarm_indices.append(index)
+
+    expired_ids = [
+        track_id
+        for track_id, seen_at in last_seen.items()
+        if track_id not in current_ids and now_time - seen_at > grace_seconds
+    ]
+    for track_id in expired_ids:
+        active.pop(track_id, None)
+        last_seen.pop(track_id, None)
+
+    return np.asarray(alarm_indices, dtype=np.int32)
+
+
+def _expire_loiter_state(now_time, grace_seconds):
+    active = AREA_LOITER_STATE["active"]
+    last_seen = AREA_LOITER_STATE["last_seen"]
+    expired_ids = [track_id for track_id, seen_at in last_seen.items() if now_time - seen_at > grace_seconds]
+    for track_id in expired_ids:
+        active.pop(track_id, None)
+        last_seen.pop(track_id, None)
+
+
+def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST, infer_custom=None):
     from common import monitor as monitorCommon
     indices_danger, fire_indices, smoke_indices = monitorCommon.preList
     try:
+        raw_img = np_img.copy()
+        draw_img = np_img.copy()
+
         #   Pose estimation + ST-GCN++ action recognition
         list0 = False   # danger zone
+        list2 = False   # area loitering
         list3 = False   # fall
         list6 = False   # punch
         list11 = False  # wave
         bboxes = None
         points = None
 
-        if TYPE_LIST[0] or TYPE_LIST[3] or TYPE_LIST[6] or TYPE_LIST[11]:
-            bboxes, scores, points = infer(np_img)
+        if _safe_bool(TYPE_LIST, 0) or _safe_bool(TYPE_LIST, 2) or _safe_bool(TYPE_LIST, 3) or _safe_bool(TYPE_LIST, 6) or _safe_bool(TYPE_LIST, 11):
+            bboxes, scores, points = infer(raw_img)
             scores = scores.cpu().numpy()
             bboxes = bboxes.to(torch.int32).cpu().numpy()
             points = points.cpu().numpy()
-            infer.draw_pose(np_img, bboxes, scores, points)
+            infer.draw_pose(draw_img, bboxes, scores, points)
 
             # --- ST-GCN++ action recognition 
-            if TYPE_LIST[3] or TYPE_LIST[6] or TYPE_LIST[11]:
+            if _safe_bool(TYPE_LIST, 3) or _safe_bool(TYPE_LIST, 6) or _safe_bool(TYPE_LIST, 11):
                 try:
                     action_result = action_recognizer.predict(
-                        points, bboxes, frame_shape=np_img.shape[:2]
+                        points, bboxes, frame_shape=raw_img.shape[:2]
                     )
                 except TypeError:
                     action_result = action_recognizer.predict(points, bboxes)
-                if TYPE_LIST[3]:
+                if _safe_bool(TYPE_LIST, 3):
                     list3 = action_result.get('fall', False)
-                if TYPE_LIST[6]:
+                if _safe_bool(TYPE_LIST, 6):
                     list6 = action_result.get('punch', False)
-                if TYPE_LIST[11]:
+                if _safe_bool(TYPE_LIST, 11):
                     list11 = action_result.get('wave', False)
 
                 # Draw action labels on image (multi-person overlays when available)
@@ -207,46 +337,57 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
                         x, y = int(box[0]), int(box[1])
                         line = 0
                         if one_action.get("fall", False):
-                            cv2.putText(np_img, "fall", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+                            cv2.putText(draw_img, "fall", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
                             line += 1
                         if one_action.get("punch", False):
-                            cv2.putText(np_img, "punch", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+                            cv2.putText(draw_img, "punch", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
                             line += 1
                         if one_action.get("wave", False):
-                            cv2.putText(np_img, "wave", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+                            cv2.putText(draw_img, "wave", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
                 elif bboxes is not None and len(bboxes) > 0:
                     # fallback for legacy recognizer behavior
                     x, y = int(bboxes[0, 0]), int(bboxes[0, 1])
                     if list3:
-                        cv2.putText(np_img, "fall", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
+                        cv2.putText(draw_img, "fall", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
                     if list6:
-                        cv2.putText(np_img, "punch", (x, y - 32), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
+                        cv2.putText(draw_img, "punch", (x, y - 32), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
                     if list11:
-                        cv2.putText(np_img, "wave", (x, y - 64), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
+                        cv2.putText(draw_img, "wave", (x, y - 64), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
 
         # ---------------------------------------------------------#
-        #   Danger zone detection (keep hand-written, position-based)
+        #   Danger-zone and loitering detection from YOLOv8-Pose body points.
         # ---------------------------------------------------------#
-        if TYPE_LIST[0] and bboxes is not None and points is not None and len(bboxes) > 0:
-            M1 = 0.3
-            M2 = 0.7
-            center_x_up = (points[:, 5 * 3] + points[:, 6 * 3]) / 2
-            center_x_down = (points[:, 11 * 3] + points[:, 12 * 3]) / 2
-            center_y_up = (points[:, 5 * 3 + 1] + points[:, 6 * 3 + 1]) / 2
-            center_y_down = (points[:, 11 * 3 + 1] + points[:, 12 * 3 + 1]) / 2
-            center_x = (center_x_up * M1 + center_x_down * M2) / 2
-            center_y = (center_y_up * M1 + center_y_down * M2) / 2
-            bound_x_left = AREA_LIST[0][0]
-            bound_x_right = AREA_LIST[1][0]
-            bound_y_up = AREA_LIST[0][1]
-            bound_y_down = AREA_LIST[1][1]
-            indices_danger = np.where(
-                (center_x > bound_x_left) & (center_x < bound_x_right) &
-                (center_y > bound_y_up) & (center_y < bound_y_down)
-            )[0]
+        area_box = _scale_area_to_frame(AREA_LIST, raw_img.shape, monitorCommon)
+        inside_indices = np.asarray([], dtype=np.int32)
+        area_loiter_enabled = _safe_bool(TYPE_LIST, 2)
+        area_grace_seconds = float(getattr(monitorCommon, "AREA_LOITER_GRACE_SECONDS", 1.5))
+        if (_safe_bool(TYPE_LIST, 0) or area_loiter_enabled) and bboxes is not None and points is not None and len(bboxes) > 0:
+            body_points = _pose_body_points(points, min(float(getattr(infer, "confidence", 0.3)), 0.4))
+            inside_indices = _indices_in_area(body_points, area_box)
+            indices_danger = inside_indices
+
+            if area_box is not None:
+                left, top, right, bottom = [int(round(value)) for value in area_box]
+                cv2.rectangle(draw_img, (left, top), (right, bottom), (0, 0, 255), 2)
+
+            if area_loiter_enabled:
+                loiter_indices = _update_loiter_state(
+                    bboxes,
+                    body_points,
+                    inside_indices,
+                    time.time(),
+                    float(getattr(monitorCommon, "AREA_LOITER_SECONDS", 5.0)),
+                    area_grace_seconds,
+                )
+                list2 = len(loiter_indices) > 0
+            else:
+                AREA_LOITER_STATE["active"].clear()
+                AREA_LOITER_STATE["last_seen"].clear()
+        elif area_loiter_enabled:
+            _expire_loiter_state(time.time(), area_grace_seconds)
         if indices_danger is None:
             indices_danger = []
-        if len(indices_danger) > 0 and TYPE_LIST[0]:
+        if len(indices_danger) > 0 and _safe_bool(TYPE_LIST, 0):
             list0 = True
             try:
                 if len(indices_danger) <= bboxes.shape[0]:
@@ -254,15 +395,24 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
                         index = indices_danger[i]
                         x = int(bboxes[index, 0])
                         y = int(bboxes[index, 1])
-                        cv2.putText(np_img, "danger", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
+                        cv2.putText(draw_img, "danger", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
+            except Exception:
+                pass
+        if list2:
+            try:
+                for index in loiter_indices:
+                    if index < bboxes.shape[0]:
+                        x = int(bboxes[index, 0])
+                        y = int(bboxes[index, 1])
+                        cv2.putText(draw_img, "loiter", (x, y + 42), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
             except Exception:
                 pass
 
         # ---------------------------------------------------------#
         #   Mamba-YOLO-World detection
-        #   Conservative prompt order:
-        #   0 fire, 1 smoke, 2 overflow, 3 garbage, 4 garbage bin,
-        #   5 bicycle, 6 motorcycle.
+        #   Business prompt order follows custom_finetune_class_texts.json:
+        #   0 overflow, 1 garbage, 2 garbage bin, 3 bicycle, 4 motorcycle,
+        #   5 fire, 6 smoke.
         #   garbage bin is context only and must not trigger garbage alarm.
         # ---------------------------------------------------------#
         list1 = False   # smoke
@@ -279,26 +429,35 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
         garbage_bin_indices = []
         ebike_indices = []
         vehicle_indices = []
+        business_ran = False
         if TYPE_LIST[4] or TYPE_LIST[1] or TYPE_LIST[7] or TYPE_LIST[9] or TYPE_LIST[10]:
-            boxes1, scores1, idxs1 = infer1(np_img)
+            boxes1, scores1, idxs1 = infer1(raw_img)
             boxes1  = np.asarray(boxes1,  dtype=np.float32)
             scores1 = np.asarray(scores1, dtype=np.float32)
             idxs1   = np.asarray(idxs1,   dtype=np.int32)
+            business_ran = True
             group_label_ids = getattr(infer1, 'business_label_groups', None)
-            if group_label_ids and len(group_label_ids) >= 7:
-                fire_indices = np.where(np.isin(idxs1, group_label_ids[0]))[0]
-                smoke_indices = np.where(np.isin(idxs1, group_label_ids[1]))[0]
-                overflow_indices = np.where(np.isin(idxs1, group_label_ids[2]))[0]
-                garbage_indices = np.where(np.isin(idxs1, group_label_ids[3]))[0]
-                garbage_bin_indices = np.where(np.isin(idxs1, group_label_ids[4]))[0]
-                ebike_indices = np.where(np.isin(idxs1, group_label_ids[5] + group_label_ids[6]))[0]
+            business_names = [str(name).strip().lower() for name in getattr(infer1, 'business_names', [])]
+            group_by_name = {
+                name: group_label_ids[i]
+                for i, name in enumerate(business_names)
+                if group_label_ids is not None and i < len(group_label_ids)
+            }
+            if group_by_name:
+                fire_indices = np.where(np.isin(idxs1, group_by_name.get("fire", [])))[0]
+                smoke_indices = np.where(np.isin(idxs1, group_by_name.get("smoke", [])))[0]
+                overflow_indices = np.where(np.isin(idxs1, group_by_name.get("overflow", [])))[0]
+                garbage_indices = np.where(np.isin(idxs1, group_by_name.get("garbage", [])))[0]
+                garbage_bin_indices = np.where(np.isin(idxs1, group_by_name.get("garbage bin", [])))[0]
+                ebike_label_ids = group_by_name.get("bicycle", []) + group_by_name.get("motorcycle", [])
+                ebike_indices = np.where(np.isin(idxs1, ebike_label_ids))[0]
             else:
-                fire_indices = np.where(idxs1 == 0)[0]
-                smoke_indices = np.where(idxs1 == 1)[0]
-                overflow_indices = np.where(idxs1 == 2)[0]
-                garbage_indices = np.where(idxs1 == 3)[0]
-                garbage_bin_indices = np.where(idxs1 == 4)[0]
-                ebike_indices = np.where(np.isin(idxs1, [5, 6]))[0]
+                overflow_indices = np.where(idxs1 == 0)[0]
+                garbage_indices = np.where(idxs1 == 1)[0]
+                garbage_bin_indices = np.where(idxs1 == 2)[0]
+                ebike_indices = np.where(np.isin(idxs1, [3, 4]))[0]
+                fire_indices = np.where(idxs1 == 5)[0]
+                smoke_indices = np.where(idxs1 == 6)[0]
             # vehicle detection is intentionally left for a future dedicated algorithm.
 
             # Vehicle/road-occupation detection is intentionally left for a future dedicated algorithm.
@@ -307,45 +466,56 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             list4 = True
         if len(smoke_indices) > 0 and TYPE_LIST[1]:
             list1 = True
+        business_categories = getattr(infer1, 'categories', None)
         # Draw detections
         if TYPE_LIST[4]:
-            draw_on_src(np_img, boxes1[fire_indices], idxs1[fire_indices])
+            draw_on_src(draw_img, boxes1[fire_indices], idxs1[fire_indices], business_categories, scores=scores1[fire_indices])
         if TYPE_LIST[1]:
-            draw_on_src(np_img, boxes1[smoke_indices], idxs1[smoke_indices])
+            draw_on_src(draw_img, boxes1[smoke_indices], idxs1[smoke_indices], business_categories, scores=scores1[smoke_indices])
         if TYPE_LIST[7] and (len(overflow_indices) > 0 or len(garbage_indices) > 0):
             garbage_alarm_indices = np.concatenate((overflow_indices, garbage_indices)).astype(np.int32)
-            draw_on_src(np_img, boxes1[garbage_alarm_indices], idxs1[garbage_alarm_indices])
+            draw_on_src(draw_img, boxes1[garbage_alarm_indices], idxs1[garbage_alarm_indices], business_categories, scores=scores1[garbage_alarm_indices])
         # garbage bin is context only: draw it for visibility, but do not trigger RES_LIST[7].
         if TYPE_LIST[7] and len(garbage_bin_indices) > 0:
-            draw_on_src(np_img, boxes1[garbage_bin_indices], idxs1[garbage_bin_indices])
+            draw_on_src(draw_img, boxes1[garbage_bin_indices], idxs1[garbage_bin_indices], business_categories, scores=scores1[garbage_bin_indices])
         if TYPE_LIST[9] and len(ebike_indices) > 0:
-            draw_on_src(np_img, boxes1[ebike_indices], idxs1[ebike_indices])
+            draw_on_src(draw_img, boxes1[ebike_indices], idxs1[ebike_indices], business_categories, scores=scores1[ebike_indices])
         if TYPE_LIST[10] and len(vehicle_indices) > 0:
-            draw_on_src(np_img, boxes1[vehicle_indices], idxs1[vehicle_indices])
+            draw_on_src(draw_img, boxes1[vehicle_indices], idxs1[vehicle_indices], business_categories, scores=scores1[vehicle_indices])
             
-        # ========================================================
-        # 【新增逻辑】：让前端动态传进来的自定义词汇也能被画上红框（不触发报警，只画框）。因为前端的自定义词汇可能会随时变更，所以我们不把它们固定死在某个 caseType 上了。
-        # 固定业务目标顺序为 fire/smoke/overflow/garbage/garbage bin/bicycle/motorcycle�?
-        # 临时 prompt 的起始label 从前 7 个业务组之后开始。
-        # ========================================================
-        group_label_ids = getattr(infer1, 'business_label_groups', None)
-        if group_label_ids and len(group_label_ids) > 7:
-            custom_label_ids = [label_id for group in group_label_ids[7:] for label_id in group]
-            custom_indices = np.where(np.isin(idxs1, custom_label_ids))[0]
-        else:
-            custom_indices = np.where(idxs1 >= 7)[0]
-        if len(custom_indices) > 0:
-            # 这些临时加进来的目标我们不管 TYPE_LIST 开关，强制画出来供人观看效果�?
-            draw_on_src(np_img, boxes1[custom_indices], idxs1[custom_indices])
+        # Draw frontend custom open-vocabulary prompts with the open detector.
+        # These boxes are visual only; fixed business alarms still come from infer1 above.
+        custom_detector = infer_custom if infer_custom is not None else infer1
+        custom_group_label_ids = getattr(custom_detector, 'business_label_groups', None)
+        if custom_group_label_ids and len(custom_group_label_ids) > 7:
+            if custom_detector is infer1 and business_ran:
+                custom_boxes = boxes1
+                custom_scores = scores1
+                custom_idxs = idxs1
+            else:
+                custom_boxes, custom_scores, custom_idxs = custom_detector(raw_img)
+                custom_boxes = np.asarray(custom_boxes, dtype=np.float32)
+                custom_scores = np.asarray(custom_scores, dtype=np.float32)
+                custom_idxs = np.asarray(custom_idxs, dtype=np.int32)
+            custom_label_ids = [label_id for group in custom_group_label_ids[7:] for label_id in group]
+            custom_indices = np.where(np.isin(custom_idxs, custom_label_ids))[0]
+            if len(custom_indices) > 0:
+                draw_on_src(
+                    draw_img,
+                    custom_boxes[custom_indices],
+                    custom_idxs[custom_indices],
+                    getattr(custom_detector, 'categories', None),
+                    scores=custom_scores[custom_indices],
+                )
 
         # Resize output
-        np_img = cv2.resize(np_img, (640, 480))
+        draw_img = cv2.resize(draw_img, (640, 480))
 
         # Build 12-element RES_LIST aligned with case_type_info (caseType 1~12)
         RES_LIST = [
             list0,   # [0]  caseType=1  danger zone
             list1,   # [1]  caseType=2  smoke
-            False,   # [2]  caseType=3  area loitering (not implemented)
+            list2,   # [2]  caseType=3  area loitering
             list3,   # [3]  caseType=4  fall (ST-GCN++)
             list4,   # [4]  caseType=5  fire
             False,   # [5]  caseType=6  smoking (not implemented)
@@ -357,6 +527,6 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST):
             list11,  # [11] caseType=12 wave (ST-GCN++)
         ]
         monitorCommon.preList = indices_danger, fire_indices, smoke_indices
-        return np_img, RES_LIST
+        return draw_img, RES_LIST
     finally:
         pass

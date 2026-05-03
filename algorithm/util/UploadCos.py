@@ -5,15 +5,30 @@ from qcloud_cos import CosS3Client
 from util import Logger
 import queue
 import threading
+from config import RuntimeConfig as Config
+
 logger = Logger.setup_logger()
 
-SECRET_ID = ''#COS
-SECRET_KEY = ''
-REGION = 'ap-beijing'
-BUCKET = 'hospital-alarm-1318141347'
+SECRET_ID = Config.TENCENT_SECRET_ID
+SECRET_KEY = Config.TENCENT_SECRET_KEY
+REGION = Config.TENCENT_COS_REGION
+BUCKET = Config.TENCENT_COS_BUCKET
+
+
+def _require_cos_config():
+    missing = []
+    if not SECRET_ID:
+        missing.append("TENCENT_SECRET_ID")
+    if not SECRET_KEY:
+        missing.append("TENCENT_SECRET_KEY")
+    if not BUCKET:
+        missing.append("TENCENT_COS_BUCKET")
+    if missing:
+        raise RuntimeError("missing COS config: " + ", ".join(missing))
 
 
 def _cos_client():
+    _require_cos_config()
     cos_config = CosConfig(Region=REGION, SecretId=SECRET_ID, SecretKey=SECRET_KEY)
     return CosS3Client(cos_config)
 

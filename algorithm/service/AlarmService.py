@@ -1,40 +1,20 @@
-import requests
+import copy
 import os
-from urllib.parse import urlencode
-from util.Logger import setup_logger
-from flask import current_app as app, jsonify
+import threading
+import time
 import uuid
 from datetime import datetime
+from urllib.parse import urlencode
+
+import requests
+
 from common import monitor as monitorCommon
-import copy
-import time
-import threading
-from util import UploadCos
 from config import RuntimeConfig as Config
 from service import AlarmCacheService
+from util import UploadCos
+from util.Logger import setup_logger
 
 logger = setup_logger()
-
-# -----------------------------------------------------------------------
-# warningList 索引 → Java 后端 caseType 的映射
-# 顺序严格对应 TYPE_LIST 和数据库 case_type_info 表
-#
-#   warningList[i]    caseType    含义
-#   [0]                 1        进入危险区域
-#   [1]                 2        烟雾
-#   [2]                 3        区域停留
-#   [3]                 4        摔倒
-#   [4]                 5        明火
-#   [5]                 6        吸烟
-#   [6]                 7        打架
-#   [7]                 8        垃圾乱放
-#   [8]                 9        冰面
-#   [9]                10        电动车进楼
-#   [10]               11        载具占用车道
-#   [11]               12        挥手呼救
-#
-# 现在是 1:1 映射: caseType = warningList索引 + 1
-# -----------------------------------------------------------------------
 
 
 def _post_alarm_to_backend(clip_id, camera_id, case_type, occurred_at=None):
@@ -57,8 +37,9 @@ def _post_alarm_to_backend(clip_id, camera_id, case_type, occurred_at=None):
 
 def _sync_cached_alarm(item):
     clip_path = item.get("clip_path")
-    if clip_path and os.path.exists(clip_path):
-        UploadCos.uploadFile2Cos(clip_path, item["clip_id"])
+    if not clip_path or not os.path.exists(clip_path):
+        raise RuntimeError(f"alarm clip not ready: {item['clip_id']}")
+    UploadCos.uploadFile2Cos(clip_path, item["clip_id"])
     _post_alarm_to_backend(
         item["clip_id"],
         item["camera_id"],
@@ -73,31 +54,42 @@ def startAlarmCacheSyncWorker():
 
 def postAlarm(warningList):
     indices = [index for index, value in enumerate(warningList) if value]
-    logger.info("warningList: " + str(indices))
+    if not indices:
+        return
+
+    logger.info("warningList: %s", indices)
     clipId = str(uuid.uuid4())
-    cameraId = app.config.get("MONITOR_ID", Config.MONITOR_ID)
+    cameraId = Config.MONITOR_ID
     occurredAt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     snapshot = list(monitorCommon.cacheQueue.queue)
     cacheQueue = [copy.deepcopy(item) for item in snapshot]
 
-    for index, element in enumerate(warningList):
-        if element:
-            # warningList 的索引直接对应 caseType - 1
-            # 例如: warningList[0]=True → caseType=1 (进入危险区域)
-            #       warningList[4]=True → caseType=5 (明火)
+    def _prepare_clip_and_post():
+        try:
+            clipPath = uploadClip(clipId, cacheQueue)
+        except Exception as e:
+            logger.error("prepare alarm clip failed: %s", e)
+            return
+
+        for index, element in enumerate(warningList):
+            if element:
+                caseType = index + 1
+                AlarmCacheService.enqueue_alarm(clipId, cameraId, caseType, clipPath, occurredAt)
+
+        print(clipId)
+        for index, element in enumerate(warningList):
+            if not element:
+                continue
             caseType = index + 1
-            AlarmCacheService.enqueue_alarm(clipId, cameraId, caseType, None, occurredAt)
             try:
                 _post_alarm_to_backend(clipId, cameraId, caseType, occurredAt)
                 AlarmCacheService.mark_synced(clipId, cameraId, caseType)
                 print("post alarm success")
             except Exception as e:
                 AlarmCacheService.mark_failed(clipId, cameraId, caseType, e)
-                logger.error("post alarm failed: " + str(e))
+                logger.error("post alarm failed: %s", e)
 
-    # 上传视频片段
-    print(clipId)
-    stream_thread = threading.Thread(target=uploadClip, name="upload_thread-" + clipId, args=(clipId, cacheQueue))
+    stream_thread = threading.Thread(target=_prepare_clip_and_post, name="upload_thread-" + clipId)
     stream_thread.start()
 
 
@@ -110,12 +102,8 @@ def uploadClip(uuidParam, cacheQueue=None):
     addedQueue = [copy.deepcopy(item) for item in snapshot]
     cacheQueue.extend(addedQueue)
     clipPath = AlarmCacheService.save_clip_frames(cacheQueue, uuidParam)
-    if clipPath:
-        AlarmCacheService.update_clip_path(uuidParam, clipPath)
-        logger.info("alarm clip saved locally: " + clipPath)
-    try:
-        UploadCos.upload2Cos(cacheQueue, uuidParam)
-    except Exception as e:
-        AlarmCacheService.mark_clip_failed(uuidParam, e)
-        logger.error("upload alarm clip to COS failed: " + str(e))
-    return True
+    if not clipPath:
+        raise RuntimeError("alarm clip is empty")
+    logger.info("alarm clip saved locally: %s", clipPath)
+    UploadCos.uploadFile2Cos(clipPath, uuidParam)
+    return clipPath

@@ -85,7 +85,11 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         if (latestAlarm == null) {
             throw new RuntimeException("Failed to retrieve the saved alarm record");
         }
-        return this.baseMapper.SqlGetAlarm(latestAlarm.getId());
+        SqlGetAlarm savedAlarm = this.baseMapper.SqlGetAlarm(latestAlarm.getId());
+        if (savedAlarm != null) {
+            savedAlarm.setClipLink(ossUtil.getClipLinkByUuid(savedAlarm.getClipLink()));
+        }
+        return savedAlarm;
     }
 
     private Timestamp parseOccurredAt(String occurredAt) {

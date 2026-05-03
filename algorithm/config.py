@@ -122,6 +122,10 @@ class RuntimeConfig:
         [False, False, False, True, False, False, True, False, False, False, False, True],
     )
     AREA_LIST = [tuple(point) for point in _env_json("AREA_LIST", [[0, 0], [1280, 720]])]
+    AREA_INPUT_WIDTH = _env_int("AREA_INPUT_WIDTH", 328)
+    AREA_INPUT_HEIGHT = _env_int("AREA_INPUT_HEIGHT", 246)
+    AREA_LOITER_SECONDS = _env_float("AREA_LOITER_SECONDS", 5.0)
+    AREA_LOITER_GRACE_SECONDS = _env_float("AREA_LOITER_GRACE_SECONDS", 1.5)
 
     VIDEO_PROCESSING_ENABLED = _env_bool("VIDEO_PROCESSING_ENABLED", True)
     VIDEO_CACHE_SIZE = _env_int("VIDEO_CACHE_SIZE", 50)
@@ -137,6 +141,21 @@ class RuntimeConfig:
         ["overflow", "garbage", "garbage bin", "bicycle", "motorcycle"],
     )
     ENABLE_PROMPT_SYNONYMS = _env_bool("ENABLE_PROMPT_SYNONYMS", False)
+
+    MAMBA_YOLO_CONFIG = _resolve_path(
+        _env_str("MAMBA_YOLO_CONFIG", os.path.join("Mamba-YOLO-World", "configs", "mamba2_yolo_world_s.py"))
+    )
+    MAMBA_YOLO_WEIGHTS = _resolve_path(
+        _env_str("MAMBA_YOLO_WEIGHTS", os.path.join("algo", "mamba2_yolo_world_s.pth"))
+    )
+    MAMBA_YOLO_CONFIDENCE = _env_float("MAMBA_YOLO_CONFIDENCE", 0.3)
+    MAMBA_YOLO_OPEN_CONFIG = _resolve_path(
+        _env_str("MAMBA_YOLO_OPEN_CONFIG", os.path.join("Mamba-YOLO-World", "configs", "mamba2_yolo_world_s.py"))
+    )
+    MAMBA_YOLO_OPEN_WEIGHTS = _resolve_path(
+        _env_str("MAMBA_YOLO_OPEN_WEIGHTS", os.path.join("algo", "mamba2_yolo_world_s.pth"))
+    )
+    MAMBA_YOLO_OPEN_CONFIDENCE = _env_float("MAMBA_YOLO_OPEN_CONFIDENCE", MAMBA_YOLO_CONFIDENCE)
 
     ACTION_MODEL_BACKEND = _env_str("ACTION_MODEL_BACKEND", "ctrgcn").lower()
     ACTION_CTR_GCN_ROOT = _resolve_path(_env_str("ACTION_CTR_GCN_ROOT", "CTR-GCN"))
@@ -193,6 +212,8 @@ class RuntimeConfig:
 
     TENCENT_SECRET_ID = _env_str("TENCENT_SECRET_ID", "")
     TENCENT_SECRET_KEY = _env_str("TENCENT_SECRET_KEY", "")
+    TENCENT_COS_REGION = _env_str("TENCENT_COS_REGION", "ap-beijing")
+    TENCENT_COS_BUCKET = _env_str("TENCENT_COS_BUCKET", "my-server-1397492316")
 
 
 config = {

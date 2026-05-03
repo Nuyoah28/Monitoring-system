@@ -35,6 +35,18 @@ const DEMO_ALARM_CLIP_VIDEO_MAP = {
 
 export const ALARM_DEFAULT_VIDEO = DEMO_ALARM_VIDEO_MAP.bike;
 
+export const resolveBackendAssetUrl = (urlOrPath) => {
+    if (!urlOrPath) return '';
+    const value = String(urlOrPath).trim();
+    if (!value) return '';
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith('//')) return value;
+    if (value.startsWith('/')) return `${API_BASE_URL.replace(/\/+$/, '')}${value}`;
+    return value;
+};
+
+const looksLikeAlarmClipKey = (value) => {
+    return /\.flv($|[?#])/i.test(value) || /^[0-9a-f-]{24,}$/i.test(value);
+};
 export const resolveDemoAlarmVideo = (clipIdOrUrl) => {
     if (!clipIdOrUrl) return ALARM_DEFAULT_VIDEO;
     const value = String(clipIdOrUrl);
@@ -46,5 +58,8 @@ export const resolveDemoAlarmVideo = (clipIdOrUrl) => {
     if (value === 'bike') return DEMO_ALARM_VIDEO_MAP.bike;
     if (value === 'fire') return DEMO_ALARM_VIDEO_MAP.fire;
     if (value === 'garbage') return DEMO_ALARM_VIDEO_MAP.garbage;
+    if (value.startsWith('/api/v1/alarm/clips/')) return resolveBackendAssetUrl(value);
+    if (value.startsWith('/')) return resolveBackendAssetUrl(value);
+    if (looksLikeAlarmClipKey(value)) return resolveBackendAssetUrl(`/api/v1/alarm/clips/${value}`);
     return value;
 };

@@ -121,15 +121,35 @@ def stream_video():
     # checkpoint_path:  从 HuggingFace 下载的 .pth 模型权重
     #                   https://huggingface.co/Xuan-World/Mamba-YOLO-World
     # -------------------------------------------------------------------
-    MAMBA_YOLO_WORLD_ROOT = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..', 'Mamba-YOLO-World')
+    same_mamba_runtime = (
+        os.path.normcase(os.path.abspath(monitorCommon.MAMBA_YOLO_CONFIG)) ==
+        os.path.normcase(os.path.abspath(monitorCommon.MAMBA_YOLO_OPEN_CONFIG))
+        and os.path.normcase(os.path.abspath(monitorCommon.MAMBA_YOLO_WEIGHTS)) ==
+        os.path.normcase(os.path.abspath(monitorCommon.MAMBA_YOLO_OPEN_WEIGHTS))
+        and float(monitorCommon.MAMBA_YOLO_CONFIDENCE) == float(monitorCommon.MAMBA_YOLO_OPEN_CONFIDENCE)
     )
+    print(f"[Mamba-YOLO] business config: {monitorCommon.MAMBA_YOLO_CONFIG}")
+    print(f"[Mamba-YOLO] business weights: {monitorCommon.MAMBA_YOLO_WEIGHTS}")
+    print(f"[Mamba-YOLO] business confidence: {monitorCommon.MAMBA_YOLO_CONFIDENCE}")
     infer1 = MambaYOLODetector(
-        config_path=os.path.join(MAMBA_YOLO_WORLD_ROOT, 'configs', 'mamba2_yolo_world_s.py'),
-        checkpoint_path='algo/mamba2_yolo_world_s.pth',   # 从 HuggingFace 下载后放这里
-        confidence=0.3,
-        extra_prompts=monitorCommon.CUSTOM_DETECTION_PROMPTS
+        config_path=monitorCommon.MAMBA_YOLO_CONFIG,
+        checkpoint_path=monitorCommon.MAMBA_YOLO_WEIGHTS,
+        confidence=monitorCommon.MAMBA_YOLO_CONFIDENCE,
+        extra_prompts=monitorCommon.CUSTOM_DETECTION_PROMPTS if same_mamba_runtime else None,
     )
+    if same_mamba_runtime:
+        infer_custom = infer1
+        print("[Mamba-YOLO] open vocabulary shares the business detector runtime.")
+    else:
+        print(f"[Mamba-YOLO] open-vocab config: {monitorCommon.MAMBA_YOLO_OPEN_CONFIG}")
+        print(f"[Mamba-YOLO] open-vocab weights: {monitorCommon.MAMBA_YOLO_OPEN_WEIGHTS}")
+        print(f"[Mamba-YOLO] open-vocab confidence: {monitorCommon.MAMBA_YOLO_OPEN_CONFIDENCE}")
+        infer_custom = MambaYOLODetector(
+            config_path=monitorCommon.MAMBA_YOLO_OPEN_CONFIG,
+            checkpoint_path=monitorCommon.MAMBA_YOLO_OPEN_WEIGHTS,
+            confidence=monitorCommon.MAMBA_YOLO_OPEN_CONFIDENCE,
+            extra_prompts=monitorCommon.CUSTOM_DETECTION_PROMPTS,
+        )
     # ST-GCN++ 动作识别器 (替换 Yolov8_Pose.py 中的手写 if-else 规则)
     # 权重来源: PYSKL 官方 ST-GCN++ NTU-60 预训练权重
     if monitorCommon.ACTION_MODEL_BACKEND == "ctrgcn":
@@ -219,23 +239,24 @@ def stream_video():
             # 动态更新 Mamba-YOLO 检测目标 (无需重启模型)
             if monitorCommon.PROMPTS_CHANGED:
                 print(f"🔥 检测到前端指令更新，正在注入新的 Mamba-YOLO 目标: {monitorCommon.CUSTOM_DETECTION_PROMPTS}")
-                infer1.set_custom_prompts(monitorCommon.CUSTOM_DETECTION_PROMPTS)
+                infer_custom.set_custom_prompts(monitorCommon.CUSTOM_DETECTION_PROMPTS)
                 monitorCommon.PROMPTS_CHANGED = False
                 
-            if monitorCommon.cacheQueue.qsize() < monitorCommon.cacheMax:
-                monitorCommon.cacheQueue.put_nowait(frame)
-                # print("put frame into queue " + str(monitorCommon.cacheQueue.qsize()))
-            else:
-                # print("queue is full")
-                monitorCommon.cacheQueue.get_nowait()
-                monitorCommon.cacheQueue.put_nowait(frame)
-            # todo: 在这里进行图像处理
             try:
-                frame, warningList = yolo.main(infer=infer, infer1=infer1, action_recognizer=action_recognizer, np_img=frame, TYPE_LIST=monitorCommon.TYPE_LIST, AREA_LIST=monitorCommon.AREA_LIST)
+                frame, warningList = yolo.main(infer=infer, infer1=infer1, action_recognizer=action_recognizer, np_img=frame, TYPE_LIST=monitorCommon.TYPE_LIST, AREA_LIST=monitorCommon.AREA_LIST, infer_custom=infer_custom)
             except Exception as e:
                 print(f"处理帧时出错: {e}")
                 traceback.print_exc()
                 continue
+
+            # Cache processed frames so alarm clips show pose/action/Mamba boxes.
+            if monitorCommon.cacheQueue.qsize() < monitorCommon.cacheMax:
+                monitorCommon.cacheQueue.put_nowait(frame.copy())
+                # print("put frame into queue " + str(monitorCommon.cacheQueue.qsize()))
+            else:
+                # print("queue is full")
+                monitorCommon.cacheQueue.get_nowait()
+                monitorCommon.cacheQueue.put_nowait(frame.copy())
             print(warningList)
             current_time = time.time()
             stable_warning_list = [False] * len(warningList)

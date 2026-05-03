@@ -28,6 +28,7 @@ import torch
 from Yolov8.mamba_yolo_prompts import (
     build_categories,
     build_categories_and_groups,
+    build_business_names,
     build_texts,
     sync_event_names,
     text_signature,
@@ -96,6 +97,7 @@ class MambaYOLODetector:
 
         # 完整类别列表，顺序决定 idxs 的值
         self.categories, self.business_label_groups = build_categories_and_groups(extra_prompts)
+        self.business_names = build_business_names(extra_prompts)
 
         print(f"🚀 [Mamba-YOLO-World] 正在加载模型...")
         print(f"   配置文件: {config_path}")
@@ -164,6 +166,7 @@ class MambaYOLODetector:
 
         self.categories = new_categories
         self.business_label_groups = new_business_label_groups
+        self.business_names = build_business_names(prompts)
         self._update_texts()
         # 同步类别名到画框工具
         sync_event_names(self.categories)

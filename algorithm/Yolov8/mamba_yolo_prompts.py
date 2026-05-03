@@ -9,13 +9,14 @@ from config import RuntimeConfig as Config
 from Yolov8.utils1 import update_event_names
 
 
-BUILTIN_CATEGORIES = ["fire", "smoke"]
 DEFAULT_BUSINESS_PROMPTS = [
     "overflow",
     "garbage",
     "garbage bin",
     "bicycle",
     "motorcycle",
+    "fire",
+    "smoke",
 ]
 
 DISABLED_PROMPTS = {
@@ -49,6 +50,22 @@ PROMPT_SYNONYM_GROUPS = {
         "trash on ground",
         "garbage bag",
         "overflowing trash bin",
+    ],
+    "bicycle": [
+        "bicycle",
+        "electric bicycle",
+        "e-bike",
+        "electric bike",
+        "electric bike in elevator",
+        "electric bike in building",
+    ],
+    "motorcycle": [
+        "motorcycle",
+        "electric motorcycle",
+        "electric scooter",
+        "scooter",
+        "scooter in elevator",
+        "motorbike",
     ],
     "ice on road": [
         "ice on road",
@@ -107,7 +124,7 @@ def build_prompt_groups(extra_prompts=None):
     multiple English prompts and aggregate their labels back to the same
     business group.
     """
-    raw_prompts = BUILTIN_CATEGORIES + DEFAULT_BUSINESS_PROMPTS
+    raw_prompts = list(DEFAULT_BUSINESS_PROMPTS)
     if extra_prompts:
         existing = {_normalize_prompt(prompt) for prompt in raw_prompts}
         for prompt in extra_prompts:
@@ -152,9 +169,18 @@ def build_categories_and_groups(extra_prompts=None):
     return flatten_prompt_groups(build_prompt_groups(extra_prompts))
 
 
+def build_business_names(extra_prompts=None):
+    """Return the primary prompt name for each business group."""
+    return [group[0] for group in build_prompt_groups(extra_prompts) if group]
+
+
 def build_texts(categories):
-    """Convert category names to Mamba-YOLO-World text format."""
-    return [[cat] for cat in categories] + [[" "]]
+    """Convert category names to the cached single-batch text format.
+
+    Mamba-YOLO-World inference caches text features with batch size 1, so all
+    prompts must live in one inner list.
+    """
+    return [list(categories) + [" "]]
 
 
 def text_signature(texts):

@@ -150,7 +150,7 @@ public class MonitorServiceImpl extends ServiceImpl<MonitorDao, Monitor> impleme
             // TODO 改字段的时候要改这里
             ability.add(dangerArea); // 0: 危险区域 (caseType=1)
             ability.add(false); // 1: 烟雾 (caseType=2)
-            ability.add(false); // 2: 区域停留 (caseType=3，暂无字段，设为false)
+            ability.add(dangerArea); // 2: 区域停留 (caseType=3)
             ability.add(updateMonitorParam.getFall()); // 3: 摔倒 (caseType=4)
             ability.add(updateMonitorParam.getFlame()); // 4: 明火 (caseType=5)
             ability.add(updateMonitorParam.getSmoke()); // 5: 吸烟 (caseType=6)

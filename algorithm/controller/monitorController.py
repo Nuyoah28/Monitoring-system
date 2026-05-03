@@ -1,5 +1,6 @@
-from flask import Blueprint, request, current_app as app, jsonify, send_file
+from flask import Blueprint, request, current_app as app, jsonify, send_file, send_from_directory, make_response
 from service.AlarmService import postAlarm
+from service import AlarmCacheService
 from common import monitor as monitorCommon
 from util.translator import TencentTranslator
 import io
@@ -91,6 +92,32 @@ def get_image():
     bytes_io = io.BytesIO(image_bytes)
     # 返回图像作为HTTP响应
     return send_file(bytes_io, mimetype='image/png')
+
+
+def _add_clip_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Range, Content-Type, Authorization"
+    response.headers["Access-Control-Expose-Headers"] = "Content-Length, Content-Range, Accept-Ranges"
+    response.headers["Accept-Ranges"] = "bytes"
+    return response
+
+
+@monitor.route("/clips/<path:clip_name>", methods=["GET", "HEAD", "OPTIONS"])
+def get_alarm_clip(clip_name):
+    if request.method == "OPTIONS":
+        return _add_clip_cors_headers(make_response("", 204))
+    if not clip_name.endswith(".flv"):
+        clip_name = clip_name + ".flv"
+    clip_dir = AlarmCacheService._clip_root()
+    response = send_from_directory(
+        clip_dir,
+        clip_name,
+        mimetype="video/x-flv",
+        conditional=True,
+        as_attachment=False,
+    )
+    return _add_clip_cors_headers(response)
 
 
 @monitor.route('/type', methods=['POST'])

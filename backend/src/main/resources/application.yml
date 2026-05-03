@@ -1,3 +1,7 @@
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:backend/.env[.properties]
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}

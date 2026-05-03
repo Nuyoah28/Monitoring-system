@@ -88,7 +88,7 @@ def load_model_and_pipeline(detector, config_path: str, checkpoint_path: str):
         from mmdet.registry import TASK_UTILS as MMDET_TASK_UTILS
     
         # 导入并注册转换器组件
-        from mmyolo.datasets.transforms.transforms import LetterResize
+        from mmyolo.datasets.transforms.transforms import LetterResize, YOLOv5KeepRatioResize
         from mmengine.registry import TRANSFORMS as MMENGINE_TRANSFORMS
         from mmdet.registry import TRANSFORMS as MMDET_TRANSFORMS
         from mmyolo.registry import TRANSFORMS as MYOLO_TRANSFORMS
@@ -233,6 +233,10 @@ def load_model_and_pipeline(detector, config_path: str, checkpoint_path: str):
             MYOLO_TRANSFORMS.register_module(name='LetterResize', module=LetterResize)
         if 'LetterResize' not in MMDET_TRANSFORMS.module_dict:
             MMDET_TRANSFORMS.register_module(name='LetterResize', module=LetterResize)
+        if 'YOLOv5KeepRatioResize' not in MYOLO_TRANSFORMS.module_dict:
+            MYOLO_TRANSFORMS.register_module(name='YOLOv5KeepRatioResize', module=YOLOv5KeepRatioResize)
+        if 'YOLOv5KeepRatioResize' not in MMDET_TRANSFORMS.module_dict:
+            MMDET_TRANSFORMS.register_module(name='YOLOv5KeepRatioResize', module=YOLOv5KeepRatioResize)
     
         # 特殊处理：Normalize 需要注册到 TRANSFORMS 注册表（如果组件有效）
         if Normalize is not None and hasattr(Normalize, '__name__'):
@@ -280,6 +284,10 @@ def load_model_and_pipeline(detector, config_path: str, checkpoint_path: str):
             MYOLO_TRANSFORMS.register_module(name='LetterResize', module=LetterResize)
         if 'LetterResize' not in MMDET_TRANSFORMS.module_dict:
             MMDET_TRANSFORMS.register_module(name='LetterResize', module=LetterResize)
+        if 'YOLOv5KeepRatioResize' not in MYOLO_TRANSFORMS.module_dict:
+            MYOLO_TRANSFORMS.register_module(name='YOLOv5KeepRatioResize', module=YOLOv5KeepRatioResize)
+        if 'YOLOv5KeepRatioResize' not in MMDET_TRANSFORMS.module_dict:
+            MMDET_TRANSFORMS.register_module(name='YOLOv5KeepRatioResize', module=YOLOv5KeepRatioResize)
     
         # 使用mmengine的配置加载机制
         from mmengine.config import Config
@@ -425,13 +433,17 @@ def load_model_and_pipeline(detector, config_path: str, checkpoint_path: str):
         print(f"⚠️ [Mamba-YOLO-World] 无法导入yolo-world模块: {e}")
         raise
 
-    # 为推理构建一个简化的管道
+    # Build an ndarray pipeline aligned with the official Mamba-YOLO-World demo.
+    # The model data_preprocessor handles /255 and BGR->RGB; doing Normalize
+    # here would normalize twice and can suppress detections.
     test_pipeline_cfg = [
         dict(type='mmdet.LoadImageFromNDArray'),
-        dict(type='mmdet.Resize', scale=(640, 640), keep_ratio=True),
-        dict(type='mmdet.LetterResize', scale=(640, 640), allow_scale_up=True, pad_val=dict(img=114)),
-        dict(type='mmdet.Normalize', mean=[0., 0., 0.], std=[255., 255., 255.], to_rgb=True),
-        dict(type='mmdet.PackDetInputs', meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor'))
+        dict(type='mmdet.YOLOv5KeepRatioResize', scale=(640, 640)),
+        dict(type='mmdet.LetterResize', scale=(640, 640), allow_scale_up=False, pad_val=dict(img=114)),
+        dict(
+            type='mmdet.PackDetInputs',
+            meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor', 'pad_param')
+        )
     ]
     self.test_pipeline = Compose(test_pipeline_cfg)
 

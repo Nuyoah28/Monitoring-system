@@ -13,8 +13,14 @@ import torch
 
 
 def build_data_batch(test_pipeline, img_src, texts):
-    """Build the MMDetection-style batch expected by the detector."""
-    data_info = dict(img_id=0, img=img_src, texts=texts)
+    """Build the MMDetection-style batch expected by the detector.
+
+    Text features are already cached on the model by reparameterize(). Passing
+    texts through data_samples adds another batch dimension and breaks the
+    tokenizer path in this runtime.
+    """
+    _ = texts
+    data_info = dict(img_id=0, img=img_src)
     data_info = test_pipeline(data_info)
     return dict(
         inputs=data_info['inputs'].unsqueeze(0),
