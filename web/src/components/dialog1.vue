@@ -78,13 +78,49 @@ const withNoCache = (url: string): string => {
   return hash ? `${nextUrl}#${hash}` : nextUrl;
 };
 
+const getBackendUrlBase = (): string => {
+  const rawBase = String(baseUrl || '').trim();
+  const candidates = [
+    rawBase,
+    rawBase && !/^[a-z][a-z0-9+.-]*:\/\//i.test(rawBase) ? `http://${rawBase}` : '',
+    typeof window !== 'undefined' && window.location ? window.location.origin : '',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      return `${new URL(candidate).origin}/`;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return '';
+};
+
+const resolveVideoUrl = (pathOrUrl: string): string => {
+  const backendBase = getBackendUrlBase();
+  if (!backendBase) return pathOrUrl;
+  try {
+    return new URL(pathOrUrl, backendBase).toString();
+  } catch {
+    return pathOrUrl;
+  }
+};
+
+const looksLikeAlarmClipKey = (value: string): boolean => {
+  return /\.flv($|[?#])/i.test(value) || /^[0-9a-f-]{24,}$/i.test(value);
+};
+
 const normalizeVideoUrl = (rawUrl: string): string => {
   if (!rawUrl) return '';
   const playableUrl = resolveDemoAlarmVideo(rawUrl);
   const trimmed = playableUrl.trim();
   if (!trimmed) return '';
+
   if (trimmed.startsWith('/')) {
-    return new URL(trimmed, `${baseUrl}/`).toString();
+    return resolveVideoUrl(trimmed);
+  }
+  if (looksLikeAlarmClipKey(trimmed)) {
+    return resolveVideoUrl(`/api/v1/alarm/clips/${trimmed}`);
   }
   try {
     return new URL(trimmed).toString();
