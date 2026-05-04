@@ -9,7 +9,6 @@ from .models import FlowEvent, TrackedObject
 
 @dataclass(slots=True)
 class TrackState:
-    class_name: str
     history: list[tuple[float, float]] = field(default_factory=list)
     counted_lines: set[str] = field(default_factory=set)
     region_inside: dict[str, bool] = field(default_factory=dict)
@@ -28,12 +27,9 @@ class FlowCounter:
 
     def update(self, tracked_objects: list[TrackedObject], frame_index: int, timestamp_ms: int) -> list[FlowEvent]:
         events: list[FlowEvent] = []
-        active_ids = set()
 
         for tracked in tracked_objects:
-            active_ids.add(tracked.track_id)
-            state = self.track_states.setdefault(tracked.track_id, TrackState(class_name=tracked.class_name))
-            state.class_name = tracked.class_name
+            state = self.track_states.setdefault(tracked.track_id, TrackState())
             state.last_frame_index = frame_index
             state.history.append(tracked.anchor)
             if len(state.history) > self.max_history:
@@ -80,7 +76,6 @@ class FlowCounter:
                     rule_type="line",
                     rule_id=line_id,
                     direction=direction,
-                    vehicle_class=tracked.class_name,
                     track_id=tracked.track_id,
                     frame_index=frame_index,
                     timestamp_ms=timestamp_ms,
@@ -118,7 +113,6 @@ class FlowCounter:
                         rule_type="region",
                         rule_id=region_id,
                         direction="IN",
-                        vehicle_class=tracked.class_name,
                         track_id=tracked.track_id,
                         frame_index=frame_index,
                         timestamp_ms=timestamp_ms,
@@ -132,7 +126,6 @@ class FlowCounter:
                         rule_type="region",
                         rule_id=region_id,
                         direction="OUT",
-                        vehicle_class=tracked.class_name,
                         track_id=tracked.track_id,
                         frame_index=frame_index,
                         timestamp_ms=timestamp_ms,
@@ -140,17 +133,17 @@ class FlowCounter:
                 )
         return events
 
-    def occupancy_snapshot(self) -> dict[str, dict[str, int]]:
-        occupancy: dict[str, dict[str, int]] = {}
+    def occupancy_snapshot(self) -> dict[str, int]:
+        occupancy: dict[str, int] = {}
         for region_rule in self.rules.get("regions", []):
             if region_rule.get("mode", "occupancy") != "occupancy":
                 continue
             region_id = region_rule["id"]
-            class_counts: dict[str, int] = defaultdict(int)
+            count = 0
             for state in self.track_states.values():
                 if state.region_inside.get(region_id, False):
-                    class_counts[state.class_name] += 1
-            occupancy[region_id] = dict(class_counts)
+                    count += 1
+            occupancy[region_id] = count
         return occupancy
 
     def _line_direction(

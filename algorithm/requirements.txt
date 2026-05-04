@@ -10,7 +10,7 @@ supervision>=0.20.0
 open-clip-torch
 transformers>=4.20.0,<4.35.0  # 避免与mmengine的兼容性问题
 
-//其他依赖 无需按照版本安装
+# 其他依赖 无需按照版本安装
 blinker==1.6.2
 certifi==2023.7.22
 charset-normalizer==3.2.0

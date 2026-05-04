@@ -69,9 +69,8 @@ def _draw_stats(frame, totals: dict) -> None:
     for rule_id, directions in totals.items():
         cv2.putText(frame, rule_id, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 0), 2, cv2.LINE_AA)
         y += 22
-        for direction, classes in directions.items():
-            parts = [f"{vehicle_class}:{count}" for vehicle_class, count in classes.items()]
-            text = f"{direction} " + ", ".join(parts)
+        for direction, count in directions.items():
+            text = f"{direction} vehicle:{count}"
             cv2.putText(frame, text, (x + 10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (220, 220, 220), 1, cv2.LINE_AA)
             y += 20
         y += 6

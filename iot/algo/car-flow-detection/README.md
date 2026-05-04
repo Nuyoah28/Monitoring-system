@@ -111,7 +111,7 @@ ByteTrack 的优势在于：
 
 文件：
 
-- `iot/algo/parking_space_occupancy_detection/train_yolov13_lite_eucb.py`
+- `iot/algo/car-flow-detection/train_yolov13_lite_eucb.py`
 
 作用：
 
@@ -123,7 +123,7 @@ ByteTrack 的优势在于：
 
 文件：
 
-- `iot/algo/parking_space_occupancy_detection/yolov13-lite/ultralytics/cfg/models/v13/yolov13.yaml`
+- `iot/algo/car-flow-detection/yolov13-lite/ultralytics/cfg/models/v13/yolov13.yaml`
 
 当前分支相对常规 YOLO 的特点：
 
@@ -138,9 +138,9 @@ ByteTrack 的优势在于：
 
 文件：
 
-- `iot/algo/parking_space_occupancy_detection/yolov13-lite/ultralytics/engine/model.py`
-- `iot/algo/parking_space_occupancy_detection/yolov13-lite/ultralytics/trackers/byte_tracker.py`
-- `iot/algo/parking_space_occupancy_detection/yolov13/ultralytics/cfg/trackers/bytetrack.yaml`
+- `iot/algo/car-flow-detection/yolov13-lite/ultralytics/engine/model.py`
+- `iot/algo/car-flow-detection/yolov13-lite/ultralytics/trackers/byte_tracker.py`
+- `iot/algo/car-flow-detection/yolov13/ultralytics/cfg/trackers/bytetrack.yaml`
 
 作用：
 
@@ -152,9 +152,9 @@ ByteTrack 的优势在于：
 
 文件：
 
-- `iot/algo/parking_space_occupancy_detection/yolov13-lite/ultralytics/solutions/object_counter.py`
-- `iot/algo/parking_space_occupancy_detection/yolov13-lite/ultralytics/solutions/region_counter.py`
-- `iot/algo/parking_space_occupancy_detection/yolov13-lite/ultralytics/solutions/solutions.py`
+- `iot/algo/car-flow-detection/yolov13-lite/ultralytics/solutions/object_counter.py`
+- `iot/algo/car-flow-detection/yolov13-lite/ultralytics/solutions/region_counter.py`
+- `iot/algo/car-flow-detection/yolov13-lite/ultralytics/solutions/solutions.py`
 
 作用：
 

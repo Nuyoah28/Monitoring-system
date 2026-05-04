@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .geometry import bottom_center
 from .models import TrackedObject
+from .single_class_dataset import VEHICLE_CLASS_ID, VEHICLE_CLASS_NAME
 
 
 class LocalYoloTracker:
@@ -12,7 +13,6 @@ class LocalYoloTracker:
         self,
         model_path: str,
         tracker_path: str,
-        classes: list[int] | None = None,
         conf: float = 0.25,
         iou: float = 0.5,
         imgsz: int = 640,
@@ -28,13 +28,12 @@ class LocalYoloTracker:
         self.max_det = max_det
         self.half = half
         self.verbose = verbose
-        self.classes = classes
         self.tracker_path = str(Path(tracker_path).resolve())
         self.model = self._load_model(model_path)
 
     def _load_model(self, model_path: str):
-        algo_root = Path(__file__).resolve().parents[2]
-        ultralytics_root = algo_root / "parking_space_occupancy_detection" / "yolov13-lite"
+        carflow_root = Path(__file__).resolve().parents[1]
+        ultralytics_root = carflow_root / "yolov13-lite"
         ultralytics_root = ultralytics_root.resolve()
         if not ultralytics_root.exists():
             raise FileNotFoundError(f"Cannot find local ultralytics fork: {ultralytics_root}")
@@ -56,7 +55,7 @@ class LocalYoloTracker:
             source=frame,
             persist=True,
             tracker=self.tracker_path,
-            classes=self.classes,
+            classes=[VEHICLE_CLASS_ID],
             conf=self.conf,
             iou=self.iou,
             imgsz=self.imgsz,
@@ -75,18 +74,17 @@ class LocalYoloTracker:
             return []
 
         xyxy = boxes.xyxy.cpu().tolist()
-        class_ids = [int(value) for value in boxes.cls.cpu().tolist()]
         track_ids = [int(value) for value in boxes.id.int().cpu().tolist()]
         confidences = boxes.conf.cpu().tolist() if boxes.conf is not None else [1.0] * len(track_ids)
 
         tracked_objects: list[TrackedObject] = []
-        for bbox, class_id, track_id, confidence in zip(xyxy, class_ids, track_ids, confidences):
+        for bbox, track_id, confidence in zip(xyxy, track_ids, confidences):
             anchor = bottom_center(bbox)
             tracked_objects.append(
                 TrackedObject(
                     track_id=track_id,
-                    class_id=class_id,
-                    class_name=result.names[class_id],
+                    class_id=VEHICLE_CLASS_ID,
+                    class_name=VEHICLE_CLASS_NAME,
                     confidence=float(confidence),
                     bbox=tuple(float(value) for value in bbox),
                     anchor=anchor,

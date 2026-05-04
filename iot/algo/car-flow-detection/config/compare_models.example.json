@@ -1,0 +1,28 @@
+{
+  "models": [
+    {
+      "name": "yolov8",
+      "ultralytics_dir": "yolov13-lite",
+      "model_path": "runs/train/vehicle_flow_yolov8n_single/weights/best.pt",
+      "enabled": true
+    },
+    {
+      "name": "yolov12",
+      "ultralytics_dir": "yolov12",
+      "model_path": "runs/train/vehicle_flow_yolov12_single/weights/best.pt",
+      "enabled": true
+    },
+    {
+      "name": "yolov13",
+      "ultralytics_dir": "yolov13",
+      "model_path": "runs/train/vehicle_flow_yolov13_single/weights/best.pt",
+      "enabled": true
+    },
+    {
+      "name": "yolov13-eucb",
+      "ultralytics_dir": "yolov13-lite",
+      "model_path": "runs/train/vehicle_flow_yolov13_lite_single/weights/best.pt",
+      "enabled": true
+    }
+  ]
+}

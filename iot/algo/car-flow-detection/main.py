@@ -54,10 +54,14 @@ def main() -> None:
     if _looks_like_local_path(source):
         source = _resolve_path_like(config_dir, source)
 
+    save_video = args.save_video
+    if save_video and _looks_like_local_path(save_video):
+        save_video = _resolve_path_like(config_dir, save_video)
+
+    print(f"[INFO] loading model: {config['model_path']}")
     tracker = LocalYoloTracker(
         model_path=config["model_path"],
         tracker_path=config["tracker_path"],
-        classes=config.get("class_ids"),
         conf=float(config.get("conf", 0.25)),
         iou=float(config.get("iou", 0.5)),
         imgsz=int(config.get("imgsz", 640)),
@@ -66,6 +70,7 @@ def main() -> None:
         half=bool(config.get("half", False)),
         verbose=bool(config.get("verbose", False)),
     )
+    print(f"[INFO] model loaded, device={config.get('device', 'cpu')}, source={source}")
 
     counter = FlowCounter(camera_id=config["camera_id"], rules=config["rules"])
     aggregator = FlowAggregator()
@@ -78,6 +83,10 @@ def main() -> None:
     capture = cv2.VideoCapture(capture_source)
     if not capture.isOpened():
         raise RuntimeError(f"Cannot open video source: {source}")
+    print("[INFO] video opened, start processing frames...")
+
+    if save_video:
+        Path(save_video).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
     writer = None
     frame_index = 0
@@ -121,12 +130,12 @@ def main() -> None:
                 snapshot=aggregator.snapshot(),
             )
 
-            if args.save_video:
+            if save_video:
                 if writer is None:
                     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                     height, width = annotated.shape[:2]
                     fps = capture.get(cv2.CAP_PROP_FPS) or 15.0
-                    writer = cv2.VideoWriter(args.save_video, fourcc, fps, (width, height))
+                    writer = cv2.VideoWriter(save_video, fourcc, fps, (width, height))
                 writer.write(annotated)
 
             if args.show:
@@ -135,6 +144,8 @@ def main() -> None:
                     break
 
             frame_index += 1
+            if frame_index == 1 or frame_index % 30 == 0:
+                print(f"[INFO] processed {frame_index} frames")
             if args.max_frames > 0 and frame_index >= args.max_frames:
                 break
     finally:
@@ -159,3 +170,11 @@ def _looks_like_local_path(value: str) -> bool:
 
 if __name__ == "__main__":
     main()
+
+
+'''
+python main.py `
+  --config ./config/camera.example.json `
+  --source "../../test_video/raw/carflow.mp4" `
+  --save-video "../../test_video/processed/carflow_processed.mp4" 
+'''

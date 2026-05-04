@@ -19,7 +19,6 @@ class FlowEvent:
     rule_type: str
     rule_id: str
     direction: str
-    vehicle_class: str
     track_id: int
     frame_index: int
     timestamp_ms: int

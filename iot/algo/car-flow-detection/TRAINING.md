@@ -24,7 +24,7 @@
 
 你们现成的训练脚本是：
 
-- [train_yolov13_lite_eucb.py](</D:/桌面/新建文件夹/Monitoring-system/iot/algo/parking_space_occupancy_detection/train_yolov13_lite_eucb.py:8>)
+- [train_yolov13_lite_eucb.py](</D:/桌面/新建文件夹/Monitoring-system/iot/algo/car-flow-detection/train_yolov13_lite_eucb.py:8>)
 
 它的作用是：
 
@@ -36,7 +36,7 @@
 
 默认模型配置文件是：
 
-- [yolov13.yaml](</D:/桌面/新建文件夹/Monitoring-system/iot/algo/parking_space_occupancy_detection/yolov13-lite/ultralytics/cfg/models/v13/yolov13.yaml:1>)
+- [yolov13.yaml](</D:/桌面/新建文件夹/Monitoring-system/iot/algo/car-flow-detection/yolov13-lite/ultralytics/cfg/models/v13/yolov13.yaml:1>)
 
 ---
 
@@ -100,7 +100,7 @@
 Windows PowerShell 示例：
 
 ```powershell
-cd D:\桌面\新建文件夹\Monitoring-system\iot\algo\parking_space_occupancy_detection
+cd D:\桌面\新建文件夹\Monitoring-system\iot\algo\car-flow-detection
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -112,12 +112,12 @@ python -m pip install --upgrade pip
 
 仓库里给出的依赖文件是：
 
-- [requirements.txt](</D:/桌面/新建文件夹/Monitoring-system/iot/algo/parking_space_occupancy_detection/yolov13-lite/requirements.txt:1>)
+- [requirements.txt](</D:/桌面/新建文件夹/Monitoring-system/iot/algo/car-flow-detection/yolov13-lite/requirements.txt:1>)
 
 建议安装顺序：
 
 ```powershell
-cd D:\桌面\新建文件夹\Monitoring-system\iot\algo\parking_space_occupancy_detection
+cd D:\桌面\新建文件夹\Monitoring-system\iot\algo\car-flow-detection
 .\.venv\Scripts\Activate.ps1
 pip install -r .\yolov13-lite\requirements.txt
 pip install -e .\yolov13-lite
@@ -366,7 +366,7 @@ python .\train_yolov13_lite_eucb.py `
 在当前仓库下，推荐从这里启动：
 
 ```powershell
-cd D:\桌面\新建文件夹\Monitoring-system\iot\algo\parking_space_occupancy_detection
+cd D:\桌面\新建文件夹\Monitoring-system\iot\algo\car-flow-detection
 .\.venv\Scripts\Activate.ps1
 ```
 
@@ -693,7 +693,7 @@ py -3 main.py --config .\config\camera.example.json --show
 ### 环境初始化
 
 ```powershell
-cd D:\桌面\新建文件夹\Monitoring-system\iot\algo\parking_space_occupancy_detection
+cd D:\桌面\新建文件夹\Monitoring-system\iot\algo\car-flow-detection
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip

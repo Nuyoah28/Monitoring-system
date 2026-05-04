@@ -51,6 +51,7 @@ eggs/
 parts/
 sdist/
 var/
+runs/
 wheels/
 share/python-wheels/
 .installed.cfg
@@ -100,3 +101,13 @@ ReAct_agent/data/db/*.db
 
 # Algorithm runtime cache
 algorithm/runtime/
+
+# Generated algorithm outputs
+algorithm/saved_images/
+iot/algo/car-flow-detection/outputs/
+iot/algo/test_video/
+iot/algo/car-flow-detection/datasets/
+iot/algo/car-flow-detection/models/
+iot/algo/img/
+iot/algo/car-flow-detection/yolov12/*
+iot/algo/car-flow-detection/yolov13/*

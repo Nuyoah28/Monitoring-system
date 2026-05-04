@@ -1,9 +1,8 @@
 {
   "camera_id": "gate_01",
   "source": "",
-  "model_path": "",
-  "tracker_path": "../../parking_space_occupancy_detection/yolov13/ultralytics/cfg/trackers/bytetrack.yaml",
-  "class_ids": [2, 3, 5, 7],
+  "model_path": "../models/carflow.pt",
+  "tracker_path": "../yolov13/ultralytics/cfg/trackers/bytetrack.yaml",
   "conf": 0.25,
   "iou": 0.5,
   "imgsz": 640,
