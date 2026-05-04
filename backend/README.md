@@ -139,6 +139,8 @@ export AGENT_API_URL=http://127.0.0.1:5050
 export ALGORITHM_API_URL=http://127.0.0.1:6006
 export IOT_MQTT_ENABLED=true
 export IOT_MQTT_BROKER_URL=tcp://127.0.0.1:1883
+export BACKEND_JAVA_OPTS='-Xms512m -Xmx2g -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/Monitoring-system/backend/logs'
+export BACKEND_CONTAINER_MEMORY_LIMIT=3g
 ```
 
 Important:
@@ -146,6 +148,9 @@ Important:
 - Ubuntu MySQL often maps `root@localhost` to `auth_socket`, which causes
   error `1698 Access denied` for password logins from the app. Prefer a
   dedicated MySQL user for Spring Boot instead of `root`.
+- On the 8G server, the default backend runtime cap is `-Xmx2g` with a 3G
+  Docker container memory limit. Increase only after checking MySQL, Redis,
+  Agent, nginx and RTMP memory usage.
 - If MongoDB logs still show `localhost:27017`, that value is not coming from
   the tracked Spring YAML files in this repo. Check the server process
   environment, startup script, or any untracked profile files on the server.

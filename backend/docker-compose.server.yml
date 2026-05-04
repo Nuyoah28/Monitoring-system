@@ -4,8 +4,10 @@ services:
     container_name: monitoring-system-backend
     restart: always
     network_mode: host
+    mem_limit: ${BACKEND_CONTAINER_MEMORY_LIMIT:-3g}
     environment:
       TZ: Asia/Shanghai
+      JAVA_TOOL_OPTIONS: ${BACKEND_JAVA_OPTS:--Xms512m -Xmx2g -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       SERVER_PORT: ${SERVER_PORT:-10215}
       MYSQL_HOST: ${MYSQL_HOST:-127.0.0.1}

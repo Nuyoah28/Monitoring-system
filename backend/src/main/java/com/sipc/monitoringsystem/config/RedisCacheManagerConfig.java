@@ -25,12 +25,14 @@ import java.util.Map;
 
 @Configuration
 public class RedisCacheManagerConfig {
+    private static final Duration CACHE_TTL = Duration.of(2, ChronoUnit.HOURS);
+
     @Resource
     RedisConnectionFactory factory;
     /**
      * 默认配置
      */
-    RedisCacheConfiguration redisCacheConfiguration = RedisCacheConfiguration.defaultCacheConfig();
+    RedisCacheConfiguration redisCacheConfiguration = RedisCacheConfiguration.defaultCacheConfig().entryTtl(CACHE_TTL);
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate() {
@@ -59,9 +61,9 @@ public class RedisCacheManagerConfig {
 
     private Map<String, RedisCacheConfiguration> getRedisCacheConfigurationMap() {
         Map<String, RedisCacheConfiguration> redisCacheConfigurationMap = new HashMap<>();
-        redisCacheConfigurationMap.put("MonitorImg", this.getRedisCacheConfigurationWithTtl(Duration.of(1, ChronoUnit.HOURS)));
-        redisCacheConfigurationMap.put("cache",this.getRedisCacheConfigurationWithTtl(Duration.of(1, ChronoUnit.HOURS)));
-        redisCacheConfigurationMap.put("clipLink",this.getRedisCacheConfigurationWithTtl(Duration.of(364, ChronoUnit.DAYS)));
+        redisCacheConfigurationMap.put("MonitorImg", this.getRedisCacheConfigurationWithTtl(CACHE_TTL));
+        redisCacheConfigurationMap.put("cache",this.getRedisCacheConfigurationWithTtl(CACHE_TTL));
+        redisCacheConfigurationMap.put("clipLink",this.getRedisCacheConfigurationWithTtl(CACHE_TTL));
         return redisCacheConfigurationMap;
     }
 

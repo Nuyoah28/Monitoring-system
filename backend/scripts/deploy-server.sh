@@ -9,6 +9,7 @@ DEPLOY_MODE="${4:-docker}"
 LOG_DIR="$BACKEND_DIR/logs"
 RUN_DIR="$BACKEND_DIR/run"
 PID_FILE="$RUN_DIR/backend.pid"
+BACKEND_JAVA_OPTS="${BACKEND_JAVA_OPTS:--Xms512m -Xmx2g -XX:MaxMetaspaceSize=256m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR}"
 
 if [ ! -d "$PROJECT_DIR/.git" ]; then
   echo "[deploy] git repository not found under $PROJECT_DIR"
@@ -23,6 +24,7 @@ echo "[deploy] backend dir: $BACKEND_DIR"
 echo "[deploy] branch: $BRANCH"
 echo "[deploy] repo: $REPO_URL"
 echo "[deploy] mode: $DEPLOY_MODE"
+echo "[deploy] backend java opts: $BACKEND_JAVA_OPTS"
 
 git fetch origin "$BRANCH"
 git checkout "$BRANCH"
@@ -82,7 +84,7 @@ elif [ "$DEPLOY_MODE" = "process" ]; then
   fi
 
   echo "[deploy] starting backend process..."
-  nohup java -jar "$APP_JAR" --spring.profiles.active=prod >> "$LOG_FILE" 2>&1 &
+  nohup java $BACKEND_JAVA_OPTS -jar "$APP_JAR" --spring.profiles.active=prod >> "$LOG_FILE" 2>&1 &
   NEW_PID=$!
   echo "$NEW_PID" > "$PID_FILE"
   ln -sfn "$(basename "$LOG_FILE")" "$LOG_DIR/current.log"
