@@ -88,7 +88,8 @@ const getBackendUrlBase = (): string => {
 
   for (const candidate of candidates) {
     try {
-      return `${new URL(candidate).origin}/`;
+      const origin = new URL(candidate).origin;
+      return `${origin}/`;
     } catch {
       // Try the next candidate.
     }
@@ -110,18 +111,29 @@ const looksLikeAlarmClipKey = (value: string): boolean => {
   return /\.flv($|[?#])/i.test(value) || /^[0-9a-f-]{24,}$/i.test(value);
 };
 
+// 修复：避免重复拼接 URL
 const normalizeVideoUrl = (rawUrl: string): string => {
   if (!rawUrl) return '';
   const playableUrl = resolveDemoAlarmVideo(rawUrl);
   const trimmed = playableUrl.trim();
   if (!trimmed) return '';
 
-  if (trimmed.startsWith('/')) {
+  // 如果已经是完整 URL，直接返回
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  
+  // 如果已经是 /api/ 开头的路径，直接拼接
+  if (trimmed.startsWith('/api/')) {
     return resolveVideoUrl(trimmed);
   }
+  
+  // 如果是文件 key（UUID 格式），拼接完整路径
   if (looksLikeAlarmClipKey(trimmed)) {
-    return resolveVideoUrl(`/api/v1/alarm/clips/${trimmed}`);
+    const cleanKey = trimmed.split('?')[0];
+    return resolveVideoUrl(`/api/v1/alarm/clips/${cleanKey}`);
   }
+  
   try {
     return new URL(trimmed).toString();
   } catch {
@@ -168,11 +180,15 @@ const clearClipRetryTimer = (): void => {
 
 const isLocalAlarmClip = (url: string): boolean => url.includes('/api/v1/alarm/clips/');
 
+// 修复：使用正确的 URL 进行探测
 const waitForClipAndRetry = async (url: string): Promise<boolean> => {
   if (!isLocalAlarmClip(url)) return true;
 
+  // 确保使用完整的 URL
+  const fullUrl = url.startsWith('http') ? url : new URL(url, window.location.origin).toString();
+  
   try {
-    const response = await fetch(withNoCache(url), {
+    const response = await fetch(withNoCache(fullUrl), {
       method: 'HEAD',
       cache: 'no-store',
     });
@@ -342,7 +358,8 @@ watch(
   { deep: true }
 );
 </script>
-  <style lang="less" scoped>
+
+<style lang="less" scoped>
 .process-modal-mask {
   position: fixed;
   inset: 0;

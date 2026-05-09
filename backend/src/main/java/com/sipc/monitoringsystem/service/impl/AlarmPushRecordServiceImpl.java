@@ -7,6 +7,8 @@ import com.sipc.monitoringsystem.service.AlarmPushRecordService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
+
 @Slf4j
 @Service
 public class AlarmPushRecordServiceImpl extends ServiceImpl<AlarmPushRecordDao, AlarmPushRecord>
@@ -23,6 +25,7 @@ public class AlarmPushRecordServiceImpl extends ServiceImpl<AlarmPushRecordDao, 
         record.setPushType(pushType);
         record.setPushStatus(pushStatus);
         record.setPushDetail(pushDetail);
+        record.setCreatedTime(new Timestamp(System.currentTimeMillis()));
         try {
             return this.save(record);
         } catch (Exception e) {
