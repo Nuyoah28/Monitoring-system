@@ -25,12 +25,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 
-/**
- * HttpClient工具类
- *
- * @author ZhangYuanqiang
- * @since 2021-06-10
- */
 
 @Slf4j
 public class HttpUtils {

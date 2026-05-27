@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 
+// AI辅助生成：GLM-5 智谱AI，新增 OssUtil 工具类，提供告警视频链接规范化和前端代理链接生成方法，统一处理 clipId 和对象 key，兼容演示标识 SIM_。
 @Component
 public class OssUtil {
     private static final String ALARM_CLIP_PREFIX = "/api/v1/alarm/clips/";

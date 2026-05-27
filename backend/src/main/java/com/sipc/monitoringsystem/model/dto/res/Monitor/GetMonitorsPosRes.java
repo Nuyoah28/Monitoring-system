@@ -5,10 +5,6 @@ import lombok.Data;
 
 import java.util.List;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-10-03 3:19
- */
 @Data
 public class GetMonitorsPosRes {
     

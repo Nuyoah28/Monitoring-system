@@ -5,10 +5,6 @@ import lombok.Data;
 
 import java.util.List;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-09-15 17:27
- */
 
 @Data
 public class GetHistoryCntRes

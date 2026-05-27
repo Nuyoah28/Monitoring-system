@@ -6,12 +6,7 @@ import lombok.Data;
 
 import java.text.SimpleDateFormat;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-09-20 18:30
- */
-
-@Data
+//AI辅助生成：GLM-5 智谱AI 2025-4-28 告警返回 DTO 中的 video 字段承接转换后的 clipLink
 public class GetAlarmRes
 {
 

@@ -8,10 +8,6 @@ import lombok.Data;
 
 import java.io.Serializable;
 
-/**
- * @author CZCZCZ
- *         &#064;date 2023-09-10 17:11
- */
 @Data
 @TableName("user_info")
 public class User implements Serializable {

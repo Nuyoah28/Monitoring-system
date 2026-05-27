@@ -4,10 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Base64;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-10-03 17:32
- */
 public class Base64Util
 {
     public static String inputStream2Base64(InputStream is) throws Exception {

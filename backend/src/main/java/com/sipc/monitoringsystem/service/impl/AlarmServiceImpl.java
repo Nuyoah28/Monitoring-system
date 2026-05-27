@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+// AI辅助生成：GLM-5 智谱AI 2025-4-27 将数据库中的 clip_link 统一转换为前端可播放的视频地址，避免列表和详情页返回格式不一致。
 @Service
 @Slf4j
 public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements AlarmService {
@@ -76,7 +77,6 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         }
         this.save(alarm);
         monitorServiceImpl.getBaseMapper().MonitorAlarmCntPlusOne(cameraID);
-        // 获取数据库中的sqlalarm,找id最大且监控id对的上的
         Alarm latestAlarm = this.baseMapper.selectOne(
                 new QueryWrapper<Alarm>()
                         .eq("monitor_id", cameraID)
@@ -150,23 +150,20 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
 
         final Set<Integer> finalMonitorIds = userMonitorIds;
 
-        // 组合过滤所有条件
         alarms = alarms.stream()
                 .filter(alarm -> {
-                    // 1. 用户权限过滤
                     if (user.getRole() != 0 && !finalMonitorIds.contains(alarm.getMonitorId()))
                         return false;
-                    // 2. 状态过滤
                     if (status != null) {
                         boolean alarmStatus = alarm.getStatus() != null && alarm.getStatus();
                         boolean targetStatus = status == 1; // 假设 1=已处理, 0=未处理
                         if (alarmStatus != targetStatus)
                             return false;
                     }
-                    // 3. 告警类型过滤
+
                     if (caseType != null && !caseType.equals(alarm.getCaseType()))
                         return false;
-                    // 4. 警报等级过滤
+  
                     if (warningLevel != null && !warningLevel.equals(alarm.getWarningLevel()))
                         return false;
 
@@ -174,7 +171,6 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
                 })
                 .collect(Collectors.toList());
 
-        // 执行内存分页
         int total = alarms.size();
         int fromIndex = (pageNum - 1) * pageSize;
         if (fromIndex >= total || fromIndex < 0) {
@@ -253,10 +249,8 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
     public List<TimePeriod> getDayHistoryCnt(String date) {
         List<TimePeriod> timePeriods = this.baseMapper.SqlGetDayHistoryCnt(date);
 
-        // 生成一个包含所有时间段的完整列表
         List<String> allPeriods = Arrays.asList("03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00", "24:00");
 
-        // 对齐补齐时间
         Alignment(allPeriods, timePeriods);
 
         return timePeriods;
@@ -280,7 +274,7 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         }
         List<TimePeriod> timePeriods = this.baseMapper.SqlGetThreeDaysHistoryCnt(date);
         Alignment(allPeriods, timePeriods);
-        // 只保留月份和日期
+
         for (TimePeriod tp : timePeriods) {
             tp.setPeriod(tp.getPeriod().substring(5));
         }
@@ -299,7 +293,7 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         }
         List<TimePeriod> timePeriods = this.baseMapper.SqlGetWeekHistoryCnt(date);
         Alignment(allPeriods, timePeriods);
-        // 只保留月份和日期
+  
         for (TimePeriod tp : timePeriods) {
             tp.setPeriod(tp.getPeriod().substring(5));
         }
@@ -347,7 +341,6 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         return this.baseMapper.SqlGetCaseTypesWeekHistoryCnt(date);
     }
 
-    // ========== 近一个月 (30天) ==========
 
     @Override
     public List<TimePeriod> getMonthHistoryCnt(String date) {
@@ -361,7 +354,6 @@ public class AlarmServiceImpl extends ServiceImpl<AlarmDao, Alarm> implements Al
         }
         List<TimePeriod> timePeriods = this.baseMapper.SqlGetMonthHistoryCnt(date);
         Alignment(allPeriods, timePeriods);
-        // 只保留月份和日期
         for (TimePeriod tp : timePeriods) {
             tp.setPeriod(tp.getPeriod().substring(5));
         }

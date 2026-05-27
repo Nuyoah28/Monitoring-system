@@ -14,10 +14,6 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
-/**
- * @author CZCZCZ
- * @date 2023-09-11 19:29
- */
 @Mapper
 public interface AlarmDao extends BaseMapper<Alarm> {
 

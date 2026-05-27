@@ -2,10 +2,6 @@ package com.sipc.monitoringsystem.model.dto.res.User;
 
 import lombok.Data;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-09-10 17:29
- */
 
 @Data
 public class LoginRes {

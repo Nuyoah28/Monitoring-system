@@ -31,10 +31,6 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Value;
 
-/**
- * @author CZCZCZ
- *         &#064;date 2023-10-01 20:50
- */
 
 @Slf4j
 @RestController

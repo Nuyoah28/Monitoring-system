@@ -4,10 +4,6 @@ import lombok.Data;
 
 import java.sql.Timestamp;
 
-/**
- * @author CZCZCZ
- *         &#064;date 2023-09-13 17:53
- */
 @Data
 public class SqlGetAlarm {
 

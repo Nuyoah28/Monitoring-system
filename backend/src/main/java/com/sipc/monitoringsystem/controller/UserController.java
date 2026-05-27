@@ -19,10 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-09-10 17:26
- */
 @Validated
 @CrossOrigin
 @RestController

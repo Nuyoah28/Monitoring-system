@@ -6,10 +6,6 @@ import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * @author CZCZCZ
- *         &#064;date 2023-10-01 21:02
- */
 
 @Data
 public class GetMonitorListRes {

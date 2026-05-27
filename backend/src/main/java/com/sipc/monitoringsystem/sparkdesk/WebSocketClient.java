@@ -19,12 +19,6 @@ import jakarta.websocket.Session;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- *
- * @author aaqqs
- * @date 2024/9/8
- * @description websocket配置类
- */
 //@ServerEndpoint(value = "/websocketClient/{userId}")
 @ServerEndpoint(value = "/api/v1/gpt/ws/{token}")
 @Component

@@ -28,6 +28,8 @@ import java.util.regex.Pattern;
 @RestController
 @CrossOrigin
 @RequestMapping("/api/v1/alarm")
+
+// AI辅助生成：GLM-5 智谱AI，2025-4-21 更新接口
 public class AlarmClipController {
 
     private static final Pattern RANGE_PATTERN = Pattern.compile("bytes=(\\d+)-(\\d+)?");
@@ -47,7 +49,7 @@ public class AlarmClipController {
         if (objectKey == null || objectKey.isBlank()) {
             return ResponseEntity.notFound().build();
         }
-
+        // AI辅助生成：GLM-5 智谱AI，2025-4-25 完善告警视频代理接口，避免 Web/App 直接访问 COS 直链导致跨域、签名过期或 Range 请求异常。
         COSClient cosClient = ossConfig.cosClient();
         String bucketName = ossConfig.getBucketName();
         try {

@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  * FLV视频流控制器
  * 用于提供FLV格式视频文件的HTTP访问
  * 
- * @author Trae
+ * @author alaner28
  * @date 2026-01-27
  */
 @Slf4j

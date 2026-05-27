@@ -6,11 +6,6 @@ import lombok.Data;
 
 import java.util.List;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-09-21 15:07
- */
-
 @Data
 public class RealTimeAlarmRes
 {

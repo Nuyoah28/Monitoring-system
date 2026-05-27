@@ -12,10 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-09-10 17:27
- */
 
 @Slf4j
 @Service

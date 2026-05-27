@@ -18,10 +18,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.Map;
 
-/**
- * @author wangfeng
- * &#064;date 2023-09-13 20:59
- */
 
 @Validated
 @CrossOrigin

@@ -4,11 +4,6 @@ import org.springframework.util.DigestUtils;
 
 import java.nio.charset.StandardCharsets;
 
-/**
- *
- * @author CZCZCZ
- * &#064;date 2023-09-10 17:36
- */
 public class MD5Util {
 
     public static final String salt = "HuaWuWin!";

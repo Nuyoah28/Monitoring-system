@@ -3,10 +3,6 @@ package com.sipc.monitoringsystem.model.dto.param.alarm;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-09-13 17:42
- */
 
 @Data
 public class UpdateAlarmParam {

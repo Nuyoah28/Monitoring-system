@@ -2,11 +2,6 @@ package com.sipc.monitoringsystem.model.dto.param.Monitor;
 
 import lombok.Data;
 
-/**
- * @author CZCZCZ
- * &#064;date 2023-10-03 14:37
- */
-
 @Data
 public class UpdateMonitorParam {
     //TODO 改字段要改这里

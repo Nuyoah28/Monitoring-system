@@ -6,10 +6,6 @@ import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
 
-/**
- * @author CZCZCZ
- * &#064;date  2023-08-04 17:47
- */
 @Component
 public class TimeMetaObjectHandler implements MetaObjectHandler {
 
