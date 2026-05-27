@@ -131,7 +131,7 @@ def processing_thread():
             
             # 处理帧
             try:
-                processed_frame, warningList = yolo.main(
+                processed_frame, warningList, event_flags = yolo.main(
                     infer=infer, 
                     infer1=infer1, 
                     action_recognizer=action_recognizer, 

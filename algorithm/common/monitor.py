@@ -17,18 +17,18 @@ VIDEO_CACHE_SIZE = Config.VIDEO_CACHE_SIZE
 # 由 Java 后端通过 /api/v1/monitor-device/type 接口下发
 #
 #   索引  caseType  含义              当前检测方式
-#   [0]     1      进入危险区域       姿态估计(禁区坐标判定)
-#   [1]     2      烟雾              Mamba-YOLO (class_id=1, smoke)
-#   [2]     3      区域停留          暂未实现
-#   [3]     4      摔倒              ST-GCN++ 动作识别
-#   [4]     5      明火              Mamba-YOLO (class_id=0, fire)
+#   [0]     1      进入危险区域       事件型：危险区域短确认后触发一次
+#   [1]     2      烟雾              状态型：Mamba-YOLO (class_id=1, smoke)
+#   [2]     3      区域停留          事件型：危险区域停留超时后触发一次
+#   [3]     4      摔倒              事件型：CTR-GCN/FSM 触发单次报警事件
+#   [4]     5      明火              状态型：Mamba-YOLO (class_id=0, fire)
 #   [5]     6      吸烟              已停用
-#   [6]     7      打架              ST-GCN++ 动作识别
-#   [7]     8      垃圾乱放          Mamba-YOLO (extra_prompt)
+#   [6]     7      打架              状态型：CTR-GCN/FSM 的 fight 状态
+#   [7]     8      垃圾乱放          状态型：Mamba-YOLO (extra_prompt)
 #   [8]     9      冰面              已停用（Mamba 权重未针对冰面微调）
-#   [9]    10      电动车进楼         Mamba-YOLO (extra_prompt)
+#   [9]    10      电动车进楼         状态型：Mamba-YOLO (extra_prompt)
 #  [10]    11      载具占用车道       暂交由后续算法实现
-#  [11]    12      挥手呼救          ST-GCN++ 动作识别
+#  [11]    12      挥手呼救          状态型：ST-GCN++ 动作识别
 # -----------------------------------------------------------------------
 TYPE_LIST = list(Config.TYPE_LIST)
 
@@ -36,6 +36,8 @@ TYPE_LIST = list(Config.TYPE_LIST)
 AREA_LIST = list(Config.AREA_LIST)
 AREA_INPUT_WIDTH = Config.AREA_INPUT_WIDTH
 AREA_INPUT_HEIGHT = Config.AREA_INPUT_HEIGHT
+AREA_ENTER_CONFIRM_SECONDS = Config.AREA_ENTER_CONFIRM_SECONDS
+AREA_ENTER_ALARM_ONCE = Config.AREA_ENTER_ALARM_ONCE
 AREA_LOITER_SECONDS = Config.AREA_LOITER_SECONDS
 AREA_LOITER_GRACE_SECONDS = Config.AREA_LOITER_GRACE_SECONDS
 
@@ -84,9 +86,9 @@ ACTION_MAX_MISSING = Config.ACTION_MAX_MISSING
 
 ACTION_FALL_ON_THR = Config.ACTION_FALL_ON_THR
 ACTION_FALL_OFF_THR = Config.ACTION_FALL_OFF_THR
-ACTION_FALL_HOLD_FRAMES = Config.ACTION_FALL_HOLD_FRAMES
-ACTION_FALL_RELEASE_FRAMES = Config.ACTION_FALL_RELEASE_FRAMES
-ACTION_FALL_LATCH = Config.ACTION_FALL_LATCH
+ACTION_FALL_CONFIRM_FRAMES = Config.ACTION_FALL_CONFIRM_FRAMES
+ACTION_FALL_EXIT_FRAMES = Config.ACTION_FALL_EXIT_FRAMES
+ACTION_FALL_ALARM_ONCE = Config.ACTION_FALL_ALARM_ONCE
 
 ACTION_WAVE_ON_THR = Config.ACTION_WAVE_ON_THR
 ACTION_WAVE_OFF_THR = Config.ACTION_WAVE_OFF_THR

@@ -30,6 +30,21 @@ else:
 # 并通过 controller/monitorController.py 的 /update_prompt 接口动态修改。
 # -----------------------------------------------------------------------
 
+CASE_TYPE_META = {
+    1: {"name": "danger_enter", "semantic": "event", "event_flag": "danger_enter_event"},
+    2: {"name": "smoke", "semantic": "state", "event_flag": None},
+    3: {"name": "danger_loiter", "semantic": "event", "event_flag": "danger_loiter_event"},
+    4: {"name": "fall", "semantic": "event", "event_flag": "fall_alarm_event"},
+    5: {"name": "fire", "semantic": "state", "event_flag": None},
+    6: {"name": "smoking", "semantic": "disabled", "event_flag": None},
+    7: {"name": "fight", "semantic": "state", "event_flag": None},
+    8: {"name": "garbage", "semantic": "state", "event_flag": None},
+    9: {"name": "ice", "semantic": "disabled", "event_flag": None},
+    10: {"name": "ebike", "semantic": "state", "event_flag": None},
+    11: {"name": "vehicle", "semantic": "disabled", "event_flag": None},
+    12: {"name": "wave", "semantic": "state", "event_flag": None},
+}
+
 
 def stream_video():
     # 增加重试连接机制
@@ -183,10 +198,12 @@ def stream_video():
         )
     print('模型加载成功！')
     
-    #设置时间
-    post_delay = 20  # 告警推送延迟20秒
-    last_post_time = time.time()  # 记录上一次post的时间
-    warning_streak = [0] * 12
+    # 报警调度：按 caseType 独立冷却，不同类型互不压制。
+    post_delay = 20
+    case_type_ids = list(range(1, 13))
+    last_post_time_by_case_type = {case_type: 0.0 for case_type in case_type_ids}
+    warning_streak_by_case_type = {case_type: 0 for case_type in case_type_ids}
+    pending_by_case_type = {case_type: False for case_type in case_type_ids}
     stable_warning_min_hits = monitorCommon.WARNING_STREAK_MIN_HITS
 
     save_img_delay = 10  # 保存图片间隔10秒
@@ -243,7 +260,7 @@ def stream_video():
                 monitorCommon.PROMPTS_CHANGED = False
                 
             try:
-                frame, warningList = yolo.main(infer=infer, infer1=infer1, action_recognizer=action_recognizer, np_img=frame, TYPE_LIST=monitorCommon.TYPE_LIST, AREA_LIST=monitorCommon.AREA_LIST, infer_custom=infer_custom)
+                frame, warningList, event_flags = yolo.main(infer=infer, infer1=infer1, action_recognizer=action_recognizer, np_img=frame, TYPE_LIST=monitorCommon.TYPE_LIST, AREA_LIST=monitorCommon.AREA_LIST, infer_custom=infer_custom)
             except Exception as e:
                 print(f"处理帧时出错: {e}")
                 traceback.print_exc()
@@ -260,16 +277,50 @@ def stream_video():
             print(warningList)
             current_time = time.time()
             stable_warning_list = [False] * len(warningList)
-            for idx, flag in enumerate(warningList):
-                if flag:
-                    warning_streak[idx] += 1
-                else:
-                    warning_streak[idx] = 0
-                stable_warning_list[idx] = warning_streak[idx] >= stable_warning_min_hits
+            event_flags = event_flags or {}
 
-            if any(stable_warning_list) and current_time - last_post_time >= post_delay:
-                AlarmService.postAlarm(copy.deepcopy(stable_warning_list))
-                last_post_time = current_time
+            for case_type, meta in CASE_TYPE_META.items():
+                if meta["semantic"] != "event" or not meta["event_flag"]:
+                    continue
+                if bool(event_flags.get(meta["event_flag"], False)):
+                    pending_by_case_type[case_type] = True
+
+            for idx, flag in enumerate(warningList):
+                case_type = idx + 1
+                meta = CASE_TYPE_META.get(case_type, {"semantic": "state"})
+                semantic = meta.get("semantic", "state")
+                if semantic == "disabled":
+                    stable_warning_list[idx] = False
+                    warning_streak_by_case_type[case_type] = 0
+                    pending_by_case_type[case_type] = False
+                    continue
+                if semantic == "event":
+                    stable_warning_list[idx] = pending_by_case_type[case_type]
+                    warning_streak_by_case_type[case_type] = 1 if pending_by_case_type[case_type] else 0
+                    continue
+                if flag:
+                    warning_streak_by_case_type[case_type] += 1
+                else:
+                    warning_streak_by_case_type[case_type] = 0
+                stable_warning_list[idx] = warning_streak_by_case_type[case_type] >= stable_warning_min_hits
+
+            fired_case_types = []
+            for idx, should_alarm in enumerate(stable_warning_list):
+                if not should_alarm:
+                    continue
+                case_type = idx + 1
+                if current_time - last_post_time_by_case_type[case_type] >= post_delay:
+                    fired_case_types.append(case_type)
+
+            if fired_case_types:
+                post_list = [False] * len(stable_warning_list)
+                for case_type in fired_case_types:
+                    post_list[case_type - 1] = True
+                AlarmService.postAlarm(copy.deepcopy(post_list))
+                for case_type in fired_case_types:
+                    last_post_time_by_case_type[case_type] = current_time
+                    if CASE_TYPE_META.get(case_type, {}).get("semantic") == "event":
+                        pending_by_case_type[case_type] = False
 
             # 每10秒保存一次带检测框的图片
             if current_time - last_save_time >= save_img_delay:

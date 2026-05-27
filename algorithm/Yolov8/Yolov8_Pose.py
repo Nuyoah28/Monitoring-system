@@ -28,10 +28,17 @@ LIMB_COLORS = [[51, 153, 255], [51, 153, 255], [51, 153, 255], [51, 153, 255],
 
 NUM_1 = 0
 
-AREA_LOITER_STATE = {
-    "active": {},
-    "last_seen": {},
-}
+
+def _new_area_state():
+    return {
+        "active": {},
+        "last_seen": {},
+        "alarmed": set(),
+    }
+
+
+AREA_ENTER_STATE = _new_area_state()
+AREA_LOITER_STATE = _new_area_state()
 
 
 class LoadPoseEngine:
@@ -241,32 +248,40 @@ def _indices_in_area(points, area_box):
     )[0].astype(np.int32)
 
 
-def _update_loiter_state(bboxes, body_points, inside_indices, now_time, threshold_seconds, grace_seconds):
-    active = AREA_LOITER_STATE["active"]
-    last_seen = AREA_LOITER_STATE["last_seen"]
+def _build_area_track_id(bboxes, body_points, index):
+    index = int(index)
+    if body_points is not None and index < len(body_points):
+        foot = body_points[index]
+    else:
+        foot = (0, 0)
+
+    if bboxes is not None and index < len(bboxes):
+        box = bboxes[index]
+        return (
+            int(round(float(foot[0]) / 40.0)),
+            int(round(float(foot[1]) / 40.0)),
+            int(round((float(box[2]) - float(box[0])) / 40.0)),
+            int(round((float(box[3]) - float(box[1])) / 40.0)),
+        )
+    return (int(round(float(foot[0]) / 40.0)), int(round(float(foot[1]) / 40.0)))
+
+
+def _update_area_state(state, bboxes, body_points, inside_indices, now_time, threshold_seconds, grace_seconds):
+    active = state["active"]
+    last_seen = state["last_seen"]
+    alarmed = state["alarmed"]
     current_ids = set()
     alarm_indices = []
 
     for index in inside_indices:
         index = int(index)
-        if bboxes is not None and index < len(bboxes):
-            box = bboxes[index]
-            foot = body_points[index] if index < len(body_points) else (0, 0)
-            track_id = (
-                int(round(float(foot[0]) / 40.0)),
-                int(round(float(foot[1]) / 40.0)),
-                int(round((float(box[2]) - float(box[0])) / 40.0)),
-                int(round((float(box[3]) - float(box[1])) / 40.0)),
-            )
-        else:
-            foot = body_points[index] if index < len(body_points) else (0, 0)
-            track_id = (int(round(float(foot[0]) / 40.0)), int(round(float(foot[1]) / 40.0)))
-
+        track_id = _build_area_track_id(bboxes, body_points, index)
         current_ids.add(track_id)
         active.setdefault(track_id, now_time)
         last_seen[track_id] = now_time
-        if now_time - active[track_id] >= threshold_seconds:
+        if now_time - active[track_id] >= threshold_seconds and track_id not in alarmed:
             alarm_indices.append(index)
+            alarmed.add(track_id)
 
     expired_ids = [
         track_id
@@ -276,32 +291,39 @@ def _update_loiter_state(bboxes, body_points, inside_indices, now_time, threshol
     for track_id in expired_ids:
         active.pop(track_id, None)
         last_seen.pop(track_id, None)
+        alarmed.discard(track_id)
 
     return np.asarray(alarm_indices, dtype=np.int32)
 
 
-def _expire_loiter_state(now_time, grace_seconds):
-    active = AREA_LOITER_STATE["active"]
-    last_seen = AREA_LOITER_STATE["last_seen"]
+def _expire_area_state(state, now_time, grace_seconds):
+    active = state["active"]
+    last_seen = state["last_seen"]
+    alarmed = state["alarmed"]
     expired_ids = [track_id for track_id, seen_at in last_seen.items() if now_time - seen_at > grace_seconds]
     for track_id in expired_ids:
         active.pop(track_id, None)
         last_seen.pop(track_id, None)
-
+        alarmed.discard(track_id)
+# AI辅助生成：多类别结果接到现有视频检测流程里 由 Deepseek 协助完成，2026-04-20。
 
 def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST, infer_custom=None):
     from common import monitor as monitorCommon
-    indices_danger, fire_indices, smoke_indices = monitorCommon.preList
+    _, fire_indices, smoke_indices = monitorCommon.preList
     try:
         raw_img = np_img.copy()
         draw_img = np_img.copy()
 
-        #   Pose estimation + ST-GCN++ action recognition
         list0 = False   # danger zone
         list2 = False   # area loitering
         list3 = False   # fall
         list6 = False   # punch
         list11 = False  # wave
+        fall_alarm_event = False
+        danger_enter_event = False
+        danger_loiter_event = False
+        danger_indices = np.asarray([], dtype=np.int32)
+        loiter_indices = np.asarray([], dtype=np.int32)
         bboxes = None
         points = None
 
@@ -322,12 +344,12 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST, infer_c
                     action_result = action_recognizer.predict(points, bboxes)
                 if _safe_bool(TYPE_LIST, 3):
                     list3 = action_result.get('fall', False)
+                    fall_alarm_event = action_result.get('fall_alarm_event', False)
                 if _safe_bool(TYPE_LIST, 6):
                     list6 = action_result.get('punch', False)
                 if _safe_bool(TYPE_LIST, 11):
                     list11 = action_result.get('wave', False)
 
-                # Draw action labels on image (multi-person overlays when available)
                 overlays = []
                 if hasattr(action_recognizer, "get_last_overlays"):
                     overlays = action_recognizer.get_last_overlays() or []
@@ -345,7 +367,6 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST, infer_c
                         if one_action.get("wave", False):
                             cv2.putText(draw_img, "wave", (x, y - line * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
                 elif bboxes is not None and len(bboxes) > 0:
-                    # fallback for legacy recognizer behavior
                     x, y = int(bboxes[0, 0]), int(bboxes[0, 1])
                     if list3:
                         cv2.putText(draw_img, "fall", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (36, 255, 12), 2)
@@ -359,49 +380,83 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST, infer_c
         # ---------------------------------------------------------#
         area_box = _scale_area_to_frame(AREA_LIST, raw_img.shape, monitorCommon)
         inside_indices = np.asarray([], dtype=np.int32)
+        body_points = np.empty((0, 2), dtype=np.float32)
+        area_enter_enabled = _safe_bool(TYPE_LIST, 0)
         area_loiter_enabled = _safe_bool(TYPE_LIST, 2)
         area_grace_seconds = float(getattr(monitorCommon, "AREA_LOITER_GRACE_SECONDS", 1.5))
-        if (_safe_bool(TYPE_LIST, 0) or area_loiter_enabled) and bboxes is not None and points is not None and len(bboxes) > 0:
+        area_enter_confirm_seconds = float(getattr(monitorCommon, "AREA_ENTER_CONFIRM_SECONDS", 0.5))
+        area_enter_once = bool(getattr(monitorCommon, "AREA_ENTER_ALARM_ONCE", True))
+        now_time = time.time()
+        if area_box is not None:
+            left, top, right, bottom = [int(round(value)) for value in area_box]
+            cv2.rectangle(draw_img, (left, top), (right, bottom), (0, 0, 255), 2)
+
+        if (area_enter_enabled or area_loiter_enabled) and area_box is not None and bboxes is not None and points is not None and len(bboxes) > 0:
             body_points = _pose_body_points(points, min(float(getattr(infer, "confidence", 0.3)), 0.4))
             inside_indices = _indices_in_area(body_points, area_box)
-            indices_danger = inside_indices
 
-            if area_box is not None:
-                left, top, right, bottom = [int(round(value)) for value in area_box]
-                cv2.rectangle(draw_img, (left, top), (right, bottom), (0, 0, 255), 2)
-
-            if area_loiter_enabled:
-                loiter_indices = _update_loiter_state(
+            if area_enter_enabled:
+                danger_indices = _update_area_state(
+                    AREA_ENTER_STATE,
                     bboxes,
                     body_points,
                     inside_indices,
-                    time.time(),
+                    now_time,
+                    area_enter_confirm_seconds,
+                    area_grace_seconds,
+                )
+                danger_enter_event = len(danger_indices) > 0
+                list0 = danger_enter_event
+                if danger_enter_event and not area_enter_once:
+                    AREA_ENTER_STATE["alarmed"].clear()
+            else:
+                AREA_ENTER_STATE["active"].clear()
+                AREA_ENTER_STATE["last_seen"].clear()
+                AREA_ENTER_STATE["alarmed"].clear()
+
+            if area_loiter_enabled:
+                loiter_indices = _update_area_state(
+                    AREA_LOITER_STATE,
+                    bboxes,
+                    body_points,
+                    inside_indices,
+                    now_time,
                     float(getattr(monitorCommon, "AREA_LOITER_SECONDS", 5.0)),
                     area_grace_seconds,
                 )
-                list2 = len(loiter_indices) > 0
+                danger_loiter_event = len(loiter_indices) > 0
+                list2 = danger_loiter_event
             else:
                 AREA_LOITER_STATE["active"].clear()
                 AREA_LOITER_STATE["last_seen"].clear()
-        elif area_loiter_enabled:
-            _expire_loiter_state(time.time(), area_grace_seconds)
-        if indices_danger is None:
-            indices_danger = []
-        if len(indices_danger) > 0 and _safe_bool(TYPE_LIST, 0):
-            list0 = True
+                AREA_LOITER_STATE["alarmed"].clear()
+        else:
+            if area_enter_enabled:
+                _expire_area_state(AREA_ENTER_STATE, now_time, area_grace_seconds)
+            else:
+                AREA_ENTER_STATE["active"].clear()
+                AREA_ENTER_STATE["last_seen"].clear()
+                AREA_ENTER_STATE["alarmed"].clear()
+            if area_loiter_enabled:
+                _expire_area_state(AREA_LOITER_STATE, now_time, area_grace_seconds)
+            else:
+                AREA_LOITER_STATE["active"].clear()
+                AREA_LOITER_STATE["last_seen"].clear()
+                AREA_LOITER_STATE["alarmed"].clear()
+
+        if danger_enter_event:
             try:
-                if len(indices_danger) <= bboxes.shape[0]:
-                    for i in range(indices_danger.shape[0]):
-                        index = indices_danger[i]
+                for index in danger_indices:
+                    if bboxes is not None and index < bboxes.shape[0]:
                         x = int(bboxes[index, 0])
                         y = int(bboxes[index, 1])
                         cv2.putText(draw_img, "danger", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 2, (36, 255, 12), 2)
             except Exception:
                 pass
-        if list2:
+        if danger_loiter_event:
             try:
                 for index in loiter_indices:
-                    if index < bboxes.shape[0]:
+                    if bboxes is not None and index < bboxes.shape[0]:
                         x = int(bboxes[index, 0])
                         y = int(bboxes[index, 1])
                         cv2.putText(draw_img, "loiter", (x, y + 42), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
@@ -526,7 +581,12 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST, infer_c
             bool(len(vehicle_indices) > 0 and TYPE_LIST[10]),  # [10] caseType=11 vehicle
             list11,  # [11] caseType=12 wave (ST-GCN++)
         ]
-        monitorCommon.preList = indices_danger, fire_indices, smoke_indices
-        return draw_img, RES_LIST
+        monitorCommon.preList = None, fire_indices, smoke_indices
+        event_flags = {
+            "danger_enter_event": bool(danger_enter_event and area_enter_enabled),
+            "danger_loiter_event": bool(danger_loiter_event and area_loiter_enabled),
+            "fall_alarm_event": bool(fall_alarm_event and _safe_bool(TYPE_LIST, 3)),
+        }
+        return draw_img, RES_LIST, event_flags
     finally:
         pass

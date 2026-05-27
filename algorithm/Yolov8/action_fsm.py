@@ -5,9 +5,9 @@ from dataclasses import dataclass
 class ActionFSMConfig:
     fall_on_thr: float = 0.35
     fall_off_thr: float = 0.15
-    fall_hold_frames: int = 75
-    fall_release_frames: int = 30
-    fall_latch: bool = False
+    fall_confirm_frames: int = 50
+    fall_exit_frames: int = 15
+    fall_alarm_once: bool = True
 
     wave_on_thr: float = 0.45
     wave_off_thr: float = 0.25
@@ -35,10 +35,11 @@ class TrackActionFSM:
     def _get_state(self, track_id):
         if track_id not in self._state:
             self._state[track_id] = {
-                "fall_hold_left": 0,
-                "fall_low_count": 0,
+                "fall_confirm_count": 0,
+                "fall_exit_count": 0,
                 "fallen_state": False,
                 "fall_event": False,
+                "fall_alarm_event": False,
                 "wave_on_count": 0,
                 "wave_off_count": 0,
                 "wave_help": False,
@@ -64,6 +65,7 @@ class TrackActionFSM:
         return {
             "fall": bool(st["fallen_state"]),
             "fall_event": bool(st["fall_event"]),
+            "fall_alarm_event": bool(st["fall_alarm_event"]),
             "fallen_state": bool(st["fallen_state"]),
             "wave": bool(st["wave_help"]),
             "wave_help": bool(st["wave_help"]),
@@ -77,29 +79,30 @@ class TrackActionFSM:
 
     def _update_fall(self, st, fall_prob):
         st["fall_event"] = fall_prob >= self.cfg.fall_on_thr
+        st["fall_alarm_event"] = False
 
         if st["fallen_state"]:
-            if self.cfg.fall_latch:
-                st["fall_hold_left"] = self.cfg.fall_hold_frames
-                st["fall_low_count"] = 0
-                return
-
-            st["fall_hold_left"] = max(0, st["fall_hold_left"] - 1)
+            st["fall_confirm_count"] = 0
             if fall_prob < self.cfg.fall_off_thr:
-                st["fall_low_count"] += 1
+                st["fall_exit_count"] += 1
             else:
-                st["fall_low_count"] = 0
+                st["fall_exit_count"] = 0
 
-            if (
-                st["fall_hold_left"] == 0
-                and st["fall_low_count"] >= self.cfg.fall_release_frames
-            ):
+            if st["fall_exit_count"] >= self.cfg.fall_exit_frames:
                 st["fallen_state"] = False
-                st["fall_low_count"] = 0
-        elif fall_prob >= self.cfg.fall_on_thr:
+                st["fall_exit_count"] = 0
+            return
+
+        st["fall_exit_count"] = 0
+        if fall_prob >= self.cfg.fall_on_thr:
+            st["fall_confirm_count"] += 1
+        else:
+            st["fall_confirm_count"] = 0
+
+        if st["fall_confirm_count"] >= self.cfg.fall_confirm_frames:
             st["fallen_state"] = True
-            st["fall_hold_left"] = self.cfg.fall_hold_frames
-            st["fall_low_count"] = 0
+            st["fall_confirm_count"] = 0
+            st["fall_alarm_event"] = True
 
     def _update_wave(self, st, wave_prob):
         if wave_prob >= self.cfg.wave_on_thr:

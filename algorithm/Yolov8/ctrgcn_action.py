@@ -117,7 +117,7 @@ class ActionRecognizer:
         self.track_last_probs = {}
         self.track_last_result = {}
         self.prob_hist = {}
-        self.last_result = {"fall": False, "punch": False, "wave": False}
+        self.last_result = {"fall": False, "fall_alarm_event": False, "punch": False, "wave": False}
         self.last_overlays = []
 
         self.ctrgcn_root = _resolve_ctrgcn_root(ctrgcn_root)
@@ -167,9 +167,9 @@ class ActionRecognizer:
             ActionFSMConfig(
                 fall_on_thr=monitorCommon.ACTION_FALL_ON_THR,
                 fall_off_thr=monitorCommon.ACTION_FALL_OFF_THR,
-                fall_hold_frames=monitorCommon.ACTION_FALL_HOLD_FRAMES,
-                fall_release_frames=monitorCommon.ACTION_FALL_RELEASE_FRAMES,
-                fall_latch=getattr(monitorCommon, "ACTION_FALL_LATCH", False),
+                fall_confirm_frames=monitorCommon.ACTION_FALL_CONFIRM_FRAMES,
+                fall_exit_frames=monitorCommon.ACTION_FALL_EXIT_FRAMES,
+                fall_alarm_once=getattr(monitorCommon, "ACTION_FALL_ALARM_ONCE", True),
                 wave_on_thr=monitorCommon.ACTION_WAVE_ON_THR,
                 wave_off_thr=monitorCommon.ACTION_WAVE_OFF_THR,
                 wave_confirm_frames=monitorCommon.ACTION_WAVE_CONFIRM_FRAMES,
@@ -306,6 +306,7 @@ class ActionRecognizer:
         self.track_last_probs[track_id] = np.zeros((len(self.label_order),), dtype=np.float32)
         self.track_last_result[track_id] = {
             "fall": False,
+            "fall_alarm_event": False,
             "punch": False,
             "wave": False,
             "fall_prob": 0.0,
@@ -407,12 +408,13 @@ class ActionRecognizer:
         return flags
 
     def _aggregate_existing_state(self):
-        global_result = {"fall": False, "punch": False, "wave": False}
+        global_result = {"fall": False, "fall_alarm_event": False, "punch": False, "wave": False}
         self.last_overlays = []
         for track_id, one_result in self.track_last_result.items():
             if track_id not in self.track_boxes:
                 continue
             global_result["fall"] = global_result["fall"] or bool(one_result.get("fall", False))
+            global_result["fall_alarm_event"] = global_result["fall_alarm_event"] or bool(one_result.get("fall_alarm_event", False))
             global_result["wave"] = global_result["wave"] or bool(one_result.get("wave", False))
             global_result["punch"] = global_result["punch"] or bool(one_result.get("punch", False))
             self.last_overlays.append((self.track_boxes[track_id].copy(), {
@@ -527,7 +529,7 @@ class ActionRecognizer:
                 self.prob_hist[track_id].append(self.track_last_probs[track_id])
 
         nearby_flags = self._compute_nearby_flags(active_track_ids)
-        global_result = {"fall": False, "punch": False, "wave": False}
+        global_result = {"fall": False, "fall_alarm_event": False, "punch": False, "wave": False}
 
         for track_id in active_track_ids:
             avg_prob = self._avg_probs(track_id)
@@ -542,6 +544,7 @@ class ActionRecognizer:
             self.track_last_result[track_id] = one_result
 
             global_result["fall"] = global_result["fall"] or bool(one_result.get("fall", False))
+            global_result["fall_alarm_event"] = global_result["fall_alarm_event"] or bool(one_result.get("fall_alarm_event", False))
             global_result["wave"] = global_result["wave"] or bool(one_result.get("wave", False))
             global_result["punch"] = global_result["punch"] or bool(one_result.get("punch", False))
 
