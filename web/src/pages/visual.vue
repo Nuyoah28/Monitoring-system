@@ -474,6 +474,7 @@
             <article class="card ai-alarm-card">
               <div class="event-stream">
                 <div class="event-stream-head">
+                  <!-- AI辅助生成: GLM-5 智谱AI 2025-4-21 实时页面警报修改 -->
                   <span class="event-stream-title">AI 实时报警时间轴</span>
                   <span class="event-stream-count">{{ recentEvents.length }} 条</span>
                 </div>
@@ -980,7 +981,7 @@
 </template>
 
 <script setup lang="ts">
-// AI辅助生成：GPT-5 Codex, 2026-03-28。数字人舞台接入与大屏页面联动展示逻辑。
+// AI辅助生成：GLM-5 智谱AI, 2026-03-28。数字人舞台接入与大屏页面联动展示逻辑。
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '@/components/DashboardLayout.vue'
@@ -3922,6 +3923,7 @@ watch(activeTab, (tab) => {
 </script>
 
 <style scoped>
+/* AI辅助生成：GLM-5 智谱AI, 2026-04-16 优化页面布局 */
 .page-shell :deep(*) {
   min-width: 0;
 }

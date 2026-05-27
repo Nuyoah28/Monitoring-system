@@ -94,11 +94,13 @@
 </template>
 
 <script setup lang="ts">
+// AI辅助生成： AI 助手的语音录入、上传识别、TTS 播放 由Deepseek协助完成，2026-04-25。
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { agentBaseUrl } from '@/config/config';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { ElMessage } from 'element-plus';
 
 type LayoutMode = 'floating' | 'inline' | 'stage';
 type MessageRole = 'user' | 'assistant';
@@ -582,6 +584,25 @@ const encodeWav = (samples: Int16Array, rate: number): Blob => {
   return new Blob([buffer], { type: 'audio/wav' });
 };
 
+const readAgentJson = async (response: Response): Promise<any> => {
+  const text = await response.text();
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (error) {
+      data = null;
+    }
+  }
+  if (!response.ok) {
+    throw new Error(data?.message || text || `服务异常 ${response.status}`);
+  }
+  if (!data) {
+    throw new Error(text || '语音接口无返回数据');
+  }
+  return data;
+};
+
 const sendVoiceToAgent = async (wavBlob: Blob): Promise<void> => {
   stopTtsPlayback(false);
   updateVoiceState('idle');
@@ -594,6 +615,7 @@ const sendVoiceToAgent = async (wavBlob: Blob): Promise<void> => {
   const formData = new FormData();
   formData.append('audio', wavBlob, 'voice.wav');
   formData.append('return_tts', 'true');
+  formData.append('client_time', new Date().toISOString());
 
   try {
     const response = await fetch(`${agentBaseUrl}/chat/voice`, {
@@ -601,7 +623,7 @@ const sendVoiceToAgent = async (wavBlob: Blob): Promise<void> => {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
-    const data = await response.json();
+    const data = await readAgentJson(response);
     if (data?.code !== '00000' || !data?.data) {
       throw new Error(data?.message || '语音请求失败');
     }
@@ -633,10 +655,13 @@ const sendVoiceToAgent = async (wavBlob: Blob): Promise<void> => {
       updateVoiceState('idle');
     }
   } catch (error: any) {
-    recognizedMessage.content = PUBLIC_VOICE_ERROR_MESSAGE;
+    const message = error?.message || PUBLIC_VOICE_ERROR_MESSAGE;
+    recognizedMessage.content = message;
     recognizedMessage.pending = false;
-    appendMessage({ role: 'assistant', content: '抱歉，当前无法完成语音提问，请稍后重试或改用文字输入。' });
-    emitAssistantPreview('抱歉，当前无法完成语音提问，请稍后重试或改用文字输入。');
+    const assistantMessage = `抱歉，当前无法完成语音提问：${message}`;
+    appendMessage({ role: 'assistant', content: assistantMessage });
+    emitAssistantPreview(assistantMessage);
+    ElMessage.error(message);
     setStreaming(false);
   }
 };
