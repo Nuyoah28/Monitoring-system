@@ -92,6 +92,7 @@ backend/src/main/resources/application-dev-my.yml
 *.tflite
 *.weights
 *.safetensors
+*.mnn
 
 .agent
 
