@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-# AI辅助生成：本文件中的 ReAct 并发读工具调度、写操作鉴权与时间直答逻辑由 GPT-5 Codex 协助完成，2026-04-04。
-
+# AI辅助生成：本文件中的 ReAct 并发读工具调度、写操作鉴权与时间直答逻辑由 GLM-5 智谱AI 协助完成，2026-04-04。
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -25,7 +24,7 @@ from agent_core.skill_support import SkillSupport
 from agent_core.tools.gateway import ToolGateway
 from agent_core.utils import build_conversation_key
 
-
+# AI辅助生成：ReactIntelligentAgent烛泪骨架由 Deepseek 协助完成，2026-04-28。
 class ReactIntelligentAgent:
     def __init__(self, settings: AgentSettings = SETTINGS):
         self.settings = settings

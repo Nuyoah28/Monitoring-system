@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# AI辅助生成：本文件中的上下文监控点补全规划逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+# AI辅助生成：本文件中的上下文监控点补全规划逻辑由 GLM-5 智谱AI 协助完成，2026-04-04。
 
 import json
 import re
