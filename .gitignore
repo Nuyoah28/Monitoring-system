@@ -101,6 +101,7 @@ ReAct_agent/data/db/*.db
 
 # Algorithm runtime cache
 algorithm/runtime/
+algorithm/token.txt
 
 # Generated algorithm outputs
 algorithm/saved_images/
