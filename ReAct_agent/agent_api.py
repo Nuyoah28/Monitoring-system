@@ -3,7 +3,7 @@ Agent API 服务 - 提供HTTP接口供前端或其他服务调用
 可以集成到Spring Boot后端，或作为独立服务运行
 """
 
-# AI辅助生成：本文件中的多用户会话隔离与身份上下文透传逻辑由 GPT-5 Codex 协助完成，2026-04-04。
+# AI辅助生成：本文件中的多用户会话隔离与身份上下文透传逻辑由 GLM-5 智谱AI 协助完成，2026-04-04。
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -321,6 +321,7 @@ def chat_voice():
             return jsonify({"code": "A1000", "message": "请上传 audio 文件", "data": None}), 400
         audio_bytes = f.read()
         return_tts = request.form.get('return_tts', 'false').lower() == 'true'
+        user_token = _get_user_token(request, {})
         current_time = _parse_client_time(request.form.get('client_time') or request.form.get('current_time'))
     elif request.json:
         data = request.json
