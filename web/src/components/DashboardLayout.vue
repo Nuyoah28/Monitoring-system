@@ -6,7 +6,7 @@
           <img class="brand-logo" src="/assets/logo.png" alt="" />
         </div>
         <div>
-          <h1>社区智眼</h1>
+          <h1>社区安盾</h1>
           <p>智慧社区监控预警平台</p>
         </div>
       </div>

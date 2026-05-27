@@ -116,7 +116,7 @@ import Vue from 'vue';
 import OwnerTabbar from '@/components/navigation/owner-tabbar.vue';
 import VirtualAgentCard from '@/components/VirtualAgentCard.vue';
 
-const AI_WELCOME_MESSAGE = '你好，我是社区智眼 AI 助手。你可以问我报警处置、监控巡检、环境数据、车位检测相关的问题，我会尽量用简单清楚的方式帮你分析。';
+const AI_WELCOME_MESSAGE = '你好，我是社区安盾 AI 助手。你可以问我报警处置、监控巡检、环境数据、车位检测相关的问题，我会尽量用简单清楚的方式帮你分析。';
 
 export default {
   components: { OwnerTabbar, VirtualAgentCard },

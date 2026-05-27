@@ -7,7 +7,7 @@
       <view class="hero-top">
         <view>
           <view class="eyebrow">管理工作台</view>
-          <view class="page-title">社区智眼</view>
+          <view class="page-title">社区安盾</view>
         </view>
         <view class="identity-btn" @tap="jumpSetting">
           <u-icon name="setting" color="#fff" size="28rpx"></u-icon>

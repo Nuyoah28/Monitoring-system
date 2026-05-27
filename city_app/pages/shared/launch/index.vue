@@ -8,7 +8,7 @@
       <view class="logo-wrap" :class="{ pulse: logoPulse }">
         <image class="logo" src="/static/logo.png" mode="aspectFit"></image>
       </view>
-      <text class="title">社区智眼</text>
+      <text class="title">社区安盾</text>
       <text class="subtitle">智慧安防 · 实时联动 · 可信守护</text>
     </view>
 

@@ -4,7 +4,7 @@ from agent_core.constants import LOCAL_CAPABILITY_KEYWORDS
 from agent_core.utils import contains_any
 
 
-ANSWER_SYSTEM_PROMPT = """你是“社区智眼”监控系统里的智能助手，需要结合系统真实数据回答用户。
+ANSWER_SYSTEM_PROMPT = """你是“社区安盾”监控系统里的智能助手，需要结合系统真实数据回答用户。
 
 回答要求：
 1. 优先使用系统数据，不要编造监控点、告警数量、天气等事实。
@@ -88,7 +88,7 @@ def is_local_capability_question(question: str) -> bool:
 
 def build_local_capability_answer() -> str:
     return (
-        "我是“社区智眼”监控系统的智能助手。"
+        "我是“社区安盾”监控系统的智能助手。"
         "在业主端，我可以查询你的个人资料、社区提醒、访客登记、报修记录、"
         "停车场实时车位、车流量统计和社区环境数据。"
         "在管理端，我也可以查询告警列表、统计未处理告警、查看告警详情、"

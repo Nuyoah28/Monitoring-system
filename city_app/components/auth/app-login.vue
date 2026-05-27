@@ -15,7 +15,7 @@
       <view class="login-stage">
         <view class="login-container">
           <view class="header">
-            <text class="title">社区智眼</text>
+            <text class="title">社区安盾</text>
             <view class="mainTitle">{{ isOwnerApp ? '居民服务入口' : '智慧社区工作入口' }}</view>
           </view>
 
@@ -133,7 +133,7 @@
       <scroll-view scroll-y="true" style="height: 60vh;">
         <view class="modal-content">
           <p>
-            欢迎您使用社区智眼服务。为保障您的合法权益，维护服务秩序，请您在注册、登录及使用本应用前，仔细阅读并充分理解本《用户服务协议》与《隐私政策》。当您点击同意或继续使用本服务，即视为您已阅读、理解并接受本协议全部条款。
+            欢迎您使用社区安盾服务。为保障您的合法权益，维护服务秩序，请您在注册、登录及使用本应用前，仔细阅读并充分理解本《用户服务协议》与《隐私政策》。当您点击同意或继续使用本服务，即视为您已阅读、理解并接受本协议全部条款。
           </p>
           <h4>1. 服务说明</h4>
           <p>1.1 本应用面向社区管理、物业服务与住户信息查询等场景提供相关功能与服务。</p>

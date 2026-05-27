@@ -34,7 +34,7 @@
 
       <div class="info-text login">
         <span class="hero-badge">COMPUTER DESIGN CONTEST</span>
-        <h2>社区智眼</h2>
+        <h2>社区安盾</h2>
         <h2>监控预警系统</h2>
         <p>AI 联动 · 态势感知 · 实时响应</p>
         <div class="hero-metrics">
