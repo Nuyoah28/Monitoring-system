@@ -80,17 +80,6 @@
                         "appkey_android" : "b793c585623cb4d4901d36623652b730"
                     }
                 },
-                "push" : {
-                    "unipush" : {
-                        "version" : "2",
-                        "offline" : false,
-                        "hms" : {},
-                        "oppo" : {},
-                        "vivo" : {},
-                        "mi" : {},
-                        "meizu" : {}
-                    }
-                },
                 "ad" : {}
             },
             "splashscreen" : {
