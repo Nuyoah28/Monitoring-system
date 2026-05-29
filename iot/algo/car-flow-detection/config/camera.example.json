@@ -1,8 +1,8 @@
 {
   "camera_id": "gate_01",
   "source": "",
-  "model_path": "../models/carflow.pt",
-  "tracker_path": "../yolov13/ultralytics/cfg/trackers/bytetrack.yaml",
+  "model_path": "../runs/train/vehicle_flow_yolov13_lite_single/weights/best.pt",
+  "tracker_path": "../yolov13-lite/ultralytics/cfg/trackers/bytetrack.yaml",
   "conf": 0.25,
   "iou": 0.5,
   "imgsz": 640,

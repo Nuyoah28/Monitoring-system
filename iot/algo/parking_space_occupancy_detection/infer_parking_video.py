@@ -8,9 +8,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 import torch
-from torch import nn
-from torchvision import transforms
-from torchvision.models import mobilenet_v3_small
+
+from parking_classifier_lib import load_checkpoint_model
 
 
 ROOT = Path(__file__).resolve().parent
@@ -20,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run parking occupancy classification on a video.")
     parser.add_argument("--source", default="../img/parking/parking_crop.mp4", help="Video path or camera index")
     parser.add_argument("--mask", default="../img/parking/mask_crop.png", help="Parking-space mask image")
-    parser.add_argument("--model", default="../img/parking/model/mobilenetv3_parking.pt", help="MobileNetV3 checkpoint path")
+    parser.add_argument("--model", default="../img/parking/model/mobilenetv4_parking.pt", help="Classifier checkpoint path")
     parser.add_argument("--device", default="0", help="Device, e.g. 0 or cpu")
     parser.add_argument("--output-dir", default="runs/parking_classifier", help="Directory for default outputs")
     parser.add_argument("--output-video", default="", help="Annotated output video path")
@@ -47,13 +46,6 @@ def read_image(path: Path):
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
 
-def create_model(num_classes: int) -> nn.Module:
-    model = mobilenet_v3_small(weights=None)
-    in_features = model.classifier[-1].in_features
-    model.classifier[-1] = nn.Linear(in_features, num_classes)
-    return model
-
-
 def resolve_device(raw: str) -> torch.device:
     if raw == "cpu" or not torch.cuda.is_available():
         return torch.device("cpu")
@@ -61,22 +53,8 @@ def resolve_device(raw: str) -> torch.device:
 
 
 def load_model(path: Path, device: torch.device):
-    checkpoint = torch.load(path, map_location=device, weights_only=True)
-    class_names = checkpoint.get("class_names", ["empty", "not_empty"])
-    image_size = int(checkpoint.get("image_size", 96))
-    model = create_model(num_classes=len(class_names))
-    model.load_state_dict(checkpoint["model_state"])
-    model.to(device)
-    model.eval()
-    preprocess = transforms.Compose(
-        [
-            transforms.ToPILImage(),
-            transforms.Resize((image_size, image_size)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]
-    )
-    return model, preprocess, class_names
+    model, preprocess, class_names, checkpoint = load_checkpoint_model(path, device)
+    return model, preprocess, class_names, checkpoint
 
 
 def extract_spaces(mask, frame_shape, min_area: int) -> list[dict]:
@@ -200,7 +178,7 @@ def main() -> None:
     output_video.parent.mkdir(parents=True, exist_ok=True)
     jsonl_path.parent.mkdir(parents=True, exist_ok=True)
 
-    model, preprocess, class_names = load_model(model_path, device)
+    model, preprocess, class_names, checkpoint = load_model(model_path, device)
     mask = read_image(mask_path)
     if mask is None:
         raise FileNotFoundError(f"Cannot read mask image: {mask_path}")
@@ -215,7 +193,8 @@ def main() -> None:
     spaces = extract_spaces(mask, first_frame.shape, args.min_space_area)
     if not spaces:
         raise ValueError(f"No parking spaces found from mask: {mask_path}")
-    print(f"[INFO] loaded MobileNetV3 classifier: {model_path}")
+    print(f"[INFO] loaded parking classifier: {model_path}")
+    print(f"[INFO] architecture: {checkpoint.get('model', 'unknown')}")
     print(f"[INFO] classes: {class_names}, device={device}")
     print(f"[INFO] extracted parking spaces: {len(spaces)}")
 
@@ -280,7 +259,7 @@ if __name__ == "__main__":
 python ./infer_parking_video.py `
   --source ../img/parking/parking_crop.mp4 `
   --mask ../img/parking/mask_crop.png `
-  --model ../img/parking/model/mobilenetv3_parking.pt `
+  --model ../img/parking/model/mobilenetv4_parking.pt `
   --device 0 `
   --output-video ../test_video/processed/parking_classifier_processed.mp4 `
   --jsonl ../test_video/processed/parking_classifier_stats.jsonl

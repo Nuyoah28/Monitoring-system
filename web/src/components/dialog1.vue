@@ -23,7 +23,6 @@
   
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
-import flvjs from 'flv.js';
 import { useUserStore } from '@/stores/user';
 import axios from 'axios';
 import { baseUrl, resolveDemoAlarmVideo } from '@/config/config';
@@ -80,28 +79,28 @@ const withNoCache = (url: string): string => {
 
 const getBackendUrlBase = (): string => {
   const rawBase = String(baseUrl || '').trim();
-  const candidates = [
-    rawBase,
-    rawBase && !/^[a-z][a-z0-9+.-]*:\/\//i.test(rawBase) ? `http://${rawBase}` : '',
-    typeof window !== 'undefined' && window.location ? window.location.origin : '',
-  ].filter(Boolean);
+  const pageOrigin = typeof window !== 'undefined' && window.location ? window.location.origin : '';
+  if (!rawBase) return pageOrigin ? `${pageOrigin}/` : '';
 
-  for (const candidate of candidates) {
-    try {
-      const origin = new URL(candidate).origin;
-      return `${origin}/`;
-    } catch {
-      // Try the next candidate.
+  try {
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(rawBase)) {
+      return `${rawBase.replace(/\/+$/, '')}/`;
     }
+    if (pageOrigin) {
+      return `${new URL(rawBase.replace(/\/+$/, '') + '/', pageOrigin).toString()}`;
+    }
+  } catch {
+    // Fall back to current origin below.
   }
-  return '';
+  return pageOrigin ? `${pageOrigin}/` : '';
 };
 
 const resolveVideoUrl = (pathOrUrl: string): string => {
   const backendBase = getBackendUrlBase();
   if (!backendBase) return pathOrUrl;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(pathOrUrl)) return pathOrUrl;
   try {
-    return new URL(pathOrUrl, backendBase).toString();
+    return new URL(pathOrUrl.replace(/^\/+/, ''), backendBase).toString();
   } catch {
     return pathOrUrl;
   }

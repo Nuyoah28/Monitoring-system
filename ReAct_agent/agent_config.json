@@ -1,6 +1,6 @@
 {
   "backend": {
-    "base_url": "http://123.56.248.17:10215/api/v1",
+    "base_url": "http://127.0.0.1:10215/api/v1",
     "username": "root",
     "password": "123456"
   },
@@ -9,7 +9,7 @@
     "max_alarm_fetch_pages": 30,
     "alarm_page_size": 100,
     "memory_ttl_seconds": 7200,
-    "max_agent_workers": 16
+    "max_agent_workers": 4
   },
   "ai": {
     "active_provider": "openai_compatible",

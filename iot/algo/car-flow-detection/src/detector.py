@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -37,6 +38,11 @@ class LocalYoloTracker:
         ultralytics_root = ultralytics_root.resolve()
         if not ultralytics_root.exists():
             raise FileNotFoundError(f"Cannot find local ultralytics fork: {ultralytics_root}")
+
+        # Keep Ultralytics runtime settings inside the repo workspace to avoid AppData permission issues.
+        local_config_dir = (carflow_root / ".yolo_runtime").resolve()
+        local_config_dir.mkdir(parents=True, exist_ok=True)
+        os.environ.setdefault("YOLO_CONFIG_DIR", str(local_config_dir))
 
         if str(ultralytics_root) not in sys.path:
             sys.path.insert(0, str(ultralytics_root))

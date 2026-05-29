@@ -1,58 +1,56 @@
-# 车位检测流程说明
+# 车位占用分类工作流
 
-当前车位检测采用基于现有数据集的分类方案，不再使用 YOLO 检测车辆框。
+当前目录已经从单一的 MobileNetV3 流程整理为统一的车位分类框架，支持以下骨干网络做对比实验：
 
-## 整体流程
+- `mobilenet_v4_small_custom`
+- `mobilenet_v3_small`
+- `resnet34`
+- `edgenext_x_small`
 
-1. 使用 `mask_crop.png` 或 `mask_1920_1080.png` 标出固定摄像头画面中的车位区域。
-2. 程序读取 mask，通过连通域自动提取每个车位的矩形框。
-3. 对视频每一帧，按车位框裁剪出每个车位小图。
-4. 使用 MobileNetV3 分类器判断裁剪图是 `empty` 还是 `not_empty`。
-5. 将每个车位输出为 `free` 或 `occupied`。
-6. 生成带标注的视频和逐帧 JSONL 统计结果。
+其中 `mobilenet_v4_small_custom` 是当前仓库内置的 MobileNetV4 风格轻量实现，用于在本地环境里补齐 MobileNetV4 对比项。当前 `yolo13` 环境中的 `timm==0.6.12` 不提供官方 MobileNetV4 预训练模型，所以这里不是官方权重版 MobileNetV4。
 
-## 当前数据集
+## 目录说明
 
-数据集位置：
+核心脚本：
 
 ```text
-iot/algo/img/parking/clf-data/
-  empty/
-  not_empty/
+iot/algo/parking_space_occupancy_detection/
+  parking_classifier_lib.py
+  train_parking_classifier.py
+  compare_parking_classifiers.py
+  annotate_parking_images.py
+  infer_parking_video.py
 ```
 
-当前数据集是车位裁剪图分类数据集：
+默认模型输出：
 
 ```text
-empty      空车位裁剪图
-not_empty  有车车位裁剪图
-```
-
-它不是 YOLO 检测数据集，不需要 `labels/train`、`labels/val` 这种 YOLO 标注。
-
-## 关键文件
-
-```text
-iot/algo/img/parking/mask_crop.png
-iot/algo/img/parking/mask_1920_1080.png
+iot/algo/img/parking/model/mobilenetv4_parking.pt
 iot/algo/img/parking/model/mobilenetv3_parking.pt
-iot/algo/img/parking/parking_crop.mp4
-iot/algo/img/parking/parking_1920_1080.mp4
+iot/algo/img/parking/model/resnet34_parking.pt
+iot/algo/img/parking/model/edgenext_x_small_parking.pt
 ```
 
-推理脚本：
+## 数据集
+
+当前推荐数据集根目录：
 
 ```text
-iot/algo/parking_space_occupancy_detection/infer_parking_video.py
+iot/algo/img/parking/archive (1)
 ```
 
-训练脚本：
+支持三类数据组织方式：
 
-```text
-iot/algo/parking_space_occupancy_detection/train_parking_classifier.py
-```
+1. `flat`
+   目录结构为 `empty/` 和 `not_empty/`
+2. `cnr_ext`
+   使用 `CNR-EXT-Patches-150x150/LABELS/train.txt`、`val.txt`、`test.txt`
+3. `cnrpark`
+   使用 `CNRPark-Patches-150x150` 中的 `busy/free`
 
-## 训练分类器
+脚本默认会自动识别数据集类型；对 `archive (1)` 会自动识别为 `cnr_ext`。
+
+## 训练单个模型
 
 进入目录：
 
@@ -60,120 +58,154 @@ iot/algo/parking_space_occupancy_detection/train_parking_classifier.py
 cd D:/桌面/新建文件夹/Monitoring-system/iot/algo/parking_space_occupancy_detection
 ```
 
-训练命令：
+训练 MobileNetV4 风格版本：
 
 ```powershell
 python ./train_parking_classifier.py `
-  --data ../img/parking/clf-data `
-  --output ../img/parking/model/mobilenetv3_parking.pt `
-  --epochs 20 `
+  --data "../img/parking/archive (1)" `
+  --dataset-type cnr_ext `
+  --model mobilenet_v4_small_custom `
+  --epochs 5 `
   --batch 64 `
   --device 0
 ```
 
-训练完成后会生成：
-
-```text
-iot/algo/img/parking/model/mobilenetv3_parking.pt
-```
-
-快速小样本测试训练：
+训练 MobileNetV3：
 
 ```powershell
 python ./train_parking_classifier.py `
-  --data ../img/parking/clf-data `
-  --output ./runs/parking_classifier/mobilenetv3_smoke.pt `
-  --epochs 1 `
-  --batch 8 `
-  --device cpu `
-  --max-per-class 20
+  --data "../img/parking/archive (1)" `
+  --dataset-type cnr_ext `
+  --model mobilenet_v3_small `
+  --epochs 5 `
+  --batch 64 `
+  --device 0
 ```
 
-## 推理视频
+训练 ResNet34：
 
-裁剪视频推理：
+```powershell
+python ./train_parking_classifier.py `
+  --data "../img/parking/archive (1)" `
+  --dataset-type cnr_ext `
+  --model resnet34 `
+  --epochs 5 `
+  --batch 64 `
+  --device 0
+```
+
+训练 EdgeNeXt：
+
+```powershell
+python ./train_parking_classifier.py `
+  --data "../img/parking/archive (1)" `
+  --dataset-type cnr_ext `
+  --model edgenext_x_small `
+  --epochs 5 `
+  --batch 64 `
+  --device 0
+```
+
+如果不显式传 `--output`，脚本会按模型名自动保存到 `../img/parking/model/` 下的对应文件。
+
+## 多模型对比实验
+
+运行完整对比：
+
+```powershell
+python ./compare_parking_classifiers.py `
+  --data "../img/parking/archive (1)" `
+  --dataset-type cnr_ext `
+  --models mobilenet_v4_small_custom,mobilenet_v3_small,resnet34,edgenext_x_small `
+  --epochs 5 `
+  --batch 64 `
+  --device 0 `
+  --output-json ./runs/parking_classifier/compare_results_v2.json `
+  --summary-md ./runs/parking_classifier/compare_summary_v2.md `
+  --checkpoint-dir ./runs/parking_classifier/models
+```
+
+输出内容：
+
+- `compare_results_v2.json`：完整指标、训练历史、推荐模型
+- `compare_summary_v2.md`：Markdown 汇总表
+- `runs/parking_classifier/models/*.pt`：每个模型的 checkpoint
+
+如果在 Windows 环境里遇到 `PermissionError: [WinError 5]` 且栈里指向 `DataLoader` 多进程队列，可以把 `--workers` 改成 `0`。
+
+快速冒烟测试：
+
+```powershell
+python ./compare_parking_classifiers.py `
+  --data "../img/parking/archive (1)" `
+  --dataset-type cnr_ext `
+  --models mobilenet_v4_small_custom,mobilenet_v3_small,resnet34,edgenext_x_small `
+  --epochs 1 `
+  --batch 4 `
+  --device cpu `
+  --workers 0 `
+  --max-samples-per-split 8 `
+  --no-pretrained `
+  --output-json ./runs/parking_classifier/compare_results_smoke_v2.json `
+  --summary-md ./runs/parking_classifier/compare_summary_smoke_v2.md `
+  --checkpoint-dir ./runs/parking_classifier/smoke_models
+```
+
+## 图片标注与推理
+
+标注脚本支持在 `iot/algo/test_img` 下对图片画与图像边框平行的矩形框，然后直接用训练好的分类模型推理，并把结果图继续保存回 `test_img`。
+
+示例：
+
+```powershell
+python ./annotate_parking_images.py `
+  --input-dir ../test_img `
+  --model ../img/parking/model/mobilenetv4_parking.pt `
+  --device 0
+```
+
+如果你希望继续沿用旧模型，也可以把 `--model` 改成：
+
+```text
+../img/parking/model/mobilenetv3_parking.pt
+../img/parking/model/resnet34_parking.pt
+../img/parking/model/edgenext_x_small_parking.pt
+```
+
+## 视频推理
+
+视频推理脚本会读取 mask 中每个白色连通区域对应的车位框，裁剪后送入分类模型，再输出带框视频和逐帧统计。
+
+示例：
 
 ```powershell
 python ./infer_parking_video.py `
   --source ../img/parking/parking_crop.mp4 `
   --mask ../img/parking/mask_crop.png `
-  --model ../img/parking/model/mobilenetv3_parking.pt `
+  --model ../img/parking/model/mobilenetv4_parking.pt `
   --device 0 `
   --output-video ../test_video/processed/parking_classifier_processed.mp4 `
   --jsonl ../test_video/processed/parking_classifier_stats.jsonl
 ```
 
-完整 1920x1080 视频推理：
+完整分辨率视频示例：
 
 ```powershell
 python ./infer_parking_video.py `
   --source ../img/parking/parking_1920_1080.mp4 `
   --mask ../img/parking/mask_1920_1080.png `
-  --model ../img/parking/model/mobilenetv3_parking.pt `
+  --model ../img/parking/model/mobilenetv4_parking.pt `
   --device 0 `
   --output-video ../test_video/processed/parking_1920_processed.mp4 `
   --jsonl ../test_video/processed/parking_1920_stats.jsonl
 ```
 
-只测试前 30 帧：
+## 旧版 MobileNetV3 文件说明
 
-```powershell
-python ./infer_parking_video.py `
-  --source ../img/parking/parking_crop.mp4 `
-  --mask ../img/parking/mask_crop.png `
-  --model ../img/parking/model/mobilenetv3_parking.pt `
-  --device 0 `
-  --output-video ../test_video/processed/parking_classifier_check.mp4 `
-  --jsonl ../test_video/processed/parking_classifier_check.jsonl `
-  --max-frames 30
-```
+旧流程并没有删除，`mobilenet_v3_small` 现在作为正式对比基线保留。
 
-## 输出结果
+- 老的 V3 权重命名：`mobilenetv3_parking.pt`
+- 新默认主推模型：`mobilenetv4_parking.pt`
+- 推理脚本已支持从 checkpoint 中自动识别模型类型，不再写死只支持 MobileNetV3
 
-视频输出会画出每个车位框：
-
-```text
-红色 occupied
-绿色 free
-```
-
-JSONL 每一行是一帧，例如：
-
-```json
-{
-  "frame_index": 0,
-  "total_spaces": 14,
-  "occupied": 13,
-  "free": 1,
-  "unknown": 0,
-  "occupancy_rate": 0.9285714285714286,
-  "spaces": [
-    {
-      "id": "1",
-      "status": "occupied",
-      "label": 1,
-      "bbox": [70, 0, 131, 56]
-    }
-  ]
-}
-```
-
-## 更换摄像头时要做什么
-
-如果换摄像头或画面裁剪方式变化，需要重新制作对应的 mask：
-
-```text
-mask_crop.png        对应 parking_crop.mp4 这种裁剪画面
-mask_1920_1080.png   对应 1920x1080 原始画面
-```
-
-mask 中每个白色连通区域代表一个车位。脚本会自动从 mask 中提取车位框。
-
-如果新摄像头画面和现有数据差异较大，需要重新采集该摄像头下的车位裁剪图，放入：
-
-```text
-clf-data/empty
-clf-data/not_empty
-```
-
-然后重新运行训练脚本生成新的 `mobilenetv3_parking.pt`。
+这样你可以直接复用旧权重，也可以把 V3、V4、ResNet34、EdgeNeXt 统一放到同一套训练和推理流程里管理。

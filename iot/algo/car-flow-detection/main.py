@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -31,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", type=str, default="", help="Override video source path/URL")
     parser.add_argument("--show", action="store_true", help="Display annotated frames in a window")
     parser.add_argument("--save-video", type=str, default="", help="Optional annotated output video path")
+    parser.add_argument("--device", type=str, default="", help="Override device, e.g. 0 or cpu")
     parser.add_argument("--max-frames", type=int, default=0, help="Stop after N frames, 0 means no limit")
     return parser.parse_args()
 
@@ -45,6 +49,8 @@ def main() -> None:
         raise ValueError("Config field 'model_path' is required and must point to a trained .pt file.")
     config["model_path"] = _resolve_path_like(config_dir, config["model_path"])
     config["tracker_path"] = _resolve_path_like(config_dir, config["tracker_path"])
+    if args.device:
+        config["device"] = args.device
     if config.get("output_jsonl"):
         config["output_jsonl"] = _resolve_path_like(config_dir, config["output_jsonl"])
 
@@ -52,11 +58,12 @@ def main() -> None:
     if not source:
         raise ValueError("No video source configured.")
     if _looks_like_local_path(source):
-        source = _resolve_path_like(config_dir, source)
+        source_base_dir = Path.cwd() if args.source else config_dir
+        source = _resolve_path_like(source_base_dir, source)
 
     save_video = args.save_video
     if save_video and _looks_like_local_path(save_video):
-        save_video = _resolve_path_like(config_dir, save_video)
+        save_video = _resolve_path_like(Path.cwd(), save_video)
 
     print(f"[INFO] loading model: {config['model_path']}")
     tracker = LocalYoloTracker(
@@ -89,6 +96,7 @@ def main() -> None:
         Path(save_video).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
     writer = None
+    writer_temp_path = ""
     frame_index = 0
     last_report_monotonic = time.monotonic()
 
@@ -103,14 +111,16 @@ def main() -> None:
             events = counter.update(tracked_objects, frame_index=frame_index, timestamp_ms=timestamp_ms)
             for event in events:
                 aggregator.add_event(event)
+            occupancy = counter.occupancy_snapshot()
+            snapshot = aggregator.snapshot()
 
             payload = {
                 "cameraId": config["camera_id"],
                 "timestampMs": timestamp_ms,
                 "frameIndex": frame_index,
                 "events": [asdict(event) for event in events],
-                "occupancy": counter.occupancy_snapshot(),
-                "stats": aggregator.snapshot(),
+                "occupancy": occupancy,
+                "stats": snapshot,
             }
 
             report_interval = float(config.get("report_interval_seconds", 5))
@@ -127,7 +137,9 @@ def main() -> None:
                 rules=config["rules"],
                 tracked_objects=tracked_objects,
                 track_history=counter.track_history,
-                snapshot=aggregator.snapshot(),
+                snapshot=snapshot,
+                occupancy=occupancy,
+                events=events,
             )
 
             if save_video:
@@ -135,7 +147,7 @@ def main() -> None:
                     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                     height, width = annotated.shape[:2]
                     fps = capture.get(cv2.CAP_PROP_FPS) or 15.0
-                    writer = cv2.VideoWriter(save_video, fourcc, fps, (width, height))
+                    writer, writer_temp_path = _create_video_writer(save_video, fourcc, fps, (width, height))
                 writer.write(annotated)
 
             if args.show:
@@ -152,6 +164,7 @@ def main() -> None:
         capture.release()
         if writer is not None:
             writer.release()
+            _finalize_video_output(save_video, writer_temp_path)
         if args.show:
             cv2.destroyAllWindows()
 
@@ -166,6 +179,43 @@ def _resolve_path_like(base_dir: Path, value: str) -> str:
 def _looks_like_local_path(value: str) -> bool:
     lowered = value.lower()
     return "://" not in lowered and not lowered.isdigit()
+
+
+def _create_video_writer(save_video: str, fourcc: int, fps: float, size: tuple[int, int]):
+    writer = cv2.VideoWriter(save_video, fourcc, fps, size)
+    if writer.isOpened():
+        return writer, ""
+
+    temp_dir = Path(tempfile.gettempdir()) / "monitoring_system_video"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    temp_path = temp_dir / Path(save_video).name
+    writer = cv2.VideoWriter(str(temp_path), fourcc, fps, size)
+    if not writer.isOpened():
+        raise RuntimeError(f"Cannot open video writer for target or temp path: {save_video}")
+    print(f"[WARN] target video path not writable by OpenCV, using temp path: {temp_path}")
+    return writer, str(temp_path)
+
+
+def _finalize_video_output(save_video: str, temp_path: str) -> None:
+    if not temp_path:
+        return
+    temp_file = Path(temp_path)
+    target_file = Path(save_video)
+    if not temp_file.exists():
+        raise FileNotFoundError(f"Temporary video file not found: {temp_file}")
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.move(str(temp_file), str(target_file))
+    except PermissionError:
+        command = [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            f"Copy-Item -LiteralPath '{temp_file}' -Destination '{target_file}' -Force",
+        ]
+        subprocess.run(command, check=True)
+        temp_file.unlink(missing_ok=True)
+    print(f"[INFO] moved temp video to: {target_file}")
 
 
 if __name__ == "__main__":
