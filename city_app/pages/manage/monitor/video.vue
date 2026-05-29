@@ -7,7 +7,33 @@
     </view>
 
     <view class="player-wrap">
-      <video :src="video" :autoplay="true" :controls="true" :show-fullscreen-btn="true" class="player"></video>
+      <!-- #ifdef APP-PLUS || MP-WEIXIN -->
+      <live-player
+        v-if="isLive"
+        :src="video"
+        mode="live"
+        :autoplay="true"
+        object-fit="fillCrop"
+        class="player"
+      ></live-player>
+      <video
+        v-else
+        :src="video"
+        :autoplay="true"
+        :controls="true"
+        :show-fullscreen-btn="true"
+        class="player"
+      ></video>
+      <!-- #endif -->
+      <!-- #ifdef H5 -->
+      <video
+        :src="video"
+        :autoplay="true"
+        :controls="true"
+        :show-fullscreen-btn="true"
+        class="player"
+      ></video>
+      <!-- #endif -->
     </view>
   </view>
 </template>
@@ -20,6 +46,13 @@ export default {
       name: '',
       video: '',
     };
+  },
+  computed: {
+    isLive() {
+      if (!this.video) return false;
+      const url = String(this.video).toLowerCase();
+      return url.includes('.flv') || url.includes('/live/');
+    },
   },
   onLoad(query) {
     const info = uni.getWindowInfo();

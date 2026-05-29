@@ -89,8 +89,9 @@
         </view>
 
         <view class="actions">
+          <view class="btn btn--primary" @tap="openVideo(item)">实时画面</view>
           <view class="btn btn--secondary" @tap="openEdit(index)">编辑区域</view>
-          <view class="btn btn--primary" @tap="goAiConfig(item)">规则</view>
+          <view class="btn btn--secondary" @tap="goAiConfig(item)">规则</view>
           <view class="btn btn--ghost" :class="!item.running ? 'is-online' : ''" @tap="editWorking(index)">{{ item.running ? '停用' : '启用' }}</view>
         </view>
       </view>
@@ -112,6 +113,7 @@
 <script>
 import Edit from "../controls/components/edit.vue";
 import ManageTabbar from '@/components/navigation/manage-tabbar.vue';
+import { resolveLiveStreamUrl } from '@/common/config.js';
 
 export default {
   components: { Edit, ManageTabbar },
@@ -229,6 +231,17 @@ export default {
       }
       uni.navigateTo({
         url: `/pages/manage/monitor/ai-config?id=${current.id || ''}&name=${encodeURIComponent(current.name || '')}&area=${encodeURIComponent(current.department || current.area || '')}`,
+      });
+    },
+    openVideo(item) {
+      if (!item) return;
+      const videoUrl = resolveLiveStreamUrl(item) || item.video || item.ip || '';
+      if (!videoUrl) {
+        uni.showToast({ title: '该设备暂无视频地址', icon: 'none' });
+        return;
+      }
+      uni.navigateTo({
+        url: `/pages/manage/monitor/video?id=${item.id || ''}&name=${encodeURIComponent(item.name || '')}&video=${encodeURIComponent(videoUrl)}`,
       });
     },
     editWorking(index) {

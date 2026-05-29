@@ -23,10 +23,30 @@
         <view class="panel panel--preview">
           <view class="panel-head">
             <text>区域预览</text>
-            <text class="panel-tag">当前截图画面</text>
+            <text class="panel-tag">实时画面</text>
           </view>
 
           <view class="preview-box">
+            <!-- #ifdef APP-PLUS || MP-WEIXIN -->
+            <live-player
+              v-if="liveStreamUrl"
+              :src="liveStreamUrl"
+              mode="live"
+              :autoplay="true"
+              object-fit="contain"
+              class="snapshot"
+            ></live-player>
+            <view v-else class="snapshot placeholder">
+              <text>实时流加载中…</text>
+            </view>
+            <cover-view
+              class="border border--preview"
+              v-for="(box, index) in border"
+              :key="`preview-${index}`"
+              :style="boxStyle(box)"
+            ></cover-view>
+            <!-- #endif -->
+            <!-- #ifdef H5 -->
             <image
               v-if="img"
               :src="img.replace(/[\r\n]/g, '')"
@@ -43,10 +63,11 @@
               :key="`preview-${index}`"
               :style="boxStyle(box)"
             ></view>
+            <!-- #endif -->
           </view>
 
           <view class="panel-tip">
-            上方用于确认当前画面和已选区域，下方用于实际框选。
+            上方为摄像头实时画面，下方在静帧截图上框选，保证坐标稳定。
           </view>
         </view>
 
@@ -115,6 +136,7 @@
 
 <script>
 import { throttle } from "lodash";
+import { resolveLiveStreamUrl } from '@/common/config.js';
 
 export default {
   name: "Edit",
@@ -173,6 +195,9 @@ export default {
     },
     dialogTitle() {
       return this.currentWarnData.name || "未命名摄像头";
+    },
+    liveStreamUrl() {
+      return resolveLiveStreamUrl(this.currentWarnData) || '';
     },
   },
   created() {
@@ -746,7 +771,7 @@ export default {
   .preview-box {
     width: 328px;
     max-width: 100%;
-    height: 190px;
+    height: 246px;
     margin: 0 auto;
     position: relative;
     border-radius: 16rpx;

@@ -91,6 +91,7 @@
 
 <script>
 import MonitorMap from "../controls/components/monitorMap.vue";
+import { resolveLiveStreamUrl } from '@/common/config.js';
 
 export default {
   components: { MonitorMap },
@@ -272,7 +273,7 @@ export default {
       });
     },
     openVideo(item) {
-      const videoUrl = item.video || item.ip || '';
+      const videoUrl = resolveLiveStreamUrl(item) || item.video || item.ip || '';
       if (!videoUrl) {
         uni.showToast({ title: '该设备暂无视频地址', icon: 'none' });
         return;
