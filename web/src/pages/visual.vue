@@ -1448,8 +1448,27 @@ const startAlarmSocket = () => {
     onAlarm: async (message: AlarmSocketMessage) => {
       console.log('[AlarmSocket] 收到新报警:', message)
       refreshAlarmDataFromSocket()
-      const { ElMessage } = await import('element-plus')
-      ElMessage.warning(message.message || '收到新的报警信息')
+      const { ElNotification } = await import('element-plus')
+      const alarmRefId = (message as any)?.data?.id ?? (message as any)?.id ?? null
+      ElNotification({
+        title: '收到新报警',
+        message: message.message || '点击进入告警处置',
+        type: 'warning',
+        duration: 6000,
+        onClick: () => {
+          const list = alarmStore.getAlarmList || []
+          let target: any = null
+          if (alarmRefId !== null) {
+            target = list.find((a: any) => Number(a?.id) === Number(alarmRefId)) || null
+          }
+          if (!target) target = list[0] || null
+          if (target) {
+            goPendingTask({ alarm: target })
+          } else {
+            activeTab.value = 'alarm'
+          }
+        },
+      })
     },
     onOpen: () => console.log('[AlarmSocket] 连接成功'),
     onClose: () => console.log('[AlarmSocket] 连接关闭'),
