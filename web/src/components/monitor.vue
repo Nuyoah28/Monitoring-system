@@ -2,7 +2,7 @@
   <div class="panel">
     <div id="demoDiv">
       <div class="videoDiv">
-        <video ref="videoElement" class="video-js vjs-default-skin" controls autoplay></video>
+        <video ref="videoElement" class="video-js vjs-default-skin" controls autoplay preload="auto"></video>
       </div>
 
       <el-button @click="drawer = true" type="primary" class="btn">
@@ -160,18 +160,14 @@
 </template>
   
 <script setup lang="ts">
-// import videojs from 'video.js'; // 引入 video.js
-// import 'video.js/dist/video-js.css'; // 引入 video.js 样式
-// import 'videojs-flash'; // 引入 RTMP 支持
-import flvjs from 'flv.js';
-// import Hls from 'hls.js';
 import { ref, onMounted, onUnmounted, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useAppStore } from '@/stores/app';
 import { ElMessage } from 'element-plus'
 import axios from 'axios';
-import { baseUrl, algorithmUrl, rtmpAddress } from '@/config/config';
+import { baseUrl, algorithmUrl, normalizeLiveStreamUrl, rtmpAddress } from '@/config/config';
+import { createSrsWebRtcPlayer, isSrsWebRtcUrl, type SrsWebRtcPlayer } from '@/utils/srsWebRtc';
 
 // 定义监控项接口
 interface MonitorItem {
@@ -197,6 +193,8 @@ let startPanelPos = { x: 0, y: 0 };
 let hasMoved = false; // 用于区分点击和拖拽
 
 const flvPlayer = ref<any>(null); // 更改为 flvPlayer
+const rtcPlayer = ref<SrsWebRtcPlayer | null>(null);
+let stopLiveLatencyGuard: (() => void) | null = null;
 const drawer = ref<boolean>(false);
 const direction = ref<string>('rtl');
 const editDialogVisible = ref<boolean>(false);
@@ -243,33 +241,94 @@ const withNoCache = (url: string): string => {
   return hash ? `${nextUrl}#${hash}` : nextUrl;
 };
 
-const initializeVideoPlayer = (videoUrl: string): void => {
-  if (flvjs.isSupported()) {
-    const videoElement = document.querySelector('video'); // 获取视频元素
-    const playUrl = withNoCache(videoUrl || rtmpAddress);
-    if(videoElement && flvPlayer.value) {
-      flvPlayer.value.unload();
-      flvPlayer.value.destroy(); // 先销毁之前的播放器实例
-      flvPlayer.value = null; // 清空引用
+const LIVE_STALL_RECOVER_MS = 15000;
+const FLV_STASH_INITIAL_SIZE = 2 * 1024 * 1024;
+
+const clearLiveLatencyGuard = (): void => {
+  if (stopLiveLatencyGuard) {
+    stopLiveLatencyGuard();
+    stopLiveLatencyGuard = null;
+  }
+};
+
+const attachLiveLatencyGuard = (videoElement: HTMLVideoElement): (() => void) => {
+  let lastPlaybackTime = videoElement.currentTime;
+  let lastProgressAt = Date.now();
+  const timer = window.setInterval(() => {
+    if (videoElement.paused) {
+      videoElement.play().catch(() => {});
+      return;
     }
-    console.log('videourl', videoUrl);
+    if (Math.abs(videoElement.currentTime - lastPlaybackTime) > 0.05) {
+      lastPlaybackTime = videoElement.currentTime;
+      lastProgressAt = Date.now();
+      return;
+    }
+    if (Date.now() - lastProgressAt > LIVE_STALL_RECOVER_MS) {
+      videoElement.play().catch(() => {});
+      lastProgressAt = Date.now();
+    }
+  }, 1000);
+
+  return () => {
+    window.clearInterval(timer);
+  };
+};
+
+const initializeVideoPlayer = (videoUrl: string): void => {
+  const videoElement = document.querySelector('video') as HTMLVideoElement | null; // 获取视频元素
+  const normalizedUrl = normalizeLiveStreamUrl(videoUrl || rtmpAddress);
+  clearLiveLatencyGuard();
+  if (rtcPlayer.value) {
+    rtcPlayer.value.close();
+    rtcPlayer.value = null;
+  }
+  if(videoElement && flvPlayer.value) {
+      flvPlayer.value.unload();
+      flvPlayer.value.destroy();
+      flvPlayer.value = null;
+  }
+  if (!videoElement) return;
+  console.log('videourl', videoUrl);
+
+  if (isSrsWebRtcUrl(normalizedUrl)) {
+    videoElement.muted = true;
+    createSrsWebRtcPlayer(videoElement, normalizedUrl)
+      .then((player) => {
+        rtcPlayer.value = player;
+      })
+      .catch((error) => {
+        console.error('SRS WebRTC Player Error:', error);
+        window.setTimeout(() => initializeVideoPlayer(videoUrl), 1200);
+      });
+    return;
+  }
+
+  if (/\.m3u8($|[?#])/i.test(normalizedUrl)) {
+    console.error('This stream type is disabled. Use a webrtc:// stream URL instead.');
+    return;
+  }
+
+  const playUrl = withNoCache(normalizedUrl);
+  if (flvjs.isSupported()) {
     try {
       flvPlayer.value = flvjs.createPlayer({
         type: 'flv',
         url: playUrl,
+        isLive: true,
       }, {
-        enableWorker: false, // 禁用worker模式以减少复杂性
-        enableStashBuffer: false, // 减少缓冲区以提高稳定性
-        stashInitialSize: 128, // 设置初始缓冲区大小
+        enableStashBuffer: true,
+        stashInitialSize: FLV_STASH_INITIAL_SIZE,
         lazyLoad: false,
+        enableWorker: false,
         deferLoadAfterSourceOpen: false,
         autoCleanupSourceBuffer: true,
       });
-      if(videoElement) {
-        flvPlayer.value.attachMediaElement(videoElement);
-        flvPlayer.value.load();
-        // 使用用户交互播放视频
-        videoElement.addEventListener('click', () => {
+      flvPlayer.value.attachMediaElement(videoElement);
+      flvPlayer.value.load();
+      stopLiveLatencyGuard = attachLiveLatencyGuard(videoElement);
+      // 使用用户交互播放视频
+      videoElement.addEventListener('click', () => {
             const playPromise = flvPlayer.value.play();
             if (playPromise && typeof playPromise.catch === 'function') {
               playPromise.catch((error: any) => {
@@ -279,10 +338,10 @@ const initializeVideoPlayer = (videoUrl: string): void => {
           });
         
         // 添加错误处理
-        flvPlayer.value.on(flvjs.Events.ERROR, (err: any) => {
+      flvPlayer.value.on(flvjs.Events.ERROR, (err: any) => {
           console.error('FLV Player Error:', err);
-        });
-      }
+          clearLiveLatencyGuard();
+      });
     } catch (error) {
       console.error('Failed to initialize FLV player:', error);
     }
@@ -334,7 +393,13 @@ const getVideoData = (): void => {
 const handleClose = (done: (() => void) | undefined): void => {
   // 在关闭抽屉之前，暂停视频
   if (flvPlayer.value) {
+    clearLiveLatencyGuard();
     flvPlayer.value.pause(); // 暂停视频
+  }
+  if (rtcPlayer.value) {
+    clearLiveLatencyGuard();
+    rtcPlayer.value.close();
+    rtcPlayer.value = null;
   }
   
   // 检查是否有未保存的更改需要确认，如果没有则直接关闭
@@ -585,7 +650,12 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  if (rtcPlayer.value) {
+    rtcPlayer.value.close();
+    rtcPlayer.value = null;
+  }
   if (flvPlayer.value) {
+    clearLiveLatencyGuard();
     flvPlayer.value.unload(); // 卸载媒体资源
     flvPlayer.value.destroy(); // 销毁 flv.js 播放器实例
     flvPlayer.value = null; // 清空引用

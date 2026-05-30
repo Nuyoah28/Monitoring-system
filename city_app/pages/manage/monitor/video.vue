@@ -6,7 +6,7 @@
       <view class="placeholder"></view>
     </view>
 
-    <view class="player-wrap">
+    <view class="player-wrap" style="min-height: 480rpx;">
       <!-- #ifdef APP-PLUS || MP-WEIXIN -->
       <live-player
         v-if="isLive"
@@ -15,6 +15,7 @@
         :autoplay="true"
         object-fit="fillCrop"
         class="player"
+        style="width: 100%; height: 480rpx; display: block;"
       ></live-player>
       <video
         v-else
@@ -23,6 +24,7 @@
         :controls="true"
         :show-fullscreen-btn="true"
         class="player"
+        style="width: 100%; height: 480rpx; display: block;"
       ></video>
       <!-- #endif -->
       <!-- #ifdef H5 -->
@@ -51,7 +53,7 @@ export default {
     isLive() {
       if (!this.video) return false;
       const url = String(this.video).toLowerCase();
-      return url.includes('.flv') || url.includes('/live/');
+      return url.includes('.flv') || url.includes('/live/') || url.startsWith('rtmp://');
     },
   },
   onLoad(query) {

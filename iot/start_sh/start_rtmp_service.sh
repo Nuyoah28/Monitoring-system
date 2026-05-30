@@ -1,49 +1,68 @@
 #!/usr/bin/env bash
+set -u
 
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-RTMP_DIR="$IOT_DIR/rtmpService"
-PYTHON_SCRIPT="$RTMP_DIR/push.py"
-
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-LOG_DIR="${LOG_DIR:-$RTMP_DIR/logs}"
+RTMP_URL="${RTMP_URL:-rtmp://123.56.248.17:1935/live/raw}"
+VIDEO_DEVICE="${VIDEO_DEVICE:-/dev/video0}"
+LOG_DIR="${LOG_DIR:-/home/user/Documents/iot/rtmpService/logs}"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/rtmp_push.log}"
 
-log() {
-  printf '[rtmp-start] %s\n' "$1"
-}
+INPUT_SIZE="${INPUT_SIZE:-1280x720}"
+INPUT_FPS="${INPUT_FPS:-30}"
+OUTPUT_SIZE="${OUTPUT_SIZE:-960:540}"
+OUTPUT_FPS="${OUTPUT_FPS:-25}"
+VIDEO_BITRATE="${VIDEO_BITRATE:-2500k}"
+VIDEO_MAXRATE="${VIDEO_MAXRATE:-3000k}"
+VIDEO_BUFSIZE="${VIDEO_BUFSIZE:-1500k}"
+GOP="${GOP:-25}"
+RESTART_DELAY="${RESTART_DELAY:-2}"
 
-require_command() {
-  local cmd="$1"
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    log "Command not found: $cmd"
-    exit 1
-  fi
-}
+FFMPEG_BIN="${FFMPEG_BIN:-/usr/local/bin/ffmpeg}"
+if [ ! -x "$FFMPEG_BIN" ]; then
+  FFMPEG_BIN="$(command -v ffmpeg || true)"
+fi
 
-prepare_environment() {
-  require_command "$PYTHON_BIN"
+mkdir -p "$LOG_DIR"
 
-  if [ ! -f "$PYTHON_SCRIPT" ]; then
-    log "Python script not found: $PYTHON_SCRIPT"
-    exit 1
-  fi
+if [ -z "$FFMPEG_BIN" ]; then
+  echo "$(date '+%F %T') ERROR: ffmpeg not found" >> "$LOG_FILE"
+  exit 127
+fi
 
-  mkdir -p "$LOG_DIR"
-}
+echo "$(date '+%F %T') RTMP push service starting, url=$RTMP_URL" >> "$LOG_FILE"
 
-main() {
-  prepare_environment
-  cd "$RTMP_DIR"
+while true; do
+  echo "$(date '+%F %T') Starting ffmpeg push..." >> "$LOG_FILE"
 
-  log "Starting RTMP push service"
-  log "Python: $PYTHON_BIN"
-  log "Script: $PYTHON_SCRIPT"
-  log "Log: $LOG_FILE"
+  "$FFMPEG_BIN" \
+    -hide_banner \
+    -loglevel info \
+    -fflags +genpts+discardcorrupt \
+    -f v4l2 \
+    -thread_queue_size 64 \
+    -input_format mjpeg \
+    -framerate "$INPUT_FPS" \
+    -video_size "$INPUT_SIZE" \
+    -err_detect ignore_err \
+    -i "$VIDEO_DEVICE" \
+    -vf "fps=${OUTPUT_FPS},scale=${OUTPUT_SIZE}" \
+    -r "$OUTPUT_FPS" \
+    -an \
+    -c:v libx264 \
+    -preset ultrafast \
+    -tune zerolatency \
+    -pix_fmt yuv420p \
+    -b:v "$VIDEO_BITRATE" \
+    -maxrate "$VIDEO_MAXRATE" \
+    -bufsize "$VIDEO_BUFSIZE" \
+    -g "$GOP" \
+    -keyint_min "$GOP" \
+    -sc_threshold 0 \
+    -bf 0 \
+    -x264-params "keyint=${GOP}:min-keyint=${GOP}:scenecut=0:repeat-headers=1" \
+    -flvflags no_duration_filesize \
+    -f flv "$RTMP_URL" >> "$LOG_FILE" 2>&1
 
-  exec "$PYTHON_BIN" -u "$PYTHON_SCRIPT" >>"$LOG_FILE" 2>&1
-}
-
-main "$@"
+  status=$?
+  echo "$(date '+%F %T') ffmpeg exited with code $status, restart in ${RESTART_DELAY}s" >> "$LOG_FILE"
+  sleep "$RESTART_DELAY"
+done

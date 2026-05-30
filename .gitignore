@@ -34,6 +34,7 @@ coverage/
 .env.local
 .env.*.local
 .npm/
+dist.zip
 
 # Python
 __pycache__/
@@ -106,6 +107,7 @@ algorithm/token.txt
 
 # Generated algorithm outputs
 algorithm/saved_images/
+iot/algo/
 iot/algo/car-flow-detection/outputs/
 iot/algo/test_video/
 iot/algo/car-flow-detection/datasets/

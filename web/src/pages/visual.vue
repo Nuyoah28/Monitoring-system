@@ -28,7 +28,7 @@
       </section>
 
       <section class="content-shell">
-        <section v-show="activeTab === 'alarm'" class="panel alarm-panel">
+        <section v-if="activeTab === 'alarm'" class="panel alarm-panel">
           <div class="alarm-left card">
             <div class="alarm-list-head">
               <div>
@@ -212,7 +212,7 @@
           </div>
         </div>
 
-        <section v-show="activeTab === 'analysis'" class="panel analysis-panel">
+        <section v-if="activeTab === 'analysis'" class="panel analysis-panel">
           <article class="card analysis-hero-card">
             <div class="panel-headline analysis-headline">
               <div>
@@ -389,7 +389,7 @@
           </article>
         </section>
 
-        <section v-show="activeTab === 'video'" class="panel video-panel">
+        <section v-if="activeTab === 'video'" class="panel video-panel">
           <article class="card video-main">
             <div class="panel-headline video-headline">
               <div class="video-title-row">
@@ -412,13 +412,19 @@
                 @click="selectPreviewTile(tile)"
                 @dblclick="openFocus(tile)"
               >
-                <video
-                  :ref="(el) => setTileVideoRef(tile.name, el as HTMLVideoElement | null)"
-                  class="tile-video"
-                  muted
-                  autoplay
-                  playsinline
-                ></video>
+                <div
+                  :ref="(el) => setTileVideoHostRef(tile.name, el as HTMLElement | null)"
+                  class="tile-video-host"
+                >
+                  <video
+                    :ref="(el) => setTileVideoRef(tile.name, el as HTMLVideoElement | null)"
+                    class="tile-video"
+                    muted
+                    autoplay
+                    playsinline
+                    preload="auto"
+                  ></video>
+                </div>
                 <div v-if="tileStatus(tile).tone === 'offline'" class="tile-offline-state">
                   <svg class="tile-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9A2.25 2.25 0 0013.5 5.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
                   <span>设备离线</span>
@@ -506,7 +512,7 @@
           </aside>
         </section>
 
-        <section v-show="activeTab === 'env'" class="panel env-panel">
+        <section v-if="activeTab === 'env'" class="panel env-panel">
           <article class="card env-overview-card">
             <div class="panel-headline env-overview-head">
               <div>
@@ -722,7 +728,7 @@
           </article>
         </section>
 
-        <section v-show="activeTab === 'agent'" class="panel agent-panel">
+        <section v-if="activeTab === 'agent'" class="panel agent-panel">
           <div class="main-col">
             <article class="card hero-card">
               <div class="section-head hero-head">
@@ -863,15 +869,7 @@
 
     <div class="focus-modal" :style="{ display: focusVisible ? 'flex' : 'none' }" :aria-hidden="focusVisible ? 'false' : 'true'">
       <div class="focus-shell">
-        <div class="focus-screen">
-          <video
-            ref="focusVideoRef"
-            class="focus-video"
-            controls
-            muted
-            autoplay
-            playsinline
-          ></video>
+        <div ref="focusVideoHostRef" class="focus-screen">
           <div v-if="!focusStreamUrl" class="focus-empty">{{ focusText }}</div>
         </div>
         <aside class="focus-panel">
@@ -990,12 +988,12 @@ import VirtualAgentStage from '@/components/VirtualAgentStage.vue'
 import ChatPanel from '@/components/chat_panel.vue'
 import dialog1 from '@/components/dialog1.vue'
 import axios from 'axios'
-import flvjs from 'flv.js'
-import { demoAlarmVideoMap, rtmpAddressList, simulateChannelName } from '@/config/config'
+import { demoAlarmVideoMap, normalizeLiveStreamUrl, rtmpAddressList, simulateChannelName } from '@/config/config'
 import { useAlarmStore } from '@/stores/alarm'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { AlarmSocketClient, type AlarmSocketMessage } from '@/utils/alarmSocket'
+import { createSrsWebRtcPlayer, isSrsWebRtcUrl, type SrsWebRtcPlayer } from '@/utils/srsWebRtc'
 
 type ModuleTab = 'alarm' | 'analysis' | 'video' | 'env' | 'agent'
 type AgentStageStatus = 'idle' | 'listening' | 'thinking' | 'speaking'
@@ -1150,14 +1148,24 @@ const submitProcessDialog = async () => {
 const focusText = ref('监控大屏')
 const focusStreamUrl = ref('')
 const focusVideoRef = ref<HTMLVideoElement | null>(null)
+const focusVideoHostRef = ref<HTMLElement | null>(null)
 let focusFlvPlayer: flvjs.Player | null = null
+let focusRtcPlayer: SrsWebRtcPlayer | null = null
 const tileVideoRefs = new Map<string, HTMLVideoElement>()
+const tileVideoHostRefs = new Map<string, HTMLElement>()
 const tileFlvPlayers = new Map<string, flvjs.Player>()
+const tileRtcPlayers = new Map<string, SrsWebRtcPlayer>()
+let stopFocusLatencyGuard: (() => void) | null = null
+const tileLatencyGuards = new Map<string, () => void>()
+let primaryStallWatchdog: number | null = null
+let primaryWatchdogLastTime = 0
+let primaryWatchdogLastProgressAt = 0
+let primaryWatchdogReconnecting = false
 const monitorModalVisible = ref(false)
 const monitors = ref<MonitorStreamItem[]>([])
 
 const cameraTiles = ref<MonitorStreamItem[]>([
-  { name: '1号机位 - 北门实时画面', streamUrl: rtmpAddressList[1] },
+  { name: '1号机位 - 北门实时画面', streamUrl: rtmpAddressList[0] },
   { name: '2号机位 - 车库入口实时画面', streamUrl: rtmpAddressList[2] },
   { name: '3号机位 - 东侧步道实时画面', streamUrl: rtmpAddressList[3] },
 ])
@@ -1183,6 +1191,91 @@ const withNoCache = (url: string) => {
   const connector = base.includes('?') ? '&' : '?'
   const nextUrl = `${base}${connector}_t=${Date.now()}`
   return hash ? `${nextUrl}#${hash}` : nextUrl
+}
+
+const LIVE_STALL_RECOVER_MS = 15000
+const LIVE_VISIBILITY_RECOVER_MS = 8000
+const FLV_STASH_INITIAL_SIZE = 2 * 1024 * 1024
+let liveVisibilityGraceUntil = 0
+
+const refreshLiveVisibilityGrace = () => {
+  liveVisibilityGraceUntil = Date.now() + LIVE_VISIBILITY_RECOVER_MS
+}
+
+const isLiveVisibilityRecovering = () => (
+  document.hidden || Date.now() < liveVisibilityGraceUntil
+)
+
+const handleLiveVisibilityChange = () => {
+  refreshLiveVisibilityGrace()
+  if (!document.hidden) {
+    tileVideoRefs.forEach(videoEl => {
+      videoEl.play().catch(() => {})
+    })
+    focusVideoRef.value?.play().catch(() => {})
+  }
+}
+
+const createLiveLatencyGuard = (
+  videoEl: HTMLVideoElement,
+  recoverStalledPlayback?: () => void,
+) => {
+  let lastPlaybackTime = videoEl.currentTime
+  let lastProgressAt = Date.now()
+  let recovering = false
+
+  const timer = window.setInterval(() => {
+    if (isLiveVisibilityRecovering()) {
+      lastPlaybackTime = videoEl.currentTime
+      lastProgressAt = Date.now()
+      return
+    }
+    if (videoEl.paused) {
+      recoverStalledPlayback?.()
+      return
+    }
+    if (Math.abs(videoEl.currentTime - lastPlaybackTime) > 0.05) {
+      lastPlaybackTime = videoEl.currentTime
+      lastProgressAt = Date.now()
+    }
+
+    if (
+      recoverStalledPlayback &&
+      !recovering &&
+      Date.now() - lastProgressAt > LIVE_STALL_RECOVER_MS
+    ) {
+      recovering = true
+      recoverStalledPlayback()
+      window.setTimeout(() => {
+        recovering = false
+        lastPlaybackTime = videoEl.currentTime
+        lastProgressAt = Date.now()
+      }, 3000)
+    }
+  }, 1000)
+
+  return () => {
+    window.clearInterval(timer)
+  }
+}
+
+const clearFocusLatencyGuard = () => {
+  if (stopFocusLatencyGuard) {
+    stopFocusLatencyGuard()
+    stopFocusLatencyGuard = null
+  }
+}
+
+const clearTileLatencyGuard = (name: string) => {
+  const stop = tileLatencyGuards.get(name)
+  if (stop) {
+    stop()
+    tileLatencyGuards.delete(name)
+  }
+}
+
+const recoverBufferedPlayback = (videoEl: HTMLVideoElement) => {
+  videoEl.play().catch(() => {})
 }
 
 const parseAlarmTimestamp = (item: any): number => {
@@ -1355,8 +1448,27 @@ const startAlarmSocket = () => {
     onAlarm: async (message: AlarmSocketMessage) => {
       console.log('[AlarmSocket] 收到新报警:', message)
       refreshAlarmDataFromSocket()
-      const { ElMessage } = await import('element-plus')
-      ElMessage.warning(message.message || '收到新的报警信息')
+      const { ElNotification } = await import('element-plus')
+      const alarmRefId = (message as any)?.data?.id ?? (message as any)?.id ?? null
+      ElNotification({
+        title: '收到新报警',
+        message: message.message || '点击进入告警处置',
+        type: 'warning',
+        duration: 6000,
+        onClick: () => {
+          const list = alarmStore.getAlarmList || []
+          let target: any = null
+          if (alarmRefId !== null) {
+            target = list.find((a: any) => Number(a?.id) === Number(alarmRefId)) || null
+          }
+          if (!target) target = list[0] || null
+          if (target) {
+            goPendingTask({ alarm: target })
+          } else {
+            activeTab.value = 'alarm'
+          }
+        },
+      })
     },
     onOpen: () => console.log('[AlarmSocket] 连接成功'),
     onClose: () => console.log('[AlarmSocket] 连接关闭'),
@@ -2749,16 +2861,29 @@ const stepMockEnvParking = () => {
 }
 
 const refreshEnvParkingData = async () => {
+  if (activeTab.value !== 'env' || focusVisible.value) return
   const synced = await syncEnvParkingFromApi()
   if (!synced) stepMockEnvParking()
 }
 
 let envParkingTimer: number | null = null
+let envParkingRefreshing = false
+const guardedRefreshEnvParkingData = async () => {
+  if (envParkingRefreshing) return
+  envParkingRefreshing = true
+  try {
+    await refreshEnvParkingData()
+  } finally {
+    envParkingRefreshing = false
+  }
+}
+
 const startEnvParkingRefresh = () => {
+  if (activeTab.value !== 'env' || focusVisible.value) return
   if (envParkingTimer !== null) return
-  void refreshEnvParkingData()
+  void guardedRefreshEnvParkingData()
   envParkingTimer = window.setInterval(() => {
-    void refreshEnvParkingData()
+    void guardedRefreshEnvParkingData()
   }, ENV_PARKING_REFRESH_MS)
 }
 
@@ -2861,9 +2986,6 @@ const syncPriorityPreviewTiles = (): void => {
   const currentPreview = cameraTiles.value
     .map(tile => sourceByKey.get(monitorKey(tile)) || (hasMonitorSource ? null : tile))
     .filter((tile): tile is MonitorStreamItem => Boolean(tile))
-  const selectedMonitor =
-    sourceList.find(item => item.name === selectedMonitorName.value) ||
-    currentPreview.find(item => item.name === selectedMonitorName.value)
   const nextTiles: MonitorStreamItem[] = []
   const seenKeys = new Set<string>()
   const addTile = (tile?: MonitorStreamItem | null) => {
@@ -2873,20 +2995,9 @@ const syncPriorityPreviewTiles = (): void => {
     seenKeys.add(key)
     nextTiles.push(tile)
   }
-  const prioritizedSource = sortMonitorsForPriority(sourceList)
-  const alertMonitors = prioritizedSource.filter(item => monitorPriorityStats(item).pendingCount > 0)
 
-  alertMonitors.forEach(addTile)
-
-  addTile(selectedMonitor)
-
-  if (alertMonitors.length > 0) {
-    currentPreview
-      .filter(item => monitorPriorityStats(item).pendingCount === 0)
-      .forEach(addTile)
-  }
-
-  prioritizedSource.forEach(addTile)
+  sourceList.forEach(addTile)
+  currentPreview.forEach(addTile)
 
   const hasChanged =
     cameraTiles.value.length !== nextTiles.length ||
@@ -2896,11 +3007,7 @@ const syncPriorityPreviewTiles = (): void => {
     cameraTiles.value = nextTiles
   }
 
-  if (!selectedMonitorName.value && nextTiles[0]) {
-    selectedMonitorName.value = nextTiles[0].name
-  } else if (selectedMonitorName.value && !nextTiles.some(item => item.name === selectedMonitorName.value) && nextTiles[0]) {
-    selectedMonitorName.value = nextTiles[0].name
-  }
+  if (nextTiles[0]) selectedMonitorName.value = nextTiles[0].name
 }
 
 const tileIsOffline = (tile: MonitorStreamItem): boolean => (
@@ -3560,7 +3667,7 @@ const fetchMonitors = async () => {
         name: item.name,
         department: item.department,
         status: item.status ?? item.running,
-        streamUrl: item.streamUrl || item.streamLink || item.video || rtmpAddressList[item.id],
+        streamUrl: normalizeLiveStreamUrl(item.streamUrl || item.streamLink || item.video || rtmpAddressList[item.id]),
       }))
       monitors.value = monitorList
       if (monitorList.length) {
@@ -3568,9 +3675,6 @@ const fetchMonitors = async () => {
         if (!monitorList.some(item => item.name === selectedMonitorName.value)) {
           selectedMonitorName.value = monitorList[0].name
         }
-        nextTick(() => {
-          initTilePlayers()
-        })
       }
     }
 
@@ -3617,14 +3721,20 @@ const goProfile = () => {
 }
 
 const destroyFocusPlayer = () => {
+  clearFocusLatencyGuard()
   if (focusFlvPlayer) {
     focusFlvPlayer.unload()
     focusFlvPlayer.destroy()
     focusFlvPlayer = null
   }
+  if (focusRtcPlayer) {
+    focusRtcPlayer.close()
+    focusRtcPlayer = null
+  }
   const videoEl = focusVideoRef.value
   if (videoEl) {
     videoEl.pause()
+    videoEl.srcObject = null
     videoEl.removeAttribute('src')
     videoEl.load()
   }
@@ -3638,65 +3748,247 @@ const setTileVideoRef = (name: string, el: HTMLVideoElement | null) => {
   tileVideoRefs.delete(name)
 }
 
+const setTileVideoHostRef = (name: string, el: HTMLElement | null) => {
+  if (el) {
+    tileVideoHostRefs.set(name, el)
+    return
+  }
+  tileVideoHostRefs.delete(name)
+}
+
+const getPrimaryTile = (fallback?: MonitorStreamItem) => cameraTiles.value[0] || fallback || null
+
+const movePrimaryVideoToFocus = (fallback?: MonitorStreamItem) => {
+  const tile = getPrimaryTile(fallback)
+  if (!tile || !focusVideoHostRef.value) return false
+  const videoEl = tileVideoRefs.get(tile.name)
+  if (!videoEl) return false
+  videoEl.classList.remove('tile-video')
+  videoEl.classList.add('focus-video')
+  videoEl.controls = true
+  focusVideoHostRef.value.prepend(videoEl)
+  videoEl.play().catch(() => {})
+  return true
+}
+
+const movePrimaryVideoToTile = () => {
+  const tile = getPrimaryTile()
+  if (!tile) return
+  const videoEl = tileVideoRefs.get(tile.name)
+  const hostEl = tileVideoHostRefs.get(tile.name)
+  if (!videoEl || !hostEl) return
+  videoEl.controls = false
+  videoEl.classList.remove('focus-video')
+  videoEl.classList.add('tile-video')
+  hostEl.appendChild(videoEl)
+  videoEl.play().catch(() => {})
+}
+
+const stopPrimaryStallWatchdog = () => {
+  if (primaryStallWatchdog !== null) {
+    window.clearInterval(primaryStallWatchdog)
+    primaryStallWatchdog = null
+  }
+  primaryWatchdogReconnecting = false
+}
+
+const reconnectPrimaryTilePlayer = () => {
+  const tile = getPrimaryTile()
+  if (!tile || primaryWatchdogReconnecting) return
+  const videoEl = tileVideoRefs.get(tile.name)
+  if (!videoEl) return
+  const wasInFocus = focusVisible.value && focusVideoHostRef.value?.contains(videoEl)
+
+  primaryWatchdogReconnecting = true
+  destroyTilePlayer(tile.name)
+  nextTick(() => {
+    initTilePlayer(tile)
+    window.setTimeout(() => {
+      const nextVideoEl = tileVideoRefs.get(tile.name)
+      if (wasInFocus && nextVideoEl && focusVideoHostRef.value) {
+        movePrimaryVideoToFocus(tile)
+      }
+      primaryWatchdogReconnecting = false
+    }, 600)
+  })
+}
+
+const startPrimaryStallWatchdog = (tile: MonitorStreamItem, videoEl: HTMLVideoElement) => {
+  stopPrimaryStallWatchdog()
+  primaryWatchdogLastTime = videoEl.currentTime
+  primaryWatchdogLastProgressAt = Date.now()
+
+  primaryStallWatchdog = window.setInterval(() => {
+    const currentTile = getPrimaryTile()
+    if (!currentTile || monitorKey(currentTile) !== monitorKey(tile)) return
+    if (isLiveVisibilityRecovering()) {
+      primaryWatchdogLastTime = videoEl.currentTime
+      primaryWatchdogLastProgressAt = Date.now()
+      videoEl.play().catch(() => {})
+      return
+    }
+    if (videoEl.paused || videoEl.ended) {
+      primaryWatchdogLastTime = videoEl.currentTime
+      primaryWatchdogLastProgressAt = Date.now()
+      return
+    }
+
+    if (Math.abs(videoEl.currentTime - primaryWatchdogLastTime) > 0.05) {
+      primaryWatchdogLastTime = videoEl.currentTime
+      primaryWatchdogLastProgressAt = Date.now()
+      return
+    }
+
+    if (Date.now() - primaryWatchdogLastProgressAt > 5000) {
+      console.warn('Primary WebRTC stream stalled for more than 5s, reconnecting...')
+      reconnectPrimaryTilePlayer()
+    }
+  }, 1000)
+}
+
 const destroyTilePlayers = () => {
+  stopPrimaryStallWatchdog()
   tileFlvPlayers.forEach(player => {
     player.unload()
     player.destroy()
   })
   tileFlvPlayers.clear()
+  tileRtcPlayers.forEach(player => {
+    player.close()
+  })
+  tileRtcPlayers.clear()
+  tileLatencyGuards.forEach(stop => stop())
+  tileLatencyGuards.clear()
   tileVideoRefs.forEach(videoEl => {
     videoEl.pause()
+    videoEl.srcObject = null
     videoEl.removeAttribute('src')
     videoEl.load()
   })
 }
 
+const destroyTilePlayer = (name: string) => {
+  const primaryTile = getPrimaryTile()
+  if (primaryTile?.name === name) stopPrimaryStallWatchdog()
+  const player = tileFlvPlayers.get(name)
+  if (player) {
+    player.unload()
+    player.destroy()
+    tileFlvPlayers.delete(name)
+  }
+  const rtcPlayer = tileRtcPlayers.get(name)
+  if (rtcPlayer) {
+    rtcPlayer.close()
+    tileRtcPlayers.delete(name)
+  }
+  clearTileLatencyGuard(name)
+  const videoEl = tileVideoRefs.get(name)
+  if (videoEl) {
+    videoEl.pause()
+    videoEl.srcObject = null
+    videoEl.removeAttribute('src')
+    videoEl.load()
+  }
+}
+
+const initTilePlayer = (tile: MonitorStreamItem) => {
+  const videoEl = tileVideoRefs.get(tile.name)
+  const url = tile.streamUrl || ''
+  if (!videoEl || !url) return
+
+  destroyTilePlayer(tile.name)
+
+  if (isSrsWebRtcUrl(url)) {
+    videoEl.muted = true
+    createSrsWebRtcPlayer(videoEl, url)
+      .then(player => {
+        tileRtcPlayers.set(tile.name, player)
+        if (monitorKey(tile) === monitorKey(getPrimaryTile() || tile)) {
+          startPrimaryStallWatchdog(tile, videoEl)
+        }
+      })
+      .catch((error) => {
+        console.error('SRS WebRTC tile player error:', error)
+        destroyTilePlayer(tile.name)
+        window.setTimeout(() => initTilePlayer(tile), 1200)
+      })
+    return
+  }
+
+  if (/\.m3u8($|[?#])/i.test(url)) {
+    console.error('This stream type is disabled. Use a webrtc:// stream URL instead.')
+    return
+  }
+
+  const playUrl = withNoCache(url)
+  if (flvjs.isSupported() && url.includes('.flv')) {
+    const player = flvjs.createPlayer(
+      { type: 'flv', url: playUrl, isLive: true },
+      {
+          enableWorker: false,
+          enableStashBuffer: true,
+          stashInitialSize: FLV_STASH_INITIAL_SIZE,
+        lazyLoad: false,
+        deferLoadAfterSourceOpen: false,
+        autoCleanupSourceBuffer: true,
+      } as any,
+    )
+    player.attachMediaElement(videoEl)
+    player.load()
+    tileLatencyGuards.set(
+      tile.name,
+      createLiveLatencyGuard(videoEl, () => recoverBufferedPlayback(videoEl)),
+    )
+    player.on(flvjs.Events.ERROR, () => {
+      destroyTilePlayer(tile.name)
+      window.setTimeout(() => initTilePlayer(tile), 800)
+    })
+    player.play().catch(() => {})
+    tileFlvPlayers.set(tile.name, player)
+    return
+  }
+
+  videoEl.src = playUrl
+  videoEl.play().catch(() => {})
+}
+
 const initTilePlayers = () => {
   destroyTilePlayers()
-  cameraTiles.value.forEach(tile => {
-    const videoEl = tileVideoRefs.get(tile.name)
-    const url = tile.streamUrl || ''
-    const playUrl = withNoCache(url)
-    if (!videoEl || !url) return
-
-    if (flvjs.isSupported() && url.includes('.flv')) {
-      const player = flvjs.createPlayer(
-        { type: 'flv', url: playUrl },
-        {
-          enableStashBuffer: false,
-          lazyLoad: false,
-          deferLoadAfterSourceOpen: false,
-          autoCleanupSourceBuffer: true,
-        } as any,
-      )
-      player.attachMediaElement(videoEl)
-      player.load()
-      player.on(flvjs.Events.ERROR, () => {
-        player.unload()
-        player.destroy()
-        tileFlvPlayers.delete(tile.name)
-      })
-      player.play().catch(() => {})
-      tileFlvPlayers.set(tile.name, player)
-      return
-    }
-
-    videoEl.src = playUrl
-    videoEl.play().catch(() => {})
-  })
+  const firstTile = cameraTiles.value[0]
+  if (firstTile) initTilePlayer(firstTile)
 }
 
 const initFocusPlayer = (url: string) => {
   const videoEl = focusVideoRef.value
   if (!videoEl || !url) return
-  const playUrl = withNoCache(url)
   destroyFocusPlayer()
 
+  if (isSrsWebRtcUrl(url)) {
+    videoEl.muted = true
+    createSrsWebRtcPlayer(videoEl, url)
+      .then(player => {
+        focusRtcPlayer = player
+      })
+      .catch((error) => {
+        console.error('SRS WebRTC focus player error:', error)
+        window.setTimeout(() => initFocusPlayer(url), 1200)
+      })
+    return
+  }
+
+  if (/\.m3u8($|[?#])/i.test(url)) {
+    console.error('This stream type is disabled. Use a webrtc:// stream URL instead.')
+    return
+  }
+
+  const playUrl = withNoCache(url)
   if (flvjs.isSupported() && url.includes('.flv')) {
     focusFlvPlayer = flvjs.createPlayer(
-      { type: 'flv', url: playUrl },
+      { type: 'flv', url: playUrl, isLive: true },
       {
-        enableStashBuffer: false,
+        enableWorker: false,
+        enableStashBuffer: true,
+        stashInitialSize: FLV_STASH_INITIAL_SIZE,
         lazyLoad: false,
         deferLoadAfterSourceOpen: false,
         autoCleanupSourceBuffer: true,
@@ -3704,6 +3996,8 @@ const initFocusPlayer = (url: string) => {
     )
     focusFlvPlayer.attachMediaElement(videoEl)
     focusFlvPlayer.load()
+    clearFocusLatencyGuard()
+    stopFocusLatencyGuard = createLiveLatencyGuard(videoEl, () => recoverBufferedPlayback(videoEl))
     focusFlvPlayer.play().catch(() => {})
     return
   }
@@ -3713,7 +4007,13 @@ const initFocusPlayer = (url: string) => {
 }
 
 const selectPreviewTile = (camera: MonitorStreamItem) => {
+  const changed = selectedMonitorName.value !== camera.name
   selectedMonitorName.value = camera.name
+  if (changed && !focusVisible.value) {
+    nextTick(() => {
+      initTilePlayers()
+    })
+  }
 }
 
 const isMonitorInPreview = (monitor: MonitorStreamItem) => (
@@ -3732,26 +4032,10 @@ const findMonitorByName = (name?: string) => {
 }
 
 const switchMonitorIntoPreview = (monitor: MonitorStreamItem, closeModal = false) => {
+  void monitor
   activeTab.value = 'video'
-
-  const existingIndex = cameraTiles.value.findIndex(tile => tile.name === monitor.name)
-  if (existingIndex >= 0) {
-    selectPreviewTile(cameraTiles.value[existingIndex])
-    if (closeModal) closeMonitorModal()
-    return
-  }
-
-  const nextTiles = [...cameraTiles.value]
-  if (nextTiles.length < PREVIEW_TILE_LIMIT) {
-    nextTiles.push(monitor)
-  } else {
-    const selectedIndex = nextTiles.findIndex(tile => tile.name === selectedMonitorName.value)
-    const replaceIndex = selectedIndex >= 0 ? selectedIndex : 0
-    nextTiles.splice(replaceIndex, 1, monitor)
-  }
-
-  cameraTiles.value = nextTiles.slice(0, PREVIEW_TILE_LIMIT)
-  selectPreviewTile(monitor)
+  const firstTile = cameraTiles.value[0]
+  if (firstTile) selectPreviewTile(firstTile)
   if (closeModal) closeMonitorModal()
 }
 
@@ -3768,12 +4052,15 @@ const openSelectedAlarmVideo = () => {
 }
 
 const openFocus = (camera: MonitorStreamItem) => {
-  selectPreviewTile(camera)
+  const firstTile = cameraTiles.value[0] || camera
+  selectPreviewTile(firstTile)
   focusSelectedAlarmKey.value = ''
   focusText.value = camera.name + '（大屏预览）'
-  focusStreamUrl.value = camera.streamUrl || rtmpAddressList[0]
+  focusStreamUrl.value = firstTile.streamUrl || rtmpAddressList[0]
   focusVisible.value = true
+  stopEnvParkingRefresh()
   nextTick(() => {
+    if (movePrimaryVideoToFocus(firstTile)) return
     if (focusStreamUrl.value) {
       initFocusPlayer(focusStreamUrl.value)
     }
@@ -3805,9 +4092,12 @@ const handoffFocusToAgent = () => {
 }
 
 const closeFocus = () => {
+  movePrimaryVideoToTile()
   focusVisible.value = false
   focusStreamUrl.value = ''
-  destroyFocusPlayer()
+  nextTick(() => {
+    if (activeTab.value === 'env') startEnvParkingRefresh()
+  })
 }
 
 const onMapPointClick = (point: MapPointItem) => {
@@ -3847,7 +4137,7 @@ onMounted(() => {
   startAlarmSocket()
   startRecentEventPolling()
   startAlarmCountRefresh()
-  startEnvParkingRefresh()
+  if (activeTab.value === 'env') startEnvParkingRefresh()
   refreshSummaryNow()
   if (activeTab.value === 'agent') {
     nextTick(() => {
@@ -3877,6 +4167,7 @@ onUnmounted(() => {
 watch(
   cameraTiles,
   () => {
+    if (focusVisible.value) return
     nextTick(() => {
       initTilePlayers()
     })
@@ -3900,11 +4191,21 @@ watch(analysisRange, () => {
 
 watch(envTrendRange, () => {
   if (ENV_PARKING_DATA_MODE === 'api') {
-    void refreshEnvParkingData()
+    void guardedRefreshEnvParkingData()
   }
 })
 
-watch(activeTab, (tab) => {
+watch(activeTab, (tab, previousTab) => {
+  if (previousTab === 'video' && tab !== 'video') {
+    destroyTilePlayers()
+  }
+
+  if (tab === 'env' && !focusVisible.value) {
+    startEnvParkingRefresh()
+  } else {
+    stopEnvParkingRefresh()
+  }
+
   if (tab === 'alarm' || tab === 'analysis') {
     void fetchAlarmList()
     if (tab === 'analysis') {
@@ -3916,6 +4217,13 @@ watch(activeTab, (tab) => {
   if (tab === 'agent') {
     agentStageKey.value += 1
     nextTick(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+  }
+
+  if (tab === 'video') {
+    nextTick(() => {
+      initTilePlayers()
       window.dispatchEvent(new Event('resize'))
     })
   }

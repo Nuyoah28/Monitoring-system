@@ -12,7 +12,21 @@ ExecStart=/bin/bash /home/user/Documents/iot/start_sh/start_rtmp_service.sh
 Restart=always
 RestartSec=5
 User=user
+Environment=PUSH_BACKEND=ffmpeg
+Environment=FFMPEG_BIN=ffmpeg
+Environment=CAMERA_SOURCE=/dev/video0
+Environment=RTMP_URL=rtmp://123.56.248.17:1935/live/raw
+Environment=FFMPEG_CAMERA_FRAMERATE=25
+Environment=FFMPEG_CAMERA_VIDEO_SIZE=1280x720
+Environment=FFMPEG_FILTER=fps=25,scale=960:540
+Environment=FFMPEG_BITRATE=1500k
+Environment=FFMPEG_MAXRATE=1500k
+Environment=FFMPEG_BUFSIZE=750k
+Environment=FFMPEG_GOP=25
+Environment=FFMPEG_RESTART_DELAY=3
 Environment=PYTHON_BIN=python3
+MemoryMax=768M
+TasksMax=128
 
 [Install]
 WantedBy=multi-user.target

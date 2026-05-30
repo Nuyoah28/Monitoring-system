@@ -30,11 +30,31 @@ const getEnvList = (name: string, fallback: string[]) => {
 
 const trimRightSlash = (value: string) => value.replace(/\/+$/, '')
 const toWsBase = (value: string) => trimRightSlash(value).replace(/^http/i, 'ws')
+const resolveWebSocketBaseUrl = (value: string) => {
+  const trimmed = trimRightSlash(value.trim())
+  if (!trimmed) return ''
+  if (/^wss?:\/\//i.test(trimmed)) return trimmed
+  if (/^https?:\/\//i.test(trimmed)) return toWsBase(trimmed)
+  if (typeof window === 'undefined' || !window.location) return trimmed
 
-const defaultApiBaseUrl = 'http://123.56.248.17:10215'
-const defaultAlgorithmUrl = 'http://123.56.248.17:6006'
-const defaultAgentBaseUrl = 'http://123.56.248.17:5050'
-const defaultDemoVideoBaseUrl = 'http://123.56.248.17:8848/video'
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  if (trimmed.startsWith('/')) {
+    return `${protocol}//${window.location.host}${trimmed}`
+  }
+  return `${protocol}//${trimmed}`
+}
+
+const defaultApiBaseUrl = '/api-backend'
+const defaultAlgorithmUrl = '/api-algorithm'
+const defaultAgentBaseUrl = '/api-agent'
+const defaultDemoVideoBaseUrl = '/video'
+const defaultLiveStreamBaseUrl = 'http://123.56.248.17:8080'
+const defaultWebRtcHost = '123.56.248.17'
+const defaultWebRtcApiUrl = `http://${defaultWebRtcHost}:1985/rtc/v1/play/`
+const buildWebRtcStreamUrl = (host: string, app: string, stream: string) => (
+  `webrtc://${host}/${app}/${stream}?eip=${host}&api=${defaultWebRtcApiUrl}`
+)
+const defaultWebRtcStreamUrl = buildWebRtcStreamUrl(defaultWebRtcHost, 'live', 'raw')
 
 const demoVideoFileMap = {
   bike: '\u7535\u52a8\u8f66\u8fdb\u697c.mp4',
@@ -48,8 +68,8 @@ const demoVideoFileMap = {
 export const baseUrl = trimRightSlash(getEnvString('VUE_APP_API_BASE_URL', defaultApiBaseUrl))
 export const algorithmUrl = trimRightSlash(getEnvString('VUE_APP_ALGORITHM_URL', defaultAlgorithmUrl))
 export const agentBaseUrl = trimRightSlash(getEnvString('VUE_APP_AGENT_BASE_URL', defaultAgentBaseUrl))
-export const webSocketBaseUrl = trimRightSlash(
-  getEnvString('VUE_APP_WS_BASE_URL', toWsBase(baseUrl)),
+export const webSocketBaseUrl = resolveWebSocketBaseUrl(
+  getEnvString('VUE_APP_WS_BASE_URL', '/api-ws'),
 )
 
 export const demoVideoBaseUrl = trimRightSlash(
@@ -84,7 +104,7 @@ export const resolveDemoAlarmVideo = (clipIdOrType?: string) => {
 }
 
 export const defaultStreamList = [
-  'http://123.56.248.17:8080/live/raw.flv',
+  defaultWebRtcStreamUrl,
   buildDemoVideoUrl(demoVideoFileMap.defaultFlv),
   buildDemoVideoUrl(demoVideoFileMap.extraFlv01),
   buildDemoVideoUrl(demoVideoFileMap.extraFlv02),
@@ -92,6 +112,35 @@ export const defaultStreamList = [
 
 export const rtmpAddressList = getEnvList('VUE_APP_MONITOR_STREAMS', defaultStreamList)
 export const rtmpAddress = rtmpAddressList[0] || ''
+export const liveStreamBaseUrl = trimRightSlash(
+  getEnvString('VUE_APP_LIVE_STREAM_BASE_URL', defaultLiveStreamBaseUrl),
+)
+
+export const normalizeLiveStreamUrl = (url?: string | null) => {
+  if (!url) return ''
+  const value = String(url).trim()
+  if (!value) return ''
+  if (/^webrtc:\/\//i.test(value)) return value
+
+  try {
+    const parsed = new URL(value, liveStreamBaseUrl || window.location.origin)
+    if (parsed.pathname.startsWith('/live/')) {
+      const [, app, rawStream = 'raw'] = parsed.pathname.split('/')
+      const stream = rawStream.replace(/\.(flv|m3u8)$/i, '')
+      return buildWebRtcStreamUrl(parsed.hostname || defaultWebRtcHost, app || 'live', stream || 'raw')
+    }
+  } catch {
+    // Keep the original value if URL parsing fails.
+  }
+
+  if (liveStreamBaseUrl && value.startsWith('/live/')) {
+    const [, app, rawStream = 'raw'] = value.split('/')
+    const stream = rawStream.replace(/\.(flv|m3u8)$/i, '')
+    return buildWebRtcStreamUrl(defaultWebRtcHost, app || 'live', stream || 'raw')
+  }
+  return value
+}
+
 export const alarmDefaultVideo = getEnvString(
   'VUE_APP_ALARM_DEFAULT_VIDEO',
   rtmpAddress || buildDemoVideoUrl(demoVideoFileMap.defaultFlv),

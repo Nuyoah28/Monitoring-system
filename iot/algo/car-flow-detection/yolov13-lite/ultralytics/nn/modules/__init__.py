@@ -5,10 +5,16 @@ available in this directory. The export script restores those bytecode files as
 sourceless modules before importing YOLO.
 """
 
-from importlib import import_module
+import sys
+from importlib import import_module, util
+from importlib.machinery import SourcelessFileLoader
+from pathlib import Path
 
 
-_MODULE_NAMES = ("block", "conv", "head", "transformer", "activation", "utils")
+# Load foundational modules first, then dependent composite modules.
+# The trimmed sourceless bytecode for `block` imports `conv`, and `head`
+# depends on both `conv` and `block`, so order matters here.
+_MODULE_NAMES = ("activation", "utils", "conv", "transformer", "block", "head")
 _EXPORT_NAMES = (
     "AIFI",
     "C1",
@@ -70,10 +76,64 @@ _EXPORT_NAMES = (
     "DSC3k2",
     "EUCB",
 )
+_MODULE_DIR = Path(__file__).resolve().parent
+
+
+def _compatible_pyc_candidates(module_name: str) -> list[Path]:
+    cache_dir = _MODULE_DIR / "__pycache__"
+    cache_tag = getattr(sys.implementation, "cache_tag", "")
+    candidates: list[Path] = []
+
+    if cache_tag:
+        candidates.append(cache_dir / f"{module_name}.{cache_tag}.pyc")
+    candidates.append(_MODULE_DIR / f"{module_name}.pyc")
+    if cache_dir.exists():
+        candidates.extend(sorted(cache_dir.glob(f"{module_name}.*.pyc")))
+
+    magic = util.MAGIC_NUMBER
+    compatible: list[Path] = []
+    for candidate in candidates:
+        if not candidate.exists() or candidate in compatible:
+            continue
+        try:
+            if candidate.read_bytes()[:4] == magic:
+                compatible.append(candidate)
+        except OSError:
+            continue
+    return compatible
+
+
+def _load_sourceless_module(module_name: str):
+    full_name = f"{__name__}.{module_name}"
+    for pyc_path in _compatible_pyc_candidates(module_name):
+        loader = SourcelessFileLoader(full_name, str(pyc_path))
+        spec = util.spec_from_loader(full_name, loader, origin=str(pyc_path))
+        if spec is None:
+            continue
+        module = util.module_from_spec(spec)
+        sys.modules[full_name] = module
+        loader.exec_module(module)
+        return module
+    raise ModuleNotFoundError(
+        f"No compatible bytecode found for trimmed module '{full_name}'. "
+        f"Expected one of: {[str(path) for path in _compatible_pyc_candidates(module_name)]}"
+    )
+
+
+def _import_module_or_sourceless(module_name: str):
+    full_name = f"{__name__}.{module_name}"
+    empty_stub = _MODULE_DIR / f"{module_name}.py.empty"
+    if empty_stub.exists():
+        try:
+            return import_module(full_name)
+        except (ImportError, ModuleNotFoundError):
+            sys.modules.pop(full_name, None)
+            return _load_sourceless_module(module_name)
+    return import_module(full_name)
 
 
 def _load_exports() -> None:
-    modules = [import_module(f"{__name__}.{module_name}") for module_name in _MODULE_NAMES]
+    modules = [_import_module_or_sourceless(module_name) for module_name in _MODULE_NAMES]
     for export_name in _EXPORT_NAMES:
         for module in modules:
             if hasattr(module, export_name):

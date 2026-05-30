@@ -20,7 +20,8 @@
         "modules" : {
             "Maps" : {},
             "Geolocation" : {},
-            "VideoPlayer" : {}
+            "VideoPlayer" : {},
+            "LivePusher" : {}
         },
         /* 应用发布信息 */
         "distribute" : {

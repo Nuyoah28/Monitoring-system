@@ -9,6 +9,7 @@ export const NETWORK_CONFIG = {
     BACKEND_PORT: '10215',
     AI_AGENT_PORT: '5050',
     SRS_HTTP_PORT: '8080',
+    SRS_RTMP_PORT: '1935',
     DEMO_VIDEO_HOST: '123.56.248.17',
     DEMO_VIDEO_PORT: '8848'
 };
@@ -20,9 +21,9 @@ export const AI_WS_URL = `ws://${NETWORK_CONFIG.LOCAL_IP}:${NETWORK_CONFIG.AI_AG
 export const LIVE_STREAM_BASE_URL = `http://${NETWORK_CONFIG.IP}:${NETWORK_CONFIG.SRS_HTTP_PORT}/live`;
 const DEMO_STATIC_BASE = `http://${NETWORK_CONFIG.DEMO_VIDEO_HOST}:${NETWORK_CONFIG.DEMO_VIDEO_PORT}/video`;
 
-// [0] 是 ffmpeg 推到 SRS 的真实直播流；[1][2][3] 是 8848 静态文件服务器上的演示片段，与 web 端 defaultStreamList 对齐。
+// [0] 是 ffmpeg 推到 SRS 的真实直播流（用 RTMP 协议，避开标准基座对 HTTP 明文流的拦截）；[1][2][3] 是 8848 静态文件服务器上的演示片段，与 web 端 defaultStreamList 对齐。
 export const LIVE_STREAM_LIST = [
-    `${LIVE_STREAM_BASE_URL}/raw.flv`,
+    `rtmp://${NETWORK_CONFIG.IP}:${NETWORK_CONFIG.SRS_RTMP_PORT}/live/raw`,
     `${DEMO_STATIC_BASE}/001.flv`,
     `${DEMO_STATIC_BASE}/002.flv`,
     `${DEMO_STATIC_BASE}/003.flv`
