@@ -46,37 +46,37 @@
           <view class="quick-icon quick-icon--red">
             <image class="quick-icon-image" src="/static/chosenTabBar/realtime.png" mode="aspectFit"></image>
           </view>
-          <text>告警处理</text>
+          <text>告警处置</text>
         </view>
         <view class="quick-item" @tap="goPage('/pages/manage/monitor/index')">
           <view class="quick-icon quick-icon--blue">
             <image class="quick-icon-image" src="/static/chosenTabBar/control.png" mode="aspectFit"></image>
           </view>
-          <text>摄像头管理</text>
+          <text>监控管理</text>
         </view>
-        <view class="quick-item" @tap="goPage('/pages/manage/monitor/ai-config')">
-          <view class="quick-icon quick-icon--rule">
-            <u-icon name="setting" color="#ffffff" size="38rpx"></u-icon>
+        <view class="quick-item" @tap="goPage('/pages/manage/statistics/index')">
+          <view class="quick-icon quick-icon--analysis">
+            <image class="quick-icon-image" src="/static/chosenTabBar/chart.png" mode="aspectFit"></image>
           </view>
-          <text>识别规则</text>
-        </view>
-        <view class="quick-item" @tap="goPage('/pages/manage/ai/index')">
-          <view class="quick-icon quick-icon--purple">
-            <image class="quick-icon-image" src="/static/chosenTabBar/GPT.png" mode="aspectFit"></image>
-          </view>
-          <text>AI助手</text>
+          <text>警情分析</text>
         </view>
         <view class="quick-item" @tap="goPage('/pages/manage/environment/index')">
           <view class="quick-icon quick-icon--teal">
             <image class="quick-icon-image" src="/static/analysis.png" mode="aspectFit"></image>
           </view>
-          <text>环境检测</text>
+          <text>环境监测</text>
         </view>
-        <view class="quick-item" @tap="goPage('/pages/manage/property/parking/index')">
-          <view class="quick-icon quick-icon--parking">
-            <u-icon name="car" color="#ffffff" size="38rpx"></u-icon>
+        <view class="quick-item" @tap="goPage('/pages/manage/dateWatcher/dateWatcher')">
+          <view class="quick-icon quick-icon--property">
+            <u-icon name="home" color="#ffffff" size="38rpx"></u-icon>
           </view>
-          <text>车位检测</text>
+          <text>物业管理</text>
+        </view>
+        <view class="quick-item" @tap="goPage('/pages/manage/ai/index')">
+          <view class="quick-icon quick-icon--purple">
+            <image class="quick-icon-image" src="/static/chosenTabBar/GPT.png" mode="aspectFit"></image>
+          </view>
+          <text>智能助手</text>
         </view>
       </view>
     </view>
@@ -771,9 +771,9 @@ export default {
   background: linear-gradient(180deg, #3b82f6 0%, #60a5fa 100%);
   box-shadow: 0 10rpx 18rpx rgba(59, 130, 246, 0.22);
 }
-.quick-icon--rule {
-  background: linear-gradient(180deg, #334155 0%, #64748b 100%);
-  box-shadow: 0 10rpx 18rpx rgba(100, 116, 139, 0.22);
+.quick-icon--analysis {
+  background: linear-gradient(180deg, #475569 0%, #14b8a6 100%);
+  box-shadow: 0 10rpx 18rpx rgba(20, 184, 166, 0.2);
 }
 .quick-icon--purple {
   background: linear-gradient(180deg, #7c3aed 0%, #c084fc 100%);
@@ -783,7 +783,7 @@ export default {
   background: linear-gradient(180deg, #0f766e 0%, #2dd4bf 100%);
   box-shadow: 0 10rpx 18rpx rgba(45, 212, 191, 0.22);
 }
-.quick-icon--parking {
+.quick-icon--property {
   background: linear-gradient(180deg, #0369a1 0%, #38bdf8 100%);
   box-shadow: 0 10rpx 18rpx rgba(56, 189, 248, 0.22);
 }

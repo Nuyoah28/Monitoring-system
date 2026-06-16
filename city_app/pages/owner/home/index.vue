@@ -78,16 +78,16 @@
       <view class="section-head">
         <view>
           <view class="section-title">常用服务</view>
-          <view class="section-sub">居民常用功能集中在这里</view>
+          <view class="section-sub">报修、访客、停车和随手拍快速办理</view>
         </view>
       </view>
       <view class="service-grid">
-        <view class="service-item" @tap="goFeature('/pages/owner/features/notice/index')"><view class="service-icon service-icon--red">提</view><text>社区提醒</text></view>
         <view class="service-item" @tap="goFeature('/pages/owner/ai/index')"><view class="service-icon service-icon--purple">助</view><text>社区助手</text></view>
         <view class="service-item" @tap="goFeature('/pages/owner/features/repair/index')"><view class="service-icon service-icon--orange">修</view><text>在线报修</text></view>
         <view class="service-item" @tap="goFeature('/pages/owner/features/visitor/index')"><view class="service-icon service-icon--blue">访</view><text>访客登记</text></view>
         <view class="service-item" @tap="goFeature('/pages/owner/features/parking/index')"><view class="service-icon service-icon--green">停</view><text>停车服务</text></view>
         <view class="service-item" @tap="goFeature('/pages/owner/features/environment/index')"><view class="service-icon service-icon--cyan">环</view><text>环境信息</text></view>
+        <view class="service-item" @tap="goFeature('/pages/owner/features/report/index')"><view class="service-icon service-icon--pink">拍</view><text>随手拍</text></view>
       </view>
     </view>
 
@@ -245,12 +245,12 @@ export default {
 .service-item { min-height: 132rpx; border-radius: 24rpx; background: rgba(255,255,255,0.92); border: 1rpx solid #dcebfa; box-shadow: 0 8rpx 20rpx rgba(37,99,235,0.08); display: flex; flex-direction: column; justify-content: center; align-items: center; }
 .service-item:active { transform: scale(0.97); }
 .service-icon, .todo-icon { width: 62rpx; height: 62rpx; border-radius: 20rpx; display: flex; align-items: center; justify-content: center; font-size: 24rpx; font-weight: 900; }
-.service-icon--red { background: #fee2e2; color: #dc2626; }
 .service-icon--purple { background: #ede9fe; color: #7c3aed; }
 .service-icon--orange, .todo-icon--orange { background: #fef3c7; color: #d97706; }
 .service-icon--blue, .todo-icon--blue { background: #dbeafe; color: #2563eb; }
 .service-icon--green { background: #dcfce7; color: #16a34a; }
 .service-icon--cyan { background: #cffafe; color: #0891b2; }
+.service-icon--pink { background: #fce7f3; color: #db2777; }
 .service-item text { margin-top: 12rpx; color: #1e3a5f; font-size: 22rpx; font-weight: 900; }
 .todo-list { display: flex; flex-direction: column; gap: 12rpx; }
 .todo-item { align-items: center; min-height: 102rpx; box-sizing: border-box; }

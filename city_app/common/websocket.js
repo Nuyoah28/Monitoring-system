@@ -96,6 +96,27 @@ function connect(userId) {
 }
 
 function handleMessage(data) {
+    if (data.type === 'NEW_REPORT') {
+        // 居民随手拍上报：只提醒管理端，复用报警 WebSocket 通道
+        const appType = uni.getStorageSync('appType');
+        if (appType === 'manage') {
+            uni.showModal({
+                title: '📢 居民上报提醒',
+                content: data.message || '有居民上报新的社区问题，请及时查看处理。',
+                showCancel: false,
+                confirmText: '去查看',
+                success: (res) => {
+                    if (res.confirm) {
+                        uni.navigateTo({ url: '/pages/manage/property/report/index' });
+                    }
+                }
+            });
+            uni.vibrateLong();
+        }
+        // 触发全局事件，供上报管理页实时刷新列表
+        uni.$emit('newReport', data);
+        return;
+    }
     if (data.type === 'NEW_ALARM') {
         console.log('[WebSocket] 收到新报警:', data);
 

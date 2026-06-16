@@ -7,6 +7,7 @@ import lombok.Data;
 import java.text.SimpleDateFormat;
 
 //AI辅助生成：GLM-5 智谱AI 2025-4-28 告警返回 DTO 中的 video 字段承接转换后的 clipLink
+@Data
 public class GetAlarmRes
 {
 

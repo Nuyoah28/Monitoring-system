@@ -9,7 +9,7 @@
           <image class="session-tag" src="/static/messagelist.png"></image>
         </view>
       </view>
-      <text class="header-title">AI助手</text>
+      <text class="header-title">智能助手</text>
     </view>
 
     <view class="session-drawer" :class="{ open: showSessionList }" @touchmove.stop.prevent>

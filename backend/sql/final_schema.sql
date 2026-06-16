@@ -29,6 +29,7 @@ DROP TABLE IF EXISTS `monitor_recognition_rule`;
 DROP TABLE IF EXISTS `alarm_info`;
 DROP TABLE IF EXISTS `visitor_info`;
 DROP TABLE IF EXISTS `parking_space_info`;
+DROP TABLE IF EXISTS `community_report`;
 DROP TABLE IF EXISTS `device_repair_info`;
 DROP TABLE IF EXISTS `monitor`;
 DROP TABLE IF EXISTS `case_type_info`;
@@ -264,6 +265,26 @@ CREATE TABLE `device_repair_info` (
   KEY `idx_device_repair_owner_user_id` (`owner_user_id`),
   CONSTRAINT `fk_device_repair_owner` FOREIGN KEY (`owner_user_id`) REFERENCES `user_info` (`id`) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='设备报修信息表';
+
+CREATE TABLE `community_report` (
+  `id` INT NOT NULL AUTO_INCREMENT COMMENT '上报ID',
+  `category` VARCHAR(32) NOT NULL COMMENT '问题分类(环境卫生/公共设施/安全隐患/违规停车/其他)',
+  `description` TEXT NOT NULL COMMENT '问题描述',
+  `location` VARCHAR(100) DEFAULT NULL COMMENT '问题位置',
+  `image_keys` VARCHAR(1024) DEFAULT NULL COMMENT '图片COS objectKey列表,逗号分隔,最多3张',
+  `report_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上报时间',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '处理状态:0待处理,1处理中,2已处理',
+  `handle_reply` VARCHAR(500) DEFAULT NULL COMMENT '物业处理回复',
+  `handle_time` DATETIME DEFAULT NULL COMMENT '处理时间',
+  `handler` VARCHAR(50) DEFAULT NULL COMMENT '处理人',
+  `publisher` VARCHAR(50) NOT NULL COMMENT '上报人',
+  `owner_user_id` INT DEFAULT NULL COMMENT '业主用户ID',
+  PRIMARY KEY (`id`),
+  KEY `idx_community_report_time` (`report_time`),
+  KEY `idx_community_report_owner` (`owner_user_id`),
+  KEY `idx_community_report_status` (`status`),
+  CONSTRAINT `fk_community_report_owner` FOREIGN KEY (`owner_user_id`) REFERENCES `user_info` (`id`) ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='社区问题上报表';
 
 CREATE TABLE `parking_space_info` (
   `id` INT NOT NULL AUTO_INCREMENT COMMENT '车位ID',

@@ -88,6 +88,13 @@
       }
     },
     {
+      "path": "pages/owner/features/report/index",
+      "style": {
+        "navigationBarTitleText": "问题上报",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/manage/realtime/realtime",
       "style": {
         "navigationBarTitleText": "",
@@ -108,7 +115,7 @@
     {
       "path": "pages/manage/statistics/index",
       "style": {
-        "navigationBarTitleText": "数据统计",
+        "navigationBarTitleText": "警情分析",
         "enablePullDownRefresh": false,
         "navigationStyle": "custom"
       }
@@ -124,7 +131,7 @@
     {
       "path": "pages/manage/ai/index",
       "style": {
-        "navigationBarTitleText": "AI助手",
+        "navigationBarTitleText": "智能助手",
         "enablePullDownRefresh": false,
         "navigationStyle": "custom"
       }
@@ -143,7 +150,7 @@
     {
       "path": "pages/manage/monitor/index",
       "style": {
-        "navigationBarTitleText": "监控列表",
+        "navigationBarTitleText": "监控管理",
         "navigationStyle": "custom"
       }
     },
@@ -233,6 +240,13 @@
       "path": "pages/manage/property/parking/index",
       "style": {
         "navigationBarTitleText": "车位检测管理",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/manage/property/report/index",
+      "style": {
+        "navigationBarTitleText": "社区上报管理",
         "navigationStyle": "custom"
       }
     },
