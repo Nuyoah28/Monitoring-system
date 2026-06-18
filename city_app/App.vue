@@ -53,25 +53,77 @@ const syncNativeShellColor = () => {
   // #endif
 };
 
+const createNotificationPlayer = () => {
+  // #ifdef APP-PLUS
+  if (typeof plus === 'undefined' || !plus.android) return null;
+  try {
+    const main = plus.android.runtimeMainActivity();
+    const RingtoneManager = plus.android.importClass("android.media.RingtoneManager");
+    const uri = RingtoneManager.getActualDefaultRingtoneUri(main, RingtoneManager.TYPE_NOTIFICATION);
+    const MediaPlayer = plus.android.importClass("android.media.MediaPlayer");
+    return MediaPlayer.create(main, uri);
+  } catch (e) {
+    console.warn('[App] 初始化通知提示音失败：', e);
+    return null;
+  }
+  // #endif
+  return null;
+};
+
+const playNotificationSound = (player) => {
+  // #ifdef APP-PLUS
+  if (!player) return;
+  try {
+    if (typeof player.isPlaying === 'function' && player.isPlaying()) {
+      player.seekTo(0);
+      return;
+    }
+    if (typeof player.start === 'function') {
+      player.start();
+    }
+  } catch (e) {
+    console.warn('[App] 播放通知提示音失败：', e);
+  }
+  // #endif
+};
+
+const safeCreatePushMessage = (options) => {
+  // #ifdef APP-PLUS
+  if (typeof uni.createPushMessage !== 'function') return;
+  try {
+    uni.createPushMessage(options);
+  } catch (e) {
+    console.warn('[App] 创建系统推送失败：', e);
+  }
+  // #endif
+};
+
+const safeVibrateLong = () => {
+  // #ifdef APP-PLUS
+  if (typeof uni.vibrateLong !== 'function') return;
+  try {
+    uni.vibrateLong({
+      fail: (err) => {
+        console.log('[App] 振动失败：', err);
+      },
+    });
+  } catch (e) {
+    console.warn('[App] 调用振动异常：', e);
+  }
+  // #endif
+};
+
 export default {
   onLaunch: function () {
     // console.log("App Launch");
     // #ifdef APP-PLUS
     if(typeof plus !== 'undefined') {
         syncNativeShellColor();
-        let main = plus.android.runtimeMainActivity();
-        let RingtoneManager = plus.android.importClass(
-          "android.media.RingtoneManager"
-        );
-        let uri = RingtoneManager.getActualDefaultRingtoneUri(
-          main,
-          RingtoneManager.TYPE_NOTIFICATION
-        );
-        let MediaPlayer = plus.android.importClass("android.media.MediaPlayer");
-        let player = MediaPlayer.create(main, uri);
+        let player = createNotificationPlayer();
         let check = 1;
+        let lastReceiveAt = 0;
 
-        uni.onPushMessage((res) => {
+        if (typeof uni.onPushMessage === 'function') uni.onPushMessage((res) => {
           // console.log(res);
           if (res.type === "click") {
             const currentAppType = uni.getStorageSync("appType");
@@ -85,27 +137,23 @@ export default {
               });
             }
           } else if (res.type === "receive") {
+            const now = Date.now();
+            if (now - lastReceiveAt < 1200) return;
+            lastReceiveAt = now;
             if (check === 0) {
               check = 1;
               return;
             }
-            uni.createPushMessage({
-              title: res.data.title,
+            safeCreatePushMessage({
+              title: (res.data && res.data.title) || '报警提醒',
               content: '您有一条新的报警信息，请及时处理',
               sound: "system",
             });
             check = 0;
-            uni.vibrateLong({
-              success: () => {
-                console.log("success");
-              },
-              fail: (err) => {
-                console.log(err);
-              },
-            });
+            safeVibrateLong();
             // player.setLooping(false);
             // player.prepare();
-            player.start();
+            playNotificationSound(player);
             // player.stop();
           }
         });
