@@ -6,7 +6,7 @@
     <view class="login-shell" :style="{ paddingTop: pageTopPadding + 'px' }">
       <view class="top-nav">
         <view class="back-btn" @tap="goBack">
-          <u-icon name="arrow-left" color="#17314c" size="34rpx"></u-icon>
+          <u-icon name="arrow-left" color="#0f2238" size="34rpx"></u-icon>
         </view>
         <view class="top-nav-title">{{ isOwnerApp ? '业主端' : '管理端' }}</view>
         <view class="top-nav-placeholder"></view>
@@ -30,46 +30,46 @@
             <view class="form-group">
               <view class="input-item">
                 <view class="iconBox">
-                  <u-icon name="account" color="#5672b9" size="34rpx"></u-icon>
+                  <u-icon name="account" color="#0b6fc6" size="34rpx"></u-icon>
                 </view>
                 <input
                   class="input custom-input"
                   type="text"
                   v-model="username"
                   placeholder="请输入用户名"
-                  placeholder-style="color:#A0B2D4"
+                  placeholder-style="color:#8AA4BF"
                 />
               </view>
 
               <view class="input-item" v-if="mode === 'register'">
                 <view class="iconBox">
-                  <u-icon name="account-fill" color="#5672b9" size="34rpx"></u-icon>
+                  <u-icon name="account-fill" color="#0b6fc6" size="34rpx"></u-icon>
                 </view>
                 <input
                   class="input custom-input"
                   type="text"
                   v-model="nickname"
                   placeholder="请输入昵称（可选）"
-                  placeholder-style="color:#A0B2D4"
+                  placeholder-style="color:#8AA4BF"
                 />
               </view>
 
               <view class="input-item" v-if="mode === 'register'">
                 <view class="iconBox">
-                  <u-icon name="map" color="#5672b9" size="34rpx"></u-icon>
+                  <u-icon name="map" color="#0b6fc6" size="34rpx"></u-icon>
                 </view>
                 <input
                   class="input custom-input"
                   type="text"
                   v-model="homeArea"
                   placeholder="请输入所属区域，如小区东门街道"
-                  placeholder-style="color:#A0B2D4"
+                  placeholder-style="color:#8AA4BF"
                 />
               </view>
 
               <view class="input-item">
                 <view class="iconBox">
-                  <u-icon name="lock" color="#5672b9" size="34rpx"></u-icon>
+                  <u-icon name="lock" color="#0b6fc6" size="34rpx"></u-icon>
                 </view>
                 <input
                   class="input custom-input"
@@ -77,13 +77,13 @@
                   password
                   type="text"
                   placeholder="请输入密码"
-                  placeholder-style="color:#A0B2D4"
+                  placeholder-style="color:#8AA4BF"
                 />
               </view>
 
               <view class="input-item" v-if="mode === 'register'">
                 <view class="iconBox">
-                  <u-icon name="lock-fill" color="#5672b9" size="34rpx"></u-icon>
+                  <u-icon name="lock-fill" color="#0b6fc6" size="34rpx"></u-icon>
                 </view>
                 <input
                   class="input custom-input"
@@ -91,7 +91,7 @@
                   password
                   type="text"
                   placeholder="请再次输入密码"
-                  placeholder-style="color:#A0B2D4"
+                  placeholder-style="color:#8AA4BF"
                 />
               </view>
 
@@ -106,7 +106,7 @@
               <view class="term-box">
                 <checkbox-group @change="checked = !checked">
                   <label class="deal-wrapper">
-                    <checkbox class="theme-checkbox" style="transform: scale(0.65);" value="true" :checked="checked" color="#007aff"/>
+                    <checkbox class="theme-checkbox" style="transform: scale(0.65);" value="true" :checked="checked" color="#18a8ff"/>
                     <text class="deal">
                       {{ mode === 'login' ? '登录' : '注册' }}即表示您已阅读并同意
                       <span class="link" @tap.stop="changeShow">《用户服务协议》</span>
@@ -128,7 +128,7 @@
       @close="isShow = false"
       @confirm="isShow = false"
       title="用户服务协议与隐私政策"
-      confirmColor="#007aff"
+      confirmColor="#18a8ff"
     >
       <scroll-view scroll-y="true" style="height: 60vh;">
         <view class="modal-content">
@@ -460,9 +460,9 @@ export default {
   min-height: 100vh;
   width: 100vw;
   background:
-    radial-gradient(circle at 12% 2%, rgba(56, 164, 255, 0.2) 0, rgba(56, 164, 255, 0) 260rpx),
-    radial-gradient(circle at 88% 18%, rgba(20, 112, 216, 0.14) 0, rgba(20, 112, 216, 0) 300rpx),
-    linear-gradient(180deg, #eaf6ff 0%, #f8fbff 52%, #ffffff 100%);
+    radial-gradient(circle at 16% 0%, rgba(32, 214, 210, 0.24) 0, rgba(32, 214, 210, 0) 280rpx),
+    radial-gradient(circle at 86% 14%, rgba(24, 168, 255, 0.28) 0, rgba(24, 168, 255, 0) 340rpx),
+    linear-gradient(180deg, #071525 0%, #0d2740 46%, #edf5ff 82%, #f8fbff 100%);
   position: relative;
   overflow-y: auto;
   overflow-x: hidden;
@@ -481,7 +481,7 @@ export default {
 .shape-1 {
   width: 360rpx;
   height: 360rpx;
-  background: rgba(0, 122, 255, 0.14);
+  background: rgba(32, 214, 210, 0.18);
   top: -120rpx;
   left: -130rpx;
 }
@@ -489,7 +489,7 @@ export default {
 .shape-2 {
   width: 420rpx;
   height: 420rpx;
-  background: rgba(0, 210, 255, 0.1);
+  background: rgba(24, 168, 255, 0.18);
   right: -170rpx;
   bottom: -150rpx;
 }
@@ -534,7 +534,7 @@ export default {
 }
 
 .top-nav-title {
-  color: #17314c;
+  color: #eaf7ff;
   font-size: 30rpx;
   font-weight: 900;
 }
@@ -569,7 +569,7 @@ export default {
 }
 
 .title {
-  color: #17314c;
+  color: #ffffff;
   font-size: 62rpx;
   font-weight: 900;
   letter-spacing: 6rpx;
@@ -579,16 +579,16 @@ export default {
 
 .mainTitle {
   margin-top: 16rpx;
-  color: #5a74ab;
+  color: rgba(234, 247, 255, 0.76);
   font-size: 24rpx;
   font-weight: 700;
 }
 
 .glass-card {
   width: 100%;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1rpx solid rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16rpx 46rpx rgba(57, 96, 156, 0.12);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1rpx solid rgba(205, 225, 246, 0.92);
+  box-shadow: 0 18rpx 46rpx rgba(4, 29, 54, 0.18);
   border-radius: 34rpx;
   padding: 32rpx 30rpx 38rpx;
   box-sizing: border-box;
@@ -601,7 +601,7 @@ export default {
   width: 100%;
   padding: 6rpx;
   border-radius: 999rpx;
-  background: #eaf4ff;
+  background: #eaf6ff;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   box-sizing: border-box;
@@ -621,8 +621,8 @@ export default {
 
 .mode-item.active {
   background: #fff;
-  color: #1470d8;
-  box-shadow: 0 6rpx 18rpx rgba(20, 112, 216, 0.12);
+  color: #0b6fc6;
+  box-shadow: 0 6rpx 18rpx rgba(24, 168, 255, 0.12);
 }
 
 .card-title {
@@ -654,15 +654,15 @@ export default {
   align-items: center;
   width: 100%;
   height: 90rpx;
-  background: rgba(255, 255, 255, 0.94);
+  background: #f5faff;
   border-radius: 20rpx;
   overflow: hidden;
-  border: 1rpx solid rgba(0, 122, 255, 0.11);
+  border: 1rpx solid #d4e7fa;
 }
 
 .input-item:focus-within {
-  border-color: rgba(0, 122, 255, 0.42);
-  box-shadow: 0 0 0 4rpx rgba(0, 122, 255, 0.06);
+  border-color: rgba(24, 168, 255, 0.42);
+  box-shadow: 0 0 0 4rpx rgba(24, 168, 255, 0.08);
 }
 
 .iconBox {
@@ -678,10 +678,13 @@ export default {
   height: 100%;
   font-size: 28rpx;
   color: #17314c;
-  border: none;
+  border: none !important;
   outline: none;
-  background: transparent;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-left: 18rpx;
   padding-right: 24rpx;
+  box-sizing: border-box;
 }
 
 .submit-wrap {
@@ -692,7 +695,7 @@ export default {
 .modern-btn {
   width: 100%;
   height: 92rpx;
-  background: linear-gradient(90deg, #1470d8 0%, #05b5ff 100%);
+  background: linear-gradient(90deg, #0b6fc6 0%, #18a8ff 58%, #20d6d2 100%);
   color: #ffffff;
   font-size: 31rpx;
   font-weight: 900;
@@ -701,7 +704,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 10rpx 26rpx rgba(20, 112, 216, 0.22);
+  box-shadow: 0 10rpx 26rpx rgba(24, 168, 255, 0.24);
 }
 
 .modern-btn:active {
@@ -746,7 +749,7 @@ export default {
 }
 
 .link {
-  color: #1470d8;
+  color: #0b6fc6;
   font-weight: 800;
   margin: 0 4rpx;
 }

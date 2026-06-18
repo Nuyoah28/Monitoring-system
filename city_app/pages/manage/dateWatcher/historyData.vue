@@ -21,7 +21,7 @@
             ></u-picker>
         </view>
 
-        <!-- 图表卡片容器：赛博清晨白璃拟态 -->
+        <!-- 图表卡片容器 -->
         <scroll-view scroll-y="true" class="chart-scroll">
             <view class="card">
                 <view class="card-header">
@@ -110,25 +110,25 @@ export default {
     padding: 20rpx 0;
     
     .text {
-        font-size: 28rpx;
-        color: #1A2A3A;
-        font-weight: 600;
+        font-size: 27rpx;
+        color: #eaf7ff;
+        font-weight: 900;
+        text-shadow: 0 0 14rpx rgba(32, 214, 210, 0.18);
     }
     
     .picker-trigger {
-        background: rgba(255, 255, 255, 0.6);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.94);
         padding: 15rpx 30rpx;
         border-radius: 40rpx;
-        border: 1px solid rgba(0, 122, 255, 0.2);
+        border: 1px solid #cde1f6;
         display: flex;
         align-items: center;
-        box-shadow: 0 4rpx 12rpx rgba(100, 150, 200, 0.05);
+        box-shadow: 0 8rpx 18rpx rgba(4, 29, 54, 0.08);
 
         .val {
             font-size: 28rpx;
-            color: #1A2A3A;
+            color: #0b6fc6;
+            font-weight: 900;
             margin-right: 10rpx;
         }
     }
@@ -143,11 +143,9 @@ export default {
 .card {
     width: 92%;
     margin: 0 auto 30rpx auto;
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 32rpx;
-    border: 1px solid rgba(255, 255, 255, 1);
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 28rpx;
+    border: 1rpx solid rgba(205, 225, 246, 0.92);
     padding: 30rpx;
     box-sizing: border-box;
     box-shadow: 0 16rpx 48rpx rgba(26, 42, 58, 0.1);
@@ -160,7 +158,7 @@ export default {
         .decorator {
             width: 8rpx;
             height: 32rpx;
-            background: linear-gradient(180deg, #007AFF, #00D2FF);
+            background: linear-gradient(180deg, #20d6d2, #18a8ff);
             border-radius: 4rpx;
             margin-right: 16rpx;
         }

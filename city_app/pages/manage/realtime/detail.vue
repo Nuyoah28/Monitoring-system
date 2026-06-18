@@ -79,6 +79,7 @@ export default {
       statusBarHeight: 0,
       alarmId: null,
       loaded: false,
+      loadingDetail: false,
       detail: {},
     }
   },
@@ -96,6 +97,8 @@ export default {
       uni.navigateBack()
     },
     async loadDetail() {
+      if (this.loadingDetail) return
+      this.loadingDetail = true
       // --- 本地备用数据逻辑 ---
       if (this.alarmId >= 999001 && this.alarmId <= 999003) {
         const mockMap = {
@@ -105,11 +108,13 @@ export default {
         };
         this.detail = mockMap[this.alarmId];
         this.loaded = true;
+        this.loadingDetail = false;
         return;
       }
 
       if (!this.alarmId) {
         uni.$showMsg('报警ID无效')
+        this.loadingDetail = false
         return
       }
       this.loaded = false
@@ -129,6 +134,7 @@ export default {
         uni.$showMsg('网络异常，请稍后重试')
       } finally {
         this.loaded = true
+        this.loadingDetail = false
       }
     },
     onVideoError(e) {

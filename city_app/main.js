@@ -6,7 +6,9 @@ import Vue from 'vue'
 import uView from 'uview-ui'
 Vue.use(uView)
 import './uni.promisify.adaptor'
+import { installSafeNavigation } from './common/safe-navigation.js'
 import {uni} from './api/request.js'
+installSafeNavigation()
 Vue.config.productionTip = false
 App.mpType = 'app'
 const app = new Vue({

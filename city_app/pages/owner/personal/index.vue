@@ -356,9 +356,14 @@ export default {
 }
 
 .profile-card {
-  background: linear-gradient(135deg, rgba(20, 112, 216, 0.96) 0%, rgba(43, 142, 240, 0.96) 54%, rgba(54, 182, 255, 0.96) 100%);
+  background:
+    linear-gradient(90deg, rgba(32, 214, 210, 0.20) 0, rgba(32, 214, 210, 0) 42%),
+    radial-gradient(circle at 88% 0%, rgba(125, 211, 252, 0.22), rgba(125, 211, 252, 0) 220rpx),
+    linear-gradient(135deg, #0b1e35 0%, #0d2740 54%, #0b6fc6 100%);
+  border: 1rpx solid rgba(125, 211, 252, 0.24);
   color: #fff;
-  box-shadow: 0 18rpx 40rpx rgba(20, 112, 216, 0.22);
+  box-shadow: 0 20rpx 46rpx rgba(2, 8, 23, 0.22);
+  overflow: hidden;
 }
 
 .profile-head {
@@ -378,8 +383,9 @@ export default {
 
 .profile-avatar-wrap {
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1rpx solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(125, 211, 252, 0.36);
+  box-shadow: 0 10rpx 24rpx rgba(2, 8, 23, 0.18);
 }
 
 .profile-avatar {
@@ -388,6 +394,7 @@ export default {
   justify-content: center;
   font-size: 36rpx;
   font-weight: 900;
+  color: #0b6fc6;
 }
 
 .profile-avatar-img {
@@ -400,6 +407,7 @@ export default {
 }
 
 .profile-name {
+  color: #ffffff;
   font-size: 34rpx;
   font-weight: 900;
   line-height: 1.2;
@@ -410,7 +418,7 @@ export default {
 
 .profile-desc {
   margin-top: 12rpx;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(234, 247, 255, 0.92);
   font-size: 23rpx;
   line-height: 1.45;
   overflow: hidden;
@@ -422,15 +430,16 @@ export default {
   height: 58rpx;
   padding: 0 20rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1rpx solid rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(205, 225, 246, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #0b6fc6;
   font-size: 23rpx;
   font-weight: 900;
   flex-shrink: 0;
+  box-shadow: 0 8rpx 18rpx rgba(2, 8, 23, 0.14);
 }
 
 .profile-meta {
@@ -443,20 +452,21 @@ export default {
 .meta-item {
   padding: 18rpx;
   border-radius: 20rpx;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1rpx solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(205, 225, 246, 0.9);
   min-width: 0;
+  box-shadow: 0 8rpx 18rpx rgba(2, 8, 23, 0.10);
 }
 
 .meta-label {
-  color: rgba(255, 255, 255, 0.78);
+  color: #64748b;
   font-size: 21rpx;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .meta-value {
   margin-top: 8rpx;
-  color: #fff;
+  color: #102033;
   font-size: 27rpx;
   font-weight: 900;
   line-height: 1.35;

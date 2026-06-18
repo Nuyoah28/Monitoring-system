@@ -1,5 +1,5 @@
 <template>
-  <view class="feature-page">
+  <view class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="bg-shape bg-1"></view>
     <view class="bg-shape bg-2"></view>
 
@@ -46,7 +46,17 @@ export default {
       list: [],
       showDetail: false,
       active: {},
+      statusBarHeight: 0,
     };
+  },
+  computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   onShow() {
     this.loadNotices();
@@ -131,7 +141,7 @@ export default {
 <style lang="scss" scoped>
 .feature-page {
   min-height: 100vh;
-  padding: 26rpx 24rpx 32rpx;
+  padding: 26rpx 24rpx calc(32rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   background: linear-gradient(180deg, #eef7ff 0%, #f9fbff 54%, #ffffff 100%);
   position: relative;
@@ -172,6 +182,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 18rpx;
+  color: #102033 !important;
 }
 
 .back-btn {
@@ -188,7 +199,8 @@ export default {
 .top-title {
   font-size: 34rpx;
   font-weight: 800;
-  color: #18304b;
+  color: #102033 !important;
+  text-shadow: none !important;
 }
 
 .ghost-btn {
@@ -199,22 +211,23 @@ export default {
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.82);
-  color: #2b5b99;
+  color: #0b6fc6;
   font-size: 24rpx;
+  font-weight: 800;
 }
 
 .panel {
   border-radius: 26rpx;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10rpx 28rpx rgba(40, 92, 150, 0.08);
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1rpx solid rgba(205, 225, 246, 0.96) !important;
+  box-shadow: 0 14rpx 34rpx rgba(4, 29, 54, 0.12) !important;
   padding: 24rpx;
 }
 
 .panel-title {
   font-size: 30rpx;
-  color: #1d2f44;
-  font-weight: 700;
+  color: #102033;
+  font-weight: 900;
   margin-bottom: 16rpx;
 }
 
@@ -229,15 +242,16 @@ export default {
 .notice-card {
   padding: 18rpx;
   border-radius: 18rpx;
-  background: #f7fbff;
-  border: 1px solid #dceafa;
+  background: #ffffff !important;
+  border: 1rpx solid #cfe4fa !important;
   margin-bottom: 12rpx;
+  box-shadow: 0 8rpx 20rpx rgba(4, 29, 54, 0.08) !important;
 }
 
 .notice-card.read {
-  background: #fbfdff;
-  border-color: #e8f0fa;
-  opacity: 0.78;
+  background: #f7fbff !important;
+  border-color: #dceafa !important;
+  opacity: 1;
 }
 
 .notice-head {
@@ -251,8 +265,8 @@ export default {
   flex: 1;
   min-width: 0;
   font-size: 28rpx;
-  color: #17314c;
-  font-weight: 700;
+  color: #102033 !important;
+  font-weight: 900;
   line-height: 1.5;
 }
 
@@ -278,30 +292,34 @@ export default {
 .notice-time {
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: #54708f;
+  color: #4b647f !important;
+  font-weight: 700;
 }
 
 .detail-wrap {
-  padding: 28rpx 24rpx 36rpx;
+  padding: 28rpx 24rpx calc(36rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
 }
 
 .detail-head {
   font-size: 32rpx;
-  color: #18304b;
-  font-weight: 800;
+  color: #102033;
+  font-weight: 900;
 }
 
 .detail-content {
   margin-top: 16rpx;
   font-size: 28rpx;
-  color: #2a4260;
+  color: #18304b !important;
   line-height: 1.7;
+  font-weight: 700;
 }
 
 .detail-time {
   margin-top: 14rpx;
   font-size: 22rpx;
-  color: #55708e;
+  color: #4b647f !important;
+  font-weight: 700;
 }
 
 .close-btn {

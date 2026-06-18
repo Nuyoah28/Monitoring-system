@@ -81,14 +81,11 @@
           <view class="section-sub">报修、访客、停车和随手拍快速办理</view>
         </view>
       </view>
-      <view class="service-grid">
-        <view class="service-item" @tap="goFeature('/pages/owner/ai/index')"><view class="service-icon service-icon--purple">助</view><text>社区助手</text></view>
-        <view class="service-item" @tap="goFeature('/pages/owner/features/repair/index')"><view class="service-icon service-icon--orange">修</view><text>在线报修</text></view>
-        <view class="service-item" @tap="goFeature('/pages/owner/features/visitor/index')"><view class="service-icon service-icon--blue">访</view><text>访客登记</text></view>
-        <view class="service-item" @tap="goFeature('/pages/owner/features/parking/index')"><view class="service-icon service-icon--green">停</view><text>停车服务</text></view>
-        <view class="service-item" @tap="goFeature('/pages/owner/features/environment/index')"><view class="service-icon service-icon--cyan">环</view><text>环境信息</text></view>
-        <view class="service-item" @tap="goFeature('/pages/owner/features/report/index')"><view class="service-icon service-icon--pink">拍</view><text>随手拍</text></view>
-      </view>
+      <command-feature-grid
+        class="service-grid"
+        :items="serviceItems"
+        @select="handleServiceItem"
+      />
     </view>
 
     <view class="section-card todo-card">
@@ -105,6 +102,7 @@
 
 <script>
 import OwnerTabbar from '@/components/navigation/owner-tabbar.vue';
+import CommandFeatureGrid from '@/components/ui/CommandFeatureGrid.vue';
 import {
   OWNER_DEMO_FALLBACK_ENABLED,
   createOwnerDemoEnvironment,
@@ -116,7 +114,7 @@ import {
 import { applyOwnerNoticeReadState } from '@/common/owner-notice-read.js';
 
 export default {
-  components: { OwnerTabbar },
+  components: { OwnerTabbar, CommandFeatureGrid },
   data() {
     return {
       pageTopPadding: 30,
@@ -127,6 +125,14 @@ export default {
       parkingRealtime: null,
       visitors: [],
       environmentData: null,
+      serviceItems: [
+        { label: '社区助手', path: '/pages/owner/ai/index', icon: 'kefu-ermai', tone: 'purple', hint: '问答服务' },
+        { label: '在线报修', path: '/pages/owner/features/repair/index', icon: 'edit-pen', tone: 'amber', hint: '故障提交' },
+        { label: '访客登记', path: '/pages/owner/features/visitor/index', icon: 'account', tone: 'blue', hint: '到访预约' },
+        { label: '停车服务', path: '/pages/owner/features/parking/index', icon: 'car', tone: 'green', hint: '空位查看' },
+        { label: '环境信息', path: '/pages/owner/features/environment/index', icon: 'map', tone: 'cyan', hint: '空气舒适' },
+        { label: '随手拍', path: '/pages/owner/features/report/index', icon: 'camera', tone: 'rose', hint: '问题上报' },
+      ],
     };
   },
   computed: {
@@ -161,6 +167,7 @@ export default {
   methods: {
     updateSafeAreaPadding() { const info = typeof uni.getWindowInfo === 'function' ? uni.getWindowInfo() : uni.getSystemInfoSync(); this.pageTopPadding = (info && info.statusBarHeight) ? info.statusBarHeight + 18 : 30; },
     goFeature(url) { uni.navigateTo({ url }); },
+    handleServiceItem(item) { this.goFeature(item.path); },
     isSuccess(res) { return String(res && res.code) === '00000'; },
     formatShortTime(value) { if (!value) return '--'; return String(value).replace('T', ' ').slice(5, 16); },
     formatNumber(value) { if (value === null || value === undefined || value === '') return '--'; const num = Number(value); if (isNaN(num)) return '--'; return Number.isInteger(num) ? `${num}` : num.toFixed(1); },
@@ -210,7 +217,7 @@ export default {
 .bg-orb--one { width: 220rpx; height: 220rpx; right: -82rpx; top: 160rpx; background: rgba(56, 164, 255, 0.12); }
 .bg-orb--two { width: 180rpx; height: 180rpx; left: -70rpx; top: 720rpx; background: rgba(22, 163, 74, 0.08); }
 .hero, .section-card { position: relative; z-index: 1; }
-.hero { border-radius: 34rpx; padding: 30rpx; color: #fff; background: radial-gradient(circle at 88% 0%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 230rpx), linear-gradient(135deg, #1470d8 0%, #2b8ef0 48%, #38a4ff 100%); box-shadow: 0 18rpx 40rpx rgba(20, 112, 216, 0.24); }
+.hero { border-radius: 34rpx; padding: 30rpx; color: #fff; background: linear-gradient(90deg, rgba(32, 214, 210, 0.22) 0, rgba(32, 214, 210, 0) 42%), radial-gradient(circle at 88% 0%, rgba(125, 211, 252, 0.24), rgba(125, 211, 252, 0) 230rpx), linear-gradient(135deg, #0b1e35 0%, #0d2740 52%, #0b6fc6 100%); border: 1rpx solid rgba(125, 211, 252, 0.22); box-shadow: 0 20rpx 46rpx rgba(2, 8, 23, 0.24); }
 .hero-top, .section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20rpx; }
 .hero-kicker { font-size: 24rpx; font-weight: 800; color: rgba(255, 255, 255, 0.82); }
 .hero-title { margin-top: 10rpx; font-size: 46rpx; line-height: 1.1; font-weight: 900; }
@@ -219,7 +226,7 @@ export default {
 .status-dot { width: 12rpx; height: 12rpx; border-radius: 50%; background: #86efac; }
 .hero-status.is-warn .status-dot { background: #fef3c7; }
 .hero-metrics { margin-top: 20rpx; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12rpx; }
-.hero-chip { min-height: 80rpx; border-radius: 20rpx; background: rgba(255,255,255,0.18); border: 1rpx solid rgba(255,255,255,0.22); padding: 12rpx 14rpx; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.hero-chip { min-height: 80rpx; border-radius: 20rpx; background: rgba(255,255,255,0.12); border: 1rpx solid rgba(125,211,252,0.22); padding: 12rpx 14rpx; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
 .chip-num { color: #fff; font-size: 28rpx; line-height: 1; font-weight: 900; }
 .chip-label { margin-top: 8rpx; color: rgba(255, 255, 255, 0.82); font-size: 20rpx; font-weight: 700; }
 .section-card { margin-top: 20rpx; padding: 24rpx; border-radius: 30rpx; background: rgba(255,255,255,0.92); border: 1rpx solid rgba(37,99,235,0.10); box-shadow: 0 10rpx 30rpx rgba(30,88,150,0.10); }

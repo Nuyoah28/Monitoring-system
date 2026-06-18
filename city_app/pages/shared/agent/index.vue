@@ -105,7 +105,8 @@
 				<view class="input-wrap">
 					<input class="input-inner" type="text" v-model="text" placeholder="输入问题，或点击麦克风对话" :disabled="isLoading" />
 					<view class="btn-voice" :class="{ recording: isRecording }" @click="voiceClickHandler" :style="{ opacity: isLoading ? 0.6 : 1 }">
-						<text class="btn-voice-text">{{ isRecording ? '停止' : '🎤' }}</text>
+						<text v-if="isRecording" class="btn-voice-text">停止</text>
+						<u-icon v-else name="kefu-ermai" color="#ffffff" size="30rpx"></u-icon>
 					</view>
 					<view class="btn-send" :class="{ disabled: isDisabled }" @click="!isDisabled && send()">
 						<text class="btn-send-text">发送</text>

@@ -157,43 +157,57 @@ export default {
 
     .top-tabs {
       display: flex;
-      height: 80rpx;
+      height: 72rpx;
       align-items: center;
+      padding: 6rpx;
+      border-radius: 999rpx;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1rpx solid rgba(205, 225, 246, 0.9);
+      box-shadow: 0 10rpx 22rpx rgba(3, 20, 39, 0.12);
 
       .tab-item + .tab-item {
-        margin-left: 50rpx;
+        margin-left: 4rpx;
       }
 
       .tab-item {
         position: relative;
-        height: 100%;
+        min-width: 156rpx;
+        height: 60rpx;
+        border-radius: 999rpx;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         justify-content: center;
         align-items: center;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: 0 !important;
+        overflow: hidden;
 
         .tab-text {
-          font-size: 32rpx;
-          color: rgba(26, 42, 58, 0.6);
-          font-weight: 500;
+          font-size: 25rpx;
+          color: #61758e !important;
+          font-weight: 800;
           transition: all 0.3s;
+          text-shadow: none !important;
         }
 
         &.active {
+          background: linear-gradient(135deg, #0b6fc6, #18a8ff) !important;
+
           .tab-text {
-            color: #1a2a3a;
-            font-size: 36rpx;
-            font-weight: bold;
+            color: #ffffff !important;
+            font-size: 25rpx;
+            font-weight: 900;
           }
         }
 
         .indicator {
           position: absolute;
-          bottom: 0;
-          width: 40rpx;
-          height: 8rpx;
-          background: linear-gradient(90deg, #00d2ff, #007aff);
-          border-radius: 4rpx;
+          bottom: 7rpx;
+          width: 32rpx;
+          height: 4rpx;
+          background: rgba(255, 255, 255, 0.82);
+          border-radius: 999rpx;
           animation: slideIn 0.3s ease;
         }
       }
@@ -239,7 +253,7 @@ export default {
     .month-btn-text {
       font-size: 28rpx;
       font-weight: 700;
-      color: #1470d8;
+      color: #0b6fc6;
     }
   }
 

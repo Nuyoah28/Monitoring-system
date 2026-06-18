@@ -183,15 +183,16 @@ export default {
 <style scoped lang="scss">
 .manage-tabbar {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: calc(104rpx + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(18rpx + env(safe-area-inset-bottom));
+  height: 100rpx;
+  padding: 8rpx;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.98);
-  border-top: 1rpx solid #E2E8F0;
-  box-shadow: 0 -8rpx 24rpx rgba(15, 23, 42, 0.08);
+  border-radius: 50rpx;
+  background: rgba(7, 21, 37, 0.92);
+  border: 1rpx solid rgba(125, 211, 252, 0.22);
+  box-shadow: 0 16rpx 36rpx rgba(2, 8, 23, 0.28);
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -206,39 +207,40 @@ export default {
   align-items: center;
   justify-content: center;
   min-width: 0;
-  height: 104rpx;
+  height: 84rpx;
+  border-radius: 42rpx;
   pointer-events: auto;
   position: relative;
 }
 
 .tab-icon {
-  width: 32rpx;
-  height: 32rpx;
-  opacity: 0.5;
+  width: 34rpx;
+  height: 34rpx;
+  opacity: 0.58;
 }
 
 .tab-text {
   margin-top: 4rpx;
   font-size: 22rpx;
   line-height: 1.2;
-  color: #64748B;
+  color: rgba(234, 247, 255, 0.62);
   white-space: nowrap;
   pointer-events: none;
 }
 
 .tab-item.active {
-  background: transparent;
+  background: rgba(24, 168, 255, 0.16);
 }
 
 .tab-item.active::before {
   content: "";
   position: absolute;
-  top: 0;
+  top: 8rpx;
   left: 50%;
-  width: 44rpx;
-  height: 6rpx;
-  border-radius: 0 0 999rpx 999rpx;
-  background: #2563EB;
+  width: 36rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: #20d6d2;
   transform: translateX(-50%);
 }
 
@@ -247,7 +249,7 @@ export default {
 }
 
 .tab-item.active .tab-text {
-  color: #2563EB;
-  font-weight: 700;
+  color: #eaf7ff;
+  font-weight: 900;
 }
 </style>

@@ -41,44 +41,11 @@
           <view class="section-subtitle">值班常用功能集中在这里</view>
         </view>
       </view>
-      <view class="quick-grid quick-grid--main">
-        <view class="quick-item" @tap="goPage('/pages/manage/realtime/realtime')">
-          <view class="quick-icon quick-icon--red">
-            <image class="quick-icon-image" src="/static/chosenTabBar/realtime.png" mode="aspectFit"></image>
-          </view>
-          <text>告警处置</text>
-        </view>
-        <view class="quick-item" @tap="goPage('/pages/manage/monitor/index')">
-          <view class="quick-icon quick-icon--blue">
-            <image class="quick-icon-image" src="/static/chosenTabBar/control.png" mode="aspectFit"></image>
-          </view>
-          <text>监控管理</text>
-        </view>
-        <view class="quick-item" @tap="goPage('/pages/manage/statistics/index')">
-          <view class="quick-icon quick-icon--analysis">
-            <image class="quick-icon-image" src="/static/chosenTabBar/chart.png" mode="aspectFit"></image>
-          </view>
-          <text>警情分析</text>
-        </view>
-        <view class="quick-item" @tap="goPage('/pages/manage/environment/index')">
-          <view class="quick-icon quick-icon--teal">
-            <image class="quick-icon-image" src="/static/analysis.png" mode="aspectFit"></image>
-          </view>
-          <text>环境监测</text>
-        </view>
-        <view class="quick-item" @tap="goPage('/pages/manage/dateWatcher/dateWatcher')">
-          <view class="quick-icon quick-icon--property">
-            <u-icon name="home" color="#ffffff" size="38rpx"></u-icon>
-          </view>
-          <text>物业管理</text>
-        </view>
-        <view class="quick-item" @tap="goPage('/pages/manage/ai/index')">
-          <view class="quick-icon quick-icon--purple">
-            <image class="quick-icon-image" src="/static/chosenTabBar/GPT.png" mode="aspectFit"></image>
-          </view>
-          <text>智能助手</text>
-        </view>
-      </view>
+      <command-feature-grid
+        class="quick-grid--main"
+        :items="quickItems"
+        @select="handleQuickItem"
+      />
     </view>
 
     <view class="section-card map-card" @tap="goPage('/pages/manage/monitor/map')">
@@ -156,9 +123,10 @@
 <script>
 import MonitorMap from "./components/monitorMap.vue";
 import ManageTabbar from '@/components/navigation/manage-tabbar.vue';
+import CommandFeatureGrid from '@/components/ui/CommandFeatureGrid.vue';
 
 export default {
-  components: { MonitorMap, ManageTabbar },
+  components: { MonitorMap, ManageTabbar, CommandFeatureGrid },
   data() {
     return {
       statusBarHeight: 0,
@@ -171,6 +139,15 @@ export default {
       monitorRefreshTimer: null,
       mapPulseTimer: null,
       pendingRefreshTimer: null,
+      detailNavigating: false,
+      quickItems: [
+        { label: '告警处置', path: '/pages/manage/realtime/realtime', icon: 'warning', tone: 'red', hint: '风险闭环' },
+        { label: '监控管理', path: '/pages/manage/monitor/index', icon: 'camera', tone: 'blue', hint: '点位规则' },
+        { label: '警情分析', path: '/pages/manage/statistics/index', icon: 'level', tone: 'cyan', hint: '趋势研判' },
+        { label: '环境监测', path: '/pages/manage/environment/index', icon: 'map', tone: 'green', hint: '空气感知' },
+        { label: '物业管理', path: '/pages/manage/dateWatcher/dateWatcher', icon: 'home', tone: 'amber', hint: '社区事务' },
+        { label: '智能助手', path: '/pages/manage/ai/index', icon: 'kefu-ermai', tone: 'purple', hint: '辅助决策' },
+      ],
     };
   },
   computed: {
@@ -248,6 +225,7 @@ export default {
     uni.$on('newAlarm', this.handleNewAlarm);
   },
   onShow() {
+    this.detailNavigating = false;
     this.startRealtimeMap();
   },
   onHide() {
@@ -464,10 +442,29 @@ export default {
     },
     goDetail(id) {
       if (!id) return;
-      uni.navigateTo({ url: `/pages/manage/realtime/detail?id=${id}` });
+      if (this.detailNavigating) return;
+      this.detailNavigating = true;
+      const url = `/pages/manage/realtime/detail?id=${id}`;
+      const pages = getCurrentPages();
+      const navigate = pages.length >= 9 ? uni.redirectTo : uni.navigateTo;
+      navigate({
+        url,
+        fail: () => {
+          this.detailNavigating = false;
+          uni.$showMsg("详情页打开失败，请稍后再试");
+        },
+        complete: () => {
+          setTimeout(() => {
+            this.detailNavigating = false;
+          }, 800);
+        },
+      });
     },
     jumpSetting() {
       uni.navigateTo({ url: "/pages/manage/personal/setting/setting" });
+    },
+    handleQuickItem(item) {
+      this.goPage(item.path);
     },
     goPage(url) {
       const path = String(url || '').split('?')[0];
@@ -534,9 +531,11 @@ export default {
   border-radius: 34rpx;
   color: #fff;
   background:
-    radial-gradient(circle at 88% 0%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 230rpx),
-    linear-gradient(135deg, #1470d8 0%, #2b8ef0 48%, #38a4ff 100%);
-  box-shadow: 0 18rpx 40rpx rgba(20, 112, 216, 0.24);
+    linear-gradient(90deg, rgba(32, 214, 210, 0.26) 0, rgba(32, 214, 210, 0) 38%),
+    radial-gradient(circle at 88% 0%, rgba(125, 211, 252, 0.25), rgba(125, 211, 252, 0) 230rpx),
+    linear-gradient(135deg, #0b1e35 0%, #0d2740 48%, #0b6fc6 100%);
+  border: 1rpx solid rgba(125, 211, 252, 0.22);
+  box-shadow: 0 20rpx 46rpx rgba(2, 8, 23, 0.26);
 }
 
 .hero-top,
@@ -612,8 +611,8 @@ export default {
 .hero-metric {
   min-height: 80rpx;
   border-radius: 20rpx;
-  background: rgba(255,255,255,0.18);
-  border: 1rpx solid rgba(255,255,255,0.22);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1rpx solid rgba(125, 211, 252, 0.22);
   padding: 12rpx 14rpx;
   box-sizing: border-box;
   display: flex;
@@ -640,9 +639,9 @@ export default {
   margin-top: 20rpx;
   padding: 24rpx;
   border-radius: 30rpx;
-  background: rgba(255,255,255,0.97);
-  border: 1rpx solid rgba(37, 99, 235, 0.14);
-  box-shadow: 0 14rpx 34rpx rgba(30, 88, 150, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(205, 225, 246, 0.92);
+  box-shadow: 0 14rpx 34rpx rgba(4, 29, 54, 0.14);
 }
 
 .map-card {

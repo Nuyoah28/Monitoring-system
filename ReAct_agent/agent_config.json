@@ -26,8 +26,8 @@
       "openai_compatible": {
         "enabled": true,
         "type": "openai_compatible",
-        "base_url": "https://api.lkeap.cloud.tencent.com/v1",
-        "api_key": "sk-kmMrIiYSFgserbReAxyxAdA92qYuJgJVbtK7FDuq25zESh4Z",
+        "base_url": "http://tokenhub.tencentmaas.com/v1/",
+        "api_key": "sk-JjBpvdLNeMa17KpvUekl6gjiCfzJ7dHMuPjpSRgaHeBLgB9t",
         "model": "deepseek-v3.2",
         "temperature": 0.5,
         "max_tokens": 2048

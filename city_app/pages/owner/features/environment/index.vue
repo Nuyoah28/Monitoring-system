@@ -1,5 +1,5 @@
 <template>
-  <view class="environment-page">
+  <view class="environment-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="bg-orb bg-orb--one"></view>
     <view class="bg-orb bg-orb--two"></view>
 
@@ -163,9 +163,13 @@ export default {
       realtimeData: null,
       trendData: [],
       hasRealtime: false,
+      statusBarHeight: 0,
     };
   },
   computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
     monitorNames() {
       return this.monitors.map(item => item.name || item.department || `区域${item.id}`);
     },
@@ -206,6 +210,10 @@ export default {
         bottom: Math.round(((item.aqi - min) / span) * 68) + 12,
       }));
     },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   onShow() {
     this.initPage();
@@ -313,7 +321,7 @@ export default {
 <style lang="scss" scoped>
 .environment-page {
   min-height: 100vh;
-  padding: 26rpx 24rpx 44rpx;
+  padding: 26rpx 24rpx calc(44rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   position: relative;
   overflow: visible;

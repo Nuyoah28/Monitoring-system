@@ -24,22 +24,10 @@
     </view>
 
     <view class="stat-grid">
-      <view class="stat-card stat-card--primary">
-        <text class="stat-num">{{ monitorList.length }}</text>
-        <text class="stat-label">总摄像头</text>
-      </view>
-      <view class="stat-card stat-card--success">
-        <text class="stat-num">{{ onlineCount }}</text>
-        <text class="stat-label">在线</text>
-      </view>
-      <view class="stat-card stat-card--muted">
-        <text class="stat-num">{{ offlineCount }}</text>
-        <text class="stat-label">离线</text>
-      </view>
-      <view class="stat-card stat-card--warning">
-        <text class="stat-num">{{ unconfiguredCount }}</text>
-        <text class="stat-label">未设规则</text>
-      </view>
+      <command-stat-card label="总摄像头" :value="monitorList.length" tone="blue" />
+      <command-stat-card label="在线" :value="onlineCount" tone="green" />
+      <command-stat-card label="离线" :value="offlineCount" tone="slate" />
+      <command-stat-card label="未设规则" :value="unconfiguredCount" tone="amber" />
     </view>
 
     <view class="section-card health-card">
@@ -95,7 +83,12 @@
           <view class="btn btn--ghost" :class="!item.running ? 'is-online' : ''" @tap="editWorking(index)">{{ item.running ? '停用' : '启用' }}</view>
         </view>
       </view>
-      <view class="empty" v-if="!filteredMonitorList.length">暂无监控设备</view>
+      <command-empty-state
+        v-if="!filteredMonitorList.length"
+        title="暂无监控设备"
+        desc="调整筛选条件或稍后刷新"
+        icon="camera"
+      />
     </scroll-view>
 
     <Edit
@@ -113,10 +106,12 @@
 <script>
 import Edit from "../controls/components/edit.vue";
 import ManageTabbar from '@/components/navigation/manage-tabbar.vue';
+import CommandEmptyState from '@/components/ui/CommandEmptyState.vue';
+import CommandStatCard from '@/components/ui/CommandStatCard.vue';
 import { resolveLiveStreamUrl } from '@/common/config.js';
 
 export default {
-  components: { Edit, ManageTabbar },
+  components: { Edit, ManageTabbar, CommandEmptyState, CommandStatCard },
   data() {
     return {
       statusBarHeight: 0,

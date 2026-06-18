@@ -1,6 +1,8 @@
 <script>
 import websocket from '@/common/websocket.js';
 
+const COMMAND_DARK_COLOR = '#071525';
+
 const resolveLaunchTarget = () => {
   const token = uni.getStorageSync("token");
   const appType = uni.getStorageSync("appType");
@@ -25,11 +27,38 @@ const resolveLaunchTarget = () => {
   };
 };
 
+const syncNativeShellColor = () => {
+  // #ifdef APP-PLUS
+  if (typeof plus === 'undefined') return;
+  try {
+    if (plus.navigator && typeof plus.navigator.setStatusBarBackground === 'function') {
+      plus.navigator.setStatusBarBackground(COMMAND_DARK_COLOR);
+    }
+    if (plus.os && plus.os.name === 'Android' && plus.android) {
+      const main = plus.android.runtimeMainActivity();
+      const window = main.getWindow();
+      plus.android.importClass(window);
+      const Color = plus.android.importClass('android.graphics.Color');
+      const color = Color.parseColor(COMMAND_DARK_COLOR);
+      if (typeof window.setNavigationBarColor === 'function') {
+        window.setNavigationBarColor(color);
+      }
+      if (typeof window.setStatusBarColor === 'function') {
+        window.setStatusBarColor(color);
+      }
+    }
+  } catch (e) {
+    console.warn('[App] 设置原生系统栏颜色失败：', e);
+  }
+  // #endif
+};
+
 export default {
   onLaunch: function () {
     // console.log("App Launch");
     // #ifdef APP-PLUS
     if(typeof plus !== 'undefined') {
+        syncNativeShellColor();
         let main = plus.android.runtimeMainActivity();
         let RingtoneManager = plus.android.importClass(
           "android.media.RingtoneManager"
@@ -97,10 +126,12 @@ export default {
     // 启动动画页作为统一入口，动画结束后再跳转业务页
     uni.reLaunch({
       url: "/pages/shared/launch/index",
+      __skipSafeNavigation: true,
     });
   },
   onShow: function () {
     // console.log("App Show");
+    syncNativeShellColor();
     // App 从后台切回前台时，检查 WebSocket 连接状态
     const token = uni.getStorageSync("token");
     const userId = uni.getStorageSync("userId");
@@ -118,10 +149,11 @@ export default {
 <style lang="scss">
 @import "uview-ui/index.scss";
 @import "./static/fonts/stylesheet.css";
+@import "./common/command-theme.scss";
 page, .uni-page-body {
   min-height: 100% !important;
-  background: #F5F7FB !important;
-  color: #0F172A;
+  background: #071525 !important;
+  color: #0F2238;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
 }
 

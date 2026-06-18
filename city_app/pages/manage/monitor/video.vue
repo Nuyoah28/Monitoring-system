@@ -93,9 +93,16 @@ export default {
   justify-content: center;
 }
 
+.back {
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(205, 225, 246, 0.9);
+  box-shadow: 0 10rpx 22rpx rgba(3, 20, 39, 0.16);
+}
+
 .title {
   font-size: 32rpx;
-  color: #213446;
+  color: #eaf7ff;
   font-weight: 700;
 }
 

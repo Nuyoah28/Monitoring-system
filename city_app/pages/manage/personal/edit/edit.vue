@@ -1,10 +1,10 @@
 <template>
   <view
+    class="edit-page"
     style="
       height: 100vh;
       width: 100vw;
       position: relative;
-      background-color: transparent;
     "
   >
     <view class="setBox" :style="{ height: safeHeight + 'px' }">
@@ -251,7 +251,9 @@ export default {
   position: absolute;
   width: 100%;
   bottom: 0;
-  background-color: transparent;
+  background:
+    linear-gradient(125deg, rgba(32, 214, 210, 0.14) 0%, rgba(32, 214, 210, 0) 34%),
+    linear-gradient(180deg, #071525 0%, #0d2740 300rpx, #edf5ff 640rpx, #f8fbff 100%);
   
   .backImg {
     position: absolute;
@@ -261,7 +263,7 @@ export default {
       position: absolute;
       top: 0;
       z-index: 999;
-      color: #1A2A3A;
+      color: #eaf7ff;
       display: flex;
       align-items: center;
       justify-content: flex-start;
@@ -276,12 +278,10 @@ export default {
         display: flex;
         justify-content: center;
         align-items: center;
-        background: rgba(255, 255, 255, 0.6);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(0, 122, 255, 0.1);
+        background: rgba(255, 255, 255, 0.94);
+        border: 1rpx solid rgba(205, 225, 246, 0.9);
         border-radius: 50%;
-        box-shadow: 0 4rpx 12rpx rgba(100, 150, 200, 0.1);
+        box-shadow: 0 10rpx 22rpx rgba(3, 20, 39, 0.16);
       }
       
       h3 {
@@ -299,18 +299,16 @@ export default {
     left: 50%;
     transform: translate(-50%);
     padding: 40rpx 30rpx;
-    border-radius: 32rpx;
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 1);
-    box-shadow: 0 16rpx 48rpx rgba(26, 42, 58, 0.08);
+    border-radius: 28rpx;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1rpx solid rgba(205, 225, 246, 0.92);
+    box-shadow: 0 14rpx 34rpx rgba(4, 29, 54, 0.14);
     
     .command {
       width: 100%;
       
       .items {
-        background: rgba(255, 255, 255, 0.9);
+        background: #f5faff;
         height: 110rpx;
         width: 100%;
         margin-bottom: 30rpx;
@@ -321,7 +319,7 @@ export default {
         padding: 0 30rpx;
         box-sizing: border-box;
         box-shadow: 0 4rpx 16rpx rgba(100, 150, 200, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.5);
+        border: 1rpx solid #d4e7fa;
         transition: transform 0.2s, box-shadow 0.2s;
         
         &:active {
@@ -355,7 +353,7 @@ export default {
       }
       
       .button {
-        background: linear-gradient(135deg, #007aff, #00d2ff);
+        background: linear-gradient(135deg, #0b6fc6, #18a8ff);
         height: 110rpx;
         width: 100%;
         margin-top: 50rpx;
@@ -366,7 +364,7 @@ export default {
         font-size: 36rpx;
         font-weight: bold;
         color: #FFFFFF;
-        box-shadow: 0 8rpx 24rpx rgba(0, 122, 255, 0.3);
+        box-shadow: 0 12rpx 24rpx rgba(24, 168, 255, 0.22);
         transition: all 0.2s;
         
         &:active {

@@ -1,5 +1,5 @@
 <template>
-  <view class="feature-page">
+  <view class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="top-bar">
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
@@ -32,7 +32,17 @@ export default {
   data() {
     return {
       records: [],
+      statusBarHeight: 0,
     }
+  },
+  computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14
+    },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo()
+    this.statusBarHeight = info.statusBarHeight || 20
   },
   onShow() {
     this.loadRepairs()
@@ -81,8 +91,9 @@ export default {
 <style lang="scss" scoped>
 .feature-page {
   min-height: 100vh;
-  padding: 26rpx 24rpx 32rpx;
+  padding: 26rpx 24rpx calc(32rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
+  background: linear-gradient(180deg, #f2f9ff 0%, #fbfdfd 54%, #ffffff 100%);
 }
 
 .top-bar {

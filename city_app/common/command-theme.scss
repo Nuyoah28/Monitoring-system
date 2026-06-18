@@ -1,0 +1,386 @@
+/* Command Center UI theme shared by the city app. */
+:root {
+  --cmd-bg: #071525;
+  --cmd-bg-mid: #0d2740;
+  --cmd-surface: #ffffff;
+  --cmd-surface-soft: #f3f8ff;
+  --cmd-line: #cde1f6;
+  --cmd-primary: #18a8ff;
+  --cmd-primary-dark: #0b6fc6;
+  --cmd-cyan: #20d6d2;
+  --cmd-success: #16a34a;
+  --cmd-warning: #f59e0b;
+  --cmd-danger: #ef4444;
+  --cmd-rose: #db2777;
+  --cmd-text: #0f2238;
+  --cmd-muted: #61758e;
+  --cmd-shadow: 0 14rpx 34rpx rgba(4, 29, 54, 0.14);
+}
+
+.bg-orb,
+.bg-shape,
+.command-page-shell__glow {
+  display: none !important;
+}
+
+.cmd-page-bg {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  background:
+    linear-gradient(125deg, rgba(32, 214, 210, 0.14) 0%, rgba(32, 214, 210, 0) 34%),
+    linear-gradient(180deg, #071525 0%, #0d2740 300rpx, #edf5ff 640rpx, #f8fbff 100%);
+}
+
+.cmd-page-bg::before {
+  content: '';
+  position: absolute;
+  left: 24rpx;
+  right: 24rpx;
+  top: 118rpx;
+  height: 1rpx;
+  background: linear-gradient(90deg, rgba(32, 214, 210, 0), rgba(32, 214, 210, 0.72), rgba(24, 168, 255, 0));
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.cmd-panel {
+  border-radius: 28rpx;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1rpx solid rgba(205, 225, 246, 0.9);
+  box-shadow: var(--cmd-shadow);
+}
+
+.cmd-chip {
+  min-height: 44rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(24, 168, 255, 0.12);
+  color: var(--cmd-primary-dark);
+  border: 1rpx solid rgba(24, 168, 255, 0.18);
+  font-size: 21rpx;
+  font-weight: 900;
+}
+
+.cmd-primary-action {
+  min-height: 72rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, var(--cmd-primary-dark), var(--cmd-primary));
+  color: #fff;
+  font-size: 25rpx;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12rpx 22rpx rgba(24, 168, 255, 0.22);
+}
+
+.cmd-soft-action {
+  min-height: 64rpx;
+  border-radius: 999rpx;
+  background: #eef7ff;
+  border: 1rpx solid #cfe4fa;
+  color: var(--cmd-primary-dark);
+  font-size: 23rpx;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+page,
+.uni-page-body {
+  background: #071525 !important;
+}
+
+.home-page,
+.owner-page,
+.alarm-page,
+.monitor-page,
+.property-page,
+.feature-page,
+.env-page,
+.environment-page,
+.detail-page,
+.rules-page,
+.map-page,
+.video-page,
+.edit-page,
+.setting-page,
+.page-wrap,
+.main {
+  background:
+    linear-gradient(125deg, rgba(32, 214, 210, 0.14) 0%, rgba(32, 214, 210, 0) 34%),
+    linear-gradient(180deg, #071525 0%, #0d2740 300rpx, #edf5ff 640rpx, #f8fbff 100%) !important;
+}
+
+.section-card,
+.panel,
+.record-card,
+.form-panel,
+.list-panel,
+.filter-card,
+.health-card,
+.stat-card,
+.quality-card,
+.score-panel,
+.metric-card,
+.picker-card,
+.notice-card,
+.area-block,
+.template-card,
+.ability-item,
+.custom-rule-item,
+.analysis-item,
+.event-card,
+.tip-card,
+.status-strip,
+.overview,
+.recommend-card,
+.traffic-card,
+.focus-card,
+.map-panel,
+.detail-card,
+.empty-card,
+.shortcut-item,
+.menu-row,
+.card,
+.detail-sheet,
+.camera-item,
+.player-wrap,
+.feature-card,
+.status-box,
+.todo-item,
+.reminder-item,
+.level-card,
+.item,
+.alarm-card {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(205, 225, 246, 0.92) !important;
+  box-shadow: var(--cmd-shadow) !important;
+}
+
+.header-card,
+.monitor-page .header-card,
+.property-page .header-card,
+.alarm-page .header-card,
+.rules-page .header-card {
+  background:
+    linear-gradient(90deg, rgba(32, 214, 210, 0.18) 0%, rgba(32, 214, 210, 0) 46%),
+    linear-gradient(135deg, #0b1e35 0%, #0d2740 56%, #0b6fc6 100%) !important;
+  border: 1rpx solid rgba(125, 211, 252, 0.22) !important;
+  box-shadow: 0 18rpx 40rpx rgba(2, 8, 23, 0.22) !important;
+  color: #eaf7ff !important;
+}
+
+.header-card::before {
+  background: linear-gradient(180deg, var(--cmd-cyan), var(--cmd-primary)) !important;
+}
+
+.header-card .eyebrow,
+.header-card .title,
+.header-card .subtitle,
+.header-card .header-title,
+.header-card .health-title,
+.header-card .stat-label,
+.header-card .summary-label {
+  color: #eaf7ff !important;
+}
+
+.header-card .subtitle {
+  opacity: 0.76;
+}
+
+.summary-pill,
+.header-stat,
+.status-pill,
+.rate-pill,
+.traffic-badge,
+.feature-tag,
+.cate-tag,
+.read-pill,
+.level-pill,
+.deal-pill,
+.status-badge {
+  border-radius: 999rpx !important;
+}
+
+.top-nav,
+.top-bar,
+.title-row,
+.header-nav {
+  color: #eaf7ff;
+}
+
+.top-title,
+.header-title,
+.title-row .title,
+.top-tabs .tab-text {
+  color: #eaf7ff !important;
+  text-shadow: 0 0 16rpx rgba(32, 214, 210, 0.18);
+}
+
+.top-subtitle,
+.section-subtitle,
+.section-sub,
+.sub-text {
+  color: rgba(15, 34, 56, 0.62);
+}
+
+.back-btn,
+.icon-btn,
+.setting-btn,
+.refresh-btn,
+.ghost-btn,
+.month-picker-btn {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1rpx solid rgba(205, 225, 246, 0.9) !important;
+  box-shadow: 0 10rpx 22rpx rgba(3, 20, 39, 0.16) !important;
+}
+
+.filter-chip,
+.filter-tab,
+.risk-chip,
+.status-opt,
+.cate-chip,
+.ability-chip,
+.recommend-chip {
+  background: #eef7ff !important;
+  border: 1rpx solid #cfe4fa !important;
+  color: #31506f !important;
+  min-height: 48rpx;
+}
+
+.filter-chip.is-active,
+.filter-tab.is-active,
+.risk-chip.is-active,
+.status-opt.is-active,
+.cate-chip.is-active,
+.top-tabs .tab-item.active,
+.tab-item.is-active {
+  background: linear-gradient(135deg, var(--cmd-primary-dark), var(--cmd-primary)) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+
+.eyebrow,
+.hero-kicker,
+.section-link,
+.map-link,
+.all-link,
+.health-percent,
+.feature-tag,
+.cate-tag,
+.filter-chip.is-active,
+.tab-item.is-active {
+  color: var(--cmd-primary-dark) !important;
+}
+
+.submit-btn,
+.primary-btn,
+.handle-btn,
+.sheet-btn.primary,
+.action-btn--primary,
+.btn--primary {
+  background: linear-gradient(135deg, var(--cmd-primary-dark), var(--cmd-primary)) !important;
+  color: #fff !important;
+  box-shadow: 0 12rpx 24rpx rgba(24, 168, 255, 0.22) !important;
+}
+
+.detail-action--primary,
+.page-btn,
+.button,
+.save-btn,
+.close-btn {
+  background: linear-gradient(135deg, var(--cmd-primary-dark), var(--cmd-primary)) !important;
+  color: #fff !important;
+  box-shadow: 0 12rpx 24rpx rgba(24, 168, 255, 0.22) !important;
+}
+
+.ipt,
+.input,
+.search-input,
+.textarea,
+.picker {
+  background: #f5faff !important;
+  border: 1rpx solid #d4e7fa !important;
+  color: var(--cmd-text) !important;
+}
+
+.label,
+.field-label,
+.form-label,
+.meta,
+.detail-time,
+.detail-desc,
+.notice-time,
+.panel-tag,
+.metric-desc,
+.area-meta,
+.status-desc,
+.profile-desc,
+.menu-subtitle {
+  color: var(--cmd-muted) !important;
+}
+
+.panel-title,
+.section-title,
+.card-title,
+.name,
+.detail,
+.notice-title,
+.profile-name,
+.menu-title,
+.field-title,
+.area-name,
+.metric-name,
+.quality-desc {
+  color: var(--cmd-text) !important;
+}
+
+.empty,
+.empty-box,
+.empty-state {
+  background: rgba(245, 250, 255, 0.9) !important;
+  border: 1rpx dashed #c7ddf3 !important;
+  color: #7b8da3 !important;
+}
+
+.delete,
+.delete-rule,
+.menu-row--danger .menu-title {
+  color: var(--cmd-danger) !important;
+}
+
+.reply,
+.status-done,
+.deal-pill.is-done {
+  background: rgba(22, 163, 74, 0.10) !important;
+  color: #15803d !important;
+}
+
+.status-pending,
+.status-doing,
+.deal-pill.is-pending {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #b45309 !important;
+}
+
+.main .header,
+.main .body {
+  background: transparent !important;
+}
+
+.assistant-dock,
+.floating-bubble,
+.chat-panel,
+.down,
+.session-panel,
+.input-wrap {
+  border-color: rgba(205, 225, 246, 0.92) !important;
+  box-shadow: var(--cmd-shadow) !important;
+}

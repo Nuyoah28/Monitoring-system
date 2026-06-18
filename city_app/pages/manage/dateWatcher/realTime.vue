@@ -91,8 +91,8 @@
               />
               <defs>
                 <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#38b6ff"/>
-                  <stop offset="100%" stop-color="#0e6ecf"/>
+                  <stop offset="0%" stop-color="#20d6d2"/>
+                  <stop offset="100%" stop-color="#0b6fc6"/>
                 </linearGradient>
               </defs>
             </svg>
@@ -471,7 +471,7 @@ export default {
   &:active { transform: scale(0.95); }
 
   &.is-active {
-    background: linear-gradient(135deg, #1470d8 0%, #38a4ff 100%);
+    background: linear-gradient(135deg, #0b6fc6 0%, #18a8ff 100%);
     border-color: transparent;
     box-shadow: 0 4rpx 16rpx rgba(20, 112, 216, 0.3);
   }
@@ -488,7 +488,7 @@ export default {
 .dt-month {
   font-size: 30rpx;
   font-weight: 900;
-  color: #1470d8;
+  color: #0b6fc6;
   .is-active & { color: #fff; }
 }
 .dt-label {
@@ -712,7 +712,7 @@ export default {
 .bar-fill {
   height: 100%;
   border-radius: 999rpx;
-  background: linear-gradient(90deg, #38d9c0 0%, #38b6ff 60%, #1470d8 100%);
+  background: linear-gradient(90deg, #20d6d2 0%, #18a8ff 60%, #0b6fc6 100%);
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

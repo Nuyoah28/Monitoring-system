@@ -1,5 +1,5 @@
 <template>
-  <view class="feature-page">
+  <view class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="bg-shape bg-1"></view>
     <view class="bg-shape bg-2"></view>
 
@@ -72,7 +72,17 @@ export default {
         plateNumber: '',
       },
       records: [],
+      statusBarHeight: 0,
     };
+  },
+  computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   onShow() {
     this.loadVisitors();
@@ -159,7 +169,7 @@ export default {
 <style lang="scss" scoped>
 .feature-page {
   min-height: 100vh;
-  padding: 26rpx 24rpx 32rpx;
+  padding: 26rpx 24rpx calc(32rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   background: linear-gradient(180deg, #edf8ff 0%, #f9fbff 54%, #ffffff 100%);
   position: relative;

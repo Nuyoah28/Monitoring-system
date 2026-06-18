@@ -192,6 +192,7 @@ export default {
       quickDealTexts: ["已到现场核实，风险已解除", "已通知负责人跟进", "误报，现场无异常"],
       dataFetchInterval: null, // 定时器ID
       isRefreshing: false, // 正在刷新状态
+      detailNavigating: false,
     };
   },
   computed: {
@@ -228,6 +229,7 @@ export default {
   },
   onShow() {
     // console.log("realShow");
+    this.detailNavigating = false;
     this.choosen = 0;
     this.caseType = null;
     this.filterIndex = null;
@@ -495,8 +497,22 @@ export default {
         uni.$showMsg("报警ID缺失，无法查看详情");
         return;
       }
-      uni.navigateTo({
-        url: `/pages/manage/realtime/detail?id=${item.id}`,
+      if (this.detailNavigating) return;
+      this.detailNavigating = true;
+      const url = `/pages/manage/realtime/detail?id=${item.id}`;
+      const pages = getCurrentPages();
+      const navigate = pages.length >= 9 ? uni.redirectTo : uni.navigateTo;
+      navigate({
+        url,
+        fail: () => {
+          this.detailNavigating = false;
+          uni.$showMsg("详情页打开失败，请稍后再试");
+        },
+        complete: () => {
+          setTimeout(() => {
+            this.detailNavigating = false;
+          }, 800);
+        },
       });
     },
     deal(index) {
@@ -704,9 +720,9 @@ export default {
 
 .header-stat {
   width: 120rpx;
-  height: 120rpx;
-  border-radius: 26rpx;
-  background: rgba(255, 255, 255, 0.96);
+  min-height: 120rpx;
+  border-radius: 0 !important;
+  background: transparent !important;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -715,15 +731,24 @@ export default {
 }
 
 .stat-num {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 38rpx;
   font-weight: 900;
   line-height: 1;
+  box-shadow: 0 10rpx 22rpx rgba(3, 20, 39, 0.12);
 }
 
 .stat-label {
-  margin-top: 8rpx;
+  margin-top: 10rpx;
   font-size: 20rpx;
   font-weight: 800;
+  color: rgba(234, 247, 255, 0.82);
 }
 
 .header-stat.is-danger { color: #dc2626; }

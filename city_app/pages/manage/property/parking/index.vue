@@ -423,7 +423,7 @@ export default {
 <style lang="scss" scoped>
 .feature-page {
   min-height: 100vh;
-  padding: 0 24rpx 34rpx;
+  padding: 0 24rpx calc(34rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   background: linear-gradient(180deg, #dceefa 0%, #f6fbff 58%, #ffffff 100%);
 }

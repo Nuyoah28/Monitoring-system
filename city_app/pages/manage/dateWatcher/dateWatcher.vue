@@ -1,5 +1,5 @@
 <template>
-  <view class="property-page" :style="{ paddingTop: statusBarHeight + 'px' }">
+  <view class="property-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="bg-orb bg-orb--one"></view>
     <view class="bg-orb bg-orb--two"></view>
 
@@ -20,7 +20,7 @@
         <view class="subtitle">访客、通知、报修、车位与居民随手拍集中处理</view>
       </view>
       <view class="summary-pill">
-        <text class="summary-num">{{ featureList.length }}</text>
+        <view class="summary-num">{{ featureList.length }}</view>
         <text class="summary-label">模块</text>
       </view>
     </view>
@@ -108,6 +108,11 @@ export default {
       ],
     }
   },
+  computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14
+    },
+  },
   onLoad() {
     const info = uni.getWindowInfo()
     this.statusBarHeight = info.statusBarHeight || 20
@@ -133,7 +138,7 @@ export default {
   min-height: 100vh;
   position: relative;
   overflow: hidden;
-  padding: 0 24rpx 36rpx;
+  padding: 0 24rpx calc(36rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   background:
     radial-gradient(circle at 12% 6%, rgba(56, 164, 255, 0.14) 0, rgba(56, 164, 255, 0) 250rpx),
@@ -244,29 +249,41 @@ export default {
 }
 
 .summary-pill {
-  min-width: 112rpx;
-  padding: 18rpx 16rpx;
+  width: 116rpx;
+  height: 116rpx;
+  padding: 0;
   border-radius: 22rpx;
   background: linear-gradient(180deg, #f8fbff, #eef7ff);
   border: 1rpx solid #dcebfa;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   flex-shrink: 0;
+  box-sizing: border-box;
+  position: relative;
 }
 
 .summary-num {
+  position: absolute;
+  inset: 0;
   color: #1470d8;
   font-size: 40rpx;
   font-weight: 900;
-  line-height: 1;
+  line-height: normal;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 18rpx;
+  box-sizing: border-box;
 }
 
 .summary-label {
-  margin-top: 8rpx;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16rpx;
+  text-align: center;
   color: #64748b;
   font-size: 21rpx;
   font-weight: 800;
+  line-height: 1;
 }
 
 .section-card {

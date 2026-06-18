@@ -3,11 +3,14 @@
     <view class="glow glow-a"></view>
     <view class="glow glow-b"></view>
     <view class="glow glow-c"></view>
+    <view class="radar-ring radar-ring--one"></view>
+    <view class="radar-ring radar-ring--two"></view>
 
     <view class="launch-center" :class="{ ready: centerReady }">
       <view class="logo-wrap" :class="{ pulse: logoPulse }">
         <image class="logo" src="/static/logo.png" mode="aspectFit"></image>
       </view>
+      <text class="kicker">COMMUNITY COMMAND</text>
       <text class="title">社区智眼</text>
       <text class="subtitle">智慧安防 · 实时联动 · 可信守护</text>
     </view>
@@ -69,15 +72,16 @@ export default {
       uni.removeStorageSync("__launch_target__");
 
       if (!target || !target.url) {
-        uni.reLaunch({ url: DEFAULT_TARGET.url });
+        uni.reLaunch({ url: DEFAULT_TARGET.url, __skipSafeNavigation: true });
         return;
       }
 
       if (target.navType === "switchTab") {
         uni.switchTab({
           url: target.url,
+          __skipSafeNavigation: true,
           fail: () => {
-            uni.reLaunch({ url: target.url });
+            uni.reLaunch({ url: target.url, __skipSafeNavigation: true });
           },
         });
         return;
@@ -86,14 +90,15 @@ export default {
       if (target.navType === "redirectTo") {
         uni.redirectTo({
           url: target.url,
+          __skipSafeNavigation: true,
           fail: () => {
-            uni.reLaunch({ url: target.url });
+            uni.reLaunch({ url: target.url, __skipSafeNavigation: true });
           },
         });
         return;
       }
 
-      uni.reLaunch({ url: target.url });
+      uni.reLaunch({ url: target.url, __skipSafeNavigation: true });
     },
   },
 };
@@ -106,9 +111,20 @@ export default {
   height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at 20% 18%, rgba(113, 177, 255, 0.42), transparent 45%),
-    radial-gradient(circle at 82% 75%, rgba(127, 240, 203, 0.34), transparent 42%),
-    linear-gradient(160deg, #0f2f51 0%, #123f6a 48%, #1d5e93 100%);
+    radial-gradient(circle at 18% 12%, rgba(32, 214, 210, 0.30), transparent 42%),
+    radial-gradient(circle at 82% 72%, rgba(24, 168, 255, 0.30), transparent 44%),
+    linear-gradient(160deg, #071525 0%, #0d2740 52%, #0b1e35 100%);
+}
+
+.launch-page::after {
+  content: '';
+  position: absolute;
+  left: 36rpx;
+  right: 36rpx;
+  top: 24%;
+  height: 1rpx;
+  background: linear-gradient(90deg, transparent, rgba(32, 214, 210, 0.72), transparent);
+  opacity: 0.68;
 }
 
 .glow {
@@ -124,7 +140,7 @@ export default {
   height: 340rpx;
   left: -70rpx;
   top: -90rpx;
-  background: rgba(130, 203, 255, 0.35);
+  background: rgba(32, 214, 210, 0.26);
 }
 
 .glow-b {
@@ -132,7 +148,7 @@ export default {
   height: 400rpx;
   right: -120rpx;
   top: 140rpx;
-  background: rgba(90, 164, 255, 0.3);
+  background: rgba(24, 168, 255, 0.28);
   animation-delay: -2s;
 }
 
@@ -141,8 +157,29 @@ export default {
   height: 300rpx;
   left: 180rpx;
   bottom: -80rpx;
-  background: rgba(102, 240, 191, 0.24);
+  background: rgba(34, 197, 94, 0.20);
   animation-delay: -3.5s;
+}
+
+.radar-ring {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  border-radius: 50%;
+  border: 1rpx solid rgba(125, 211, 252, 0.22);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.radar-ring--one {
+  width: 420rpx;
+  height: 420rpx;
+}
+
+.radar-ring--two {
+  width: 620rpx;
+  height: 620rpx;
+  border-color: rgba(32, 214, 210, 0.12);
 }
 
 .launch-center {
@@ -167,7 +204,7 @@ export default {
   width: 148rpx;
   height: 148rpx;
   border-radius: 36rpx;
-  background: linear-gradient(145deg, rgba(223, 243, 255, 0.94), rgba(178, 224, 255, 0.92));
+  background: linear-gradient(145deg, rgba(245, 252, 255, 0.98), rgba(195, 235, 255, 0.94));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,11 +220,19 @@ export default {
   height: 86rpx;
 }
 
+.kicker {
+  margin-top: 34rpx;
+  color: #7dd3fc;
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 2rpx;
+}
+
 .title {
-  margin-top: 30rpx;
-  color: #eaf6ff;
+  margin-top: 12rpx;
+  color: #ffffff;
   font-size: 56rpx;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 3rpx;
 }
 
@@ -217,7 +262,7 @@ export default {
   width: 100%;
   height: 10rpx;
   border-radius: 999rpx;
-  background: rgba(208, 231, 250, 0.28);
+  background: rgba(255, 255, 255, 0.14);
   overflow: hidden;
   box-shadow: inset 0 0 0 1rpx rgba(222, 244, 255, 0.18);
 }
@@ -225,7 +270,7 @@ export default {
 .bar-inner {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #67e8f9 0%, #7dd3fc 40%, #4ade80 100%);
+  background: linear-gradient(90deg, #18a8ff 0%, #20d6d2 50%, #22c55e 100%);
   box-shadow: 0 0 14rpx rgba(125, 211, 252, 0.55);
   transition: width 120ms linear;
 }
