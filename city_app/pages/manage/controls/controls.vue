@@ -171,6 +171,7 @@ export default {
       monitorRefreshTimer: null,
       mapPulseTimer: null,
       pendingRefreshTimer: null,
+      detailNavigating: false,
     };
   },
   computed: {
@@ -248,6 +249,7 @@ export default {
     uni.$on('newAlarm', this.handleNewAlarm);
   },
   onShow() {
+    this.detailNavigating = false;
     this.startRealtimeMap();
   },
   onHide() {
@@ -464,7 +466,26 @@ export default {
     },
     goDetail(id) {
       if (!id) return;
-      uni.navigateTo({ url: `/pages/manage/realtime/detail?id=${id}` });
+      if (this.detailNavigating) return;
+      this.detailNavigating = true;
+      const url = `/pages/manage/realtime/detail?id=${id}`;
+      let pages = [];
+      try {
+        pages = getCurrentPages();
+      } catch (e) {}
+      const navigate = pages.length >= 9 ? uni.redirectTo : uni.navigateTo;
+      navigate({
+        url,
+        fail: () => {
+          this.detailNavigating = false;
+          uni.$showMsg("详情页打开失败，请稍后再试");
+        },
+        complete: () => {
+          setTimeout(() => {
+            this.detailNavigating = false;
+          }, 800);
+        },
+      });
     },
     jumpSetting() {
       uni.navigateTo({ url: "/pages/manage/personal/setting/setting" });
