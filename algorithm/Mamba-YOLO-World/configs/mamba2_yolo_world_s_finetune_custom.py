@@ -47,7 +47,7 @@ model = dict(
         image_model={{_base_.model.backbone}},
         text_model=dict(
             type='HuggingCLIPLanguageBackbone',
-            model_name='openai/clip-vit-base-patch32',
+            model_name='pretrained_models/clip-vit-base-patch32',
             frozen_modules=['all']      # ★ 冻结 CLIP 文本编码器，保留开放词汇能力
         ),
     ),
