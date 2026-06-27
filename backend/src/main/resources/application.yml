@@ -5,3 +5,7 @@ spring:
       - optional:file:backend/.env[.properties]
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:prod}
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 30MB

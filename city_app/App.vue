@@ -29,7 +29,8 @@ export default {
   onLaunch: function () {
     // console.log("App Launch");
     // #ifdef APP-PLUS
-    if(typeof plus !== 'undefined') {
+    try {
+      if (typeof plus !== 'undefined') {
         let main = plus.android.runtimeMainActivity();
         let RingtoneManager = plus.android.importClass(
           "android.media.RingtoneManager"
@@ -80,6 +81,9 @@ export default {
             // player.stop();
           }
         });
+      }
+    } catch (e) {
+      console.warn('[App] 原生推送/铃声初始化失败，不影响启动流程:', e);
     }
     // #endif
 
@@ -93,6 +97,8 @@ export default {
 
     const launchTarget = resolveLaunchTarget();
     uni.setStorageSync("__launch_target__", launchTarget);
+
+
 
     // 启动动画页作为统一入口，动画结束后再跳转业务页
     uni.reLaunch({

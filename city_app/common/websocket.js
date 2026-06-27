@@ -11,6 +11,7 @@ let reconnectTimer = null;
 let heartbeatTimer = null;
 let socketTask = null;
 let currentUserId = null;
+let alarmModalVisible = false;
 
 // WebSocket 服务器地址（根据环境配置）
 const WS_BASE_URL = WS_ALARM_URL;
@@ -100,7 +101,7 @@ function handleMessage(data) {
         // 居民随手拍上报：只提醒管理端，复用报警 WebSocket 通道
         const appType = uni.getStorageSync('appType');
         if (appType === 'manage') {
-            uni.showModal({
+            showAlarmModal({
                 title: '📢 居民上报提醒',
                 content: data.message || '有居民上报新的社区问题，请及时查看处理。',
                 showCancel: false,
@@ -111,7 +112,7 @@ function handleMessage(data) {
                     }
                 }
             });
-            uni.vibrateLong();
+            safeVibrateLong();
         }
         // 触发全局事件，供上报管理页实时刷新列表
         uni.$emit('newReport', data);
@@ -129,7 +130,7 @@ function handleMessage(data) {
         if (appType === 'owner') {
             const areaText = alarmData.department || '附近区域';
             const eventText = alarmData.eventName || '异常事件';
-            uni.showModal({
+            showAlarmModal({
                 title: '⚠️ 社区报警提醒',
                 content: `【${areaText}】发生${eventText}，请注意安全。`,
                 showCancel: false,
@@ -140,14 +141,14 @@ function handleMessage(data) {
                     }
                 }
             });
-            uni.vibrateLong();
+            safeVibrateLong();
             return;
         }
 
         // 区分“原生常态告警”和“AI自定义下发动态监测(caseType=13)”
         if (alarmData.caseType === 13) {
             // 给负责人的特快专递消息
-            uni.showModal({
+            showAlarmModal({
                 title: '🎯 [特急] AI 目标抓拍通知',
                 content: `您关注的动态目标监控点【${alarmData.name || '摄像头区域'}】刚刚抓拍到目标，请立即核实处理！`,
                 showCancel: false,
@@ -159,10 +160,10 @@ function handleMessage(data) {
                 }
             });
             // 振动提醒更强力（连震两次）
-            uni.vibrateLong({ success: () => { setTimeout(() => uni.vibrateLong(), 500); } });
+            safeVibrateLong(() => { setTimeout(() => safeVibrateLong(), 500); });
         } else {
             // 普通警报
-            uni.showModal({
+            showAlarmModal({
                 title: '⚠️ 报警提醒',
                 content: data.message || '您有新的常规报警信息，请及时处理。',
                 showCancel: false,
@@ -173,11 +174,41 @@ function handleMessage(data) {
                     }
                 }
             });
-            uni.vibrateLong();
+            safeVibrateLong();
         }
 
         // 依然触发全局事件供页面刷新(页面流里已将 caseType=13 过滤，不会污染列表)
         uni.$emit('newAlarm', data);
+    }
+}
+
+function showAlarmModal(options) {
+    if (alarmModalVisible) return;
+    alarmModalVisible = true;
+    uni.showModal({
+        ...options,
+        complete: (...args) => {
+            alarmModalVisible = false;
+            if (typeof options.complete === 'function') {
+                options.complete(...args);
+            }
+        }
+    });
+}
+
+function safeVibrateLong(success) {
+    if (typeof uni.vibrateLong !== 'function') return;
+    try {
+        uni.vibrateLong({
+            success: () => {
+                if (typeof success === 'function') success();
+            },
+            fail: (err) => {
+                console.log('[WebSocket] 振动失败:', err);
+            }
+        });
+    } catch (e) {
+        console.log('[WebSocket] 调用振动异常:', e);
     }
 }
 

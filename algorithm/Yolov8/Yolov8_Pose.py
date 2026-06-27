@@ -305,6 +305,55 @@ def _expire_area_state(state, now_time, grace_seconds):
         active.pop(track_id, None)
         last_seen.pop(track_id, None)
         alarmed.discard(track_id)
+
+
+def _filter_indices_overlapping_humans(indices, object_boxes, human_boxes, iou_threshold=0.2):
+    if indices is None or len(indices) == 0 or human_boxes is None or len(human_boxes) == 0:
+        return np.asarray(indices, dtype=np.int32)
+
+    object_boxes = np.asarray(object_boxes, dtype=np.float32)
+    human_boxes = np.asarray(human_boxes, dtype=np.float32)
+    keep = []
+    for index in np.asarray(indices, dtype=np.int32):
+        if index >= len(object_boxes):
+            continue
+        box = object_boxes[index]
+        x1, y1, x2, y2 = box
+        box_area = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+        if box_area <= 0:
+            continue
+
+        hx1 = human_boxes[:, 0]
+        hy1 = human_boxes[:, 1]
+        hx2 = human_boxes[:, 2]
+        hy2 = human_boxes[:, 3]
+        inter_x1 = np.maximum(x1, hx1)
+        inter_y1 = np.maximum(y1, hy1)
+        inter_x2 = np.minimum(x2, hx2)
+        inter_y2 = np.minimum(y2, hy2)
+        inter_area = np.maximum(0.0, inter_x2 - inter_x1) * np.maximum(0.0, inter_y2 - inter_y1)
+        human_area = np.maximum(0.0, hx2 - hx1) * np.maximum(0.0, hy2 - hy1)
+        union = box_area + human_area - inter_area
+        iou = np.divide(inter_area, union, out=np.zeros_like(inter_area), where=union > 0)
+
+        center_x = (x1 + x2) / 2.0
+        center_y = (y1 + y2) / 2.0
+        center_inside_human = (
+            (center_x >= hx1) & (center_x <= hx2) &
+            (center_y >= hy1) & (center_y <= hy2)
+        )
+
+        if bool(np.any(iou >= iou_threshold) or np.any(center_inside_human)):
+            continue
+        keep.append(int(index))
+    return np.asarray(keep, dtype=np.int32)
+
+
+def _run_pose_boxes_for_filter(infer, raw_img):
+    bboxes, _, _ = infer(raw_img)
+    return bboxes.to(torch.int32).cpu().numpy()
+
+
 # AI辅助生成：多类别结果接到现有视频检测流程里 由 Deepseek 协助完成，2026-04-20。
 
 def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST, infer_custom=None):
@@ -517,6 +566,25 @@ def main(infer, infer1, action_recognizer, np_img, TYPE_LIST, AREA_LIST, infer_c
 
             # Vehicle/road-occupation detection is intentionally left for a future dedicated algorithm.
             vehicle_indices = np.empty((0,), dtype=np.int32)
+
+            if TYPE_LIST[7] and (len(overflow_indices) > 0 or len(garbage_indices) > 0):
+                human_filter_boxes = bboxes
+                if human_filter_boxes is None or len(human_filter_boxes) == 0:
+                    try:
+                        human_filter_boxes = _run_pose_boxes_for_filter(infer, raw_img)
+                    except Exception as exc:
+                        print(f"垃圾误检人体过滤跳过: {exc}")
+                        human_filter_boxes = None
+                overflow_indices = _filter_indices_overlapping_humans(
+                    overflow_indices,
+                    boxes1,
+                    human_filter_boxes,
+                )
+                garbage_indices = _filter_indices_overlapping_humans(
+                    garbage_indices,
+                    boxes1,
+                    human_filter_boxes,
+                )
         if len(fire_indices) > 0 and TYPE_LIST[4]:
             list4 = True
         if len(smoke_indices) > 0 and TYPE_LIST[1]:
