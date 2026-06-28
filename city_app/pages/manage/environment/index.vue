@@ -182,6 +182,16 @@ const MOCK_MONITORS = [
   { id: 3, name: '4号楼楼道', department: '4号楼楼道' },
 ];
 
+const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+const randDelta = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const gaussian = (x, center, width, amplitude) =>
+  amplitude * Math.exp(-Math.pow(x - center, 2) / (2 * width * width));
+
+const expectAqi = (h) => clamp(Math.round(58 + gaussian(h, 8, 1.8, 45) + gaussian(h, 18, 2.0, 50)), 40, 140);
+const expectHumidity = (h) => clamp(Math.round(72 + gaussian(h, 14, 3.6, -26)), 30, 85);
+const expectPm25 = (h) => clamp(Math.round(34 + gaussian(h, 8, 1.7, 36) + gaussian(h, 18, 1.9, 44)), 16, 95);
+const expectTemperature = (h) => clamp(Math.round(21 + gaussian(h, 14, 4.0, 11)), 10, 38);
+
 export default {
   data() {
     return {
@@ -207,11 +217,55 @@ export default {
     realtime() {
       const base = this.weather || {};
       const seed = Number((this.currentMonitor && this.currentMonitor.id) || 1);
-      const nowMinute = new Date().getMinutes();
-      const temperature = Number(base.temperature || (22 + seed + (nowMinute % 5) * 0.4)).toFixed(1);
-      const humidity = Math.round(Number(base.humidity || (48 + seed * 3 + (nowMinute % 6))));
-      const pm25 = Math.max(18, Math.round(Number(base.pm25 || (42 + seed * 4 + (nowMinute % 7) * 2))));
-      const aqi = Math.max(45, Math.round(Number(base.aqi || pm25 * 1.55)));
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const hourFloat = hour + minute / 60;
+
+      const tempBase = expectTemperature(hourFloat) + (seed % 3 - 1) * 0.8;
+      const humidBase = expectHumidity(hourFloat) + (seed % 3 - 1) * 3;
+      const pmBase = expectPm25(hourFloat) + (seed % 3 - 1) * 4;
+      const aqiBase = expectAqi(hourFloat) + (seed % 3 - 1) * 5;
+
+      const hash = (minute + seed * 7) % 10;
+      const noiseT = (hash - 5) * 0.05;
+      const noiseH = (hash - 5) * 0.4;
+      const noiseP = (hash - 5) * 0.6;
+      const noiseA = (hash - 5) * 0.8;
+
+      const temperature = Number(
+        base.temperature !== undefined && base.temperature !== null
+          ? base.temperature
+          : (tempBase + noiseT)
+      ).toFixed(1);
+      const humidity = Math.round(
+        Number(
+          base.humidity !== undefined && base.humidity !== null
+            ? base.humidity
+            : (humidBase + noiseH)
+        )
+      );
+      const pm25 = Math.max(
+        16,
+        Math.round(
+          Number(
+            base.pm25 !== undefined && base.pm25 !== null
+              ? base.pm25
+              : (pmBase + noiseP)
+          )
+        )
+      );
+      const aqi = Math.max(
+        35,
+        Math.round(
+          Number(
+            base.aqi !== undefined && base.aqi !== null
+              ? base.aqi
+              : (aqiBase + noiseA)
+          )
+        )
+      );
+
       return {
         temperature,
         humidity,
@@ -398,17 +452,26 @@ export default {
     },
     generateVisualData() {
       const seed = Number((this.currentMonitor && this.currentMonitor.id) || 1);
-      const labels = ['06:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
-      this.trendData = labels.map((label, index) => ({
-        label,
-        aqi: Math.round(58 + seed * 5 + Math.sin(index + seed) * 13 + index * 2),
-        humidity: Math.round(48 + seed * 2 + Math.cos(index + seed) * 8),
-      }));
+      const timeHours = [6, 9, 12, 15, 18, 21];
+      this.trendData = timeHours.map((h) => {
+        const label = `${String(h).padStart(2, '0')}:00`;
+        const aqiVal = expectAqi(h) + (seed % 3 - 1) * 4 + randDelta(-2, 2);
+        const humVal = expectHumidity(h) + (seed % 3 - 1) * 3 + randDelta(-2, 2);
+        return {
+          label,
+          aqi: clamp(aqiVal, 40, 140),
+          humidity: clamp(humVal, 30, 85),
+        };
+      });
+
       const names = this.monitors.slice(0, 4).map((item) => item.name || item.department || '监测区域');
-      this.areaStats = (names.length ? names : MOCK_MONITORS.map((item) => item.name)).map((name, index) => ({
-        name,
-        score: Math.max(48, Math.min(94, Math.round(this.comfortScore - index * 5 + Math.sin(index + seed) * 8))),
-      }));
+      this.areaStats = (names.length ? names : MOCK_MONITORS.map((item) => item.name)).map((name, index) => {
+        const areaComfort = clamp(this.comfortScore - index * 3 + randDelta(-2, 2), 60, 96);
+        return {
+          name,
+          score: areaComfort,
+        };
+      });
     },
     formatTime(value) {
       if (!value) {
