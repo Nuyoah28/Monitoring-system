@@ -115,5 +115,4 @@ iot/algo/car-flow-detection/models/
 iot/algo/img/
 iot/algo/car-flow-detection/yolov12/*
 iot/algo/car-flow-detection/yolov13/*
-# Local pretrained model folder for CLIP
 algorithm/pretrained_models/

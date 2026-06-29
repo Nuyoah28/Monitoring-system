@@ -31,7 +31,6 @@ export const createOwnerDemoNotices = () => [
   },
 ];
 
-// ====== 自然曲线与昼夜节律辅助函数 ======
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const randDelta = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const gaussian = (x, center, width, amplitude) =>
@@ -43,7 +42,6 @@ const expectPm25 = (h) => clamp(Math.round(34 + gaussian(h, 8, 1.7, 36) + gaussi
 const expectGas = (h) => clamp(Math.round(6 + gaussian(h, 7, 1.0, 11) + gaussian(h, 12, 1.1, 15) + gaussian(h, 18, 1.2, 18)), 4, 38);
 const expectTemperature = (h) => clamp(Math.round(21 + gaussian(h, 14, 4.0, 11)), 10, 38);
 
-// 车位占用期望曲线
 const expectParkingPercent = (h) => clamp(Math.round(82 + gaussian(h, 11.5, 3.5, -38)), 42, 93);
 
 const zoneOccupancyAdjust = (name, base, h) => {

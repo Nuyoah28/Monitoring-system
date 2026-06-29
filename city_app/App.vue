@@ -43,7 +43,6 @@ export default {
         let player = MediaPlayer.create(main, uri);
         let check = 1;
 
-        // Removed UniPush block to resolve HBuilderX cloud packaging issues.
       }
     } catch (e) {
       console.warn('[App] 原生推送/铃声初始化失败，不影响启动流程:', e);
