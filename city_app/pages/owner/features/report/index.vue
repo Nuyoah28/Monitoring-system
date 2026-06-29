@@ -1,5 +1,5 @@
 <template>
-  <view class="feature-page">
+  <view class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="bg-shape bg-1"></view>
     <view class="bg-shape bg-2"></view>
 
@@ -90,6 +90,7 @@ const SUCCESS_CODE = '00000';
 export default {
   data() {
     return {
+      statusBarHeight: 0,
       categories: ['环境卫生', '公共设施', '安全隐患', '违规停车', '其他'],
       records: [],
       images: [],
@@ -102,6 +103,15 @@ export default {
   },
   onShow() {
     this.loadList();
+  },
+  computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   methods: {
     isSuccess(res) {

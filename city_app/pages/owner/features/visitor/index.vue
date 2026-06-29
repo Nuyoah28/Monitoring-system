@@ -1,5 +1,5 @@
 <template>
-  <view class="feature-page">
+  <view class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="bg-shape bg-1"></view>
     <view class="bg-shape bg-2"></view>
 
@@ -65,6 +65,7 @@ export default {
     const hh = `${now.getHours()}`.padStart(2, '0');
     const mi = `${now.getMinutes()}`.padStart(2, '0');
     return {
+      statusBarHeight: 0,
       visitDate: `${yyyy}-${mm}-${dd}`,
       visitTime: `${hh}:${mi}`,
       form: {
@@ -76,6 +77,15 @@ export default {
   },
   onShow() {
     this.loadVisitors();
+  },
+  computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   methods: {
     isSuccess(res) {

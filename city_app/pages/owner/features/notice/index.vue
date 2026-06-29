@@ -1,5 +1,5 @@
 <template>
-  <view class="feature-page">
+  <view class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="bg-shape bg-1"></view>
     <view class="bg-shape bg-2"></view>
 
@@ -43,6 +43,7 @@ const SUCCESS_CODE = '00000';
 export default {
   data() {
     return {
+      statusBarHeight: 0,
       list: [],
       showDetail: false,
       active: {},
@@ -50,6 +51,15 @@ export default {
   },
   onShow() {
     this.loadNotices();
+  },
+  computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   methods: {
     isSuccess(res) {

@@ -1,5 +1,5 @@
 <template>
-  <view class="feature-page">
+  <view class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="top-bar">
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
@@ -75,6 +75,7 @@ const SUCCESS_CODE = '00000';
 export default {
   data() {
     return {
+      statusBarHeight: 0,
       records: [],
       filterStatus: -1,
       filterOptions: [
@@ -97,12 +98,17 @@ export default {
     };
   },
   computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
     filteredRecords() {
       if (this.filterStatus === -1) return this.records;
       return this.records.filter((item) => Number(item.status) === this.filterStatus);
     },
   },
   onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
     uni.$on('newReport', this.handleNewReport);
   },
   onShow() {

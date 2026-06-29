@@ -1,5 +1,5 @@
 <template>
-  <view class="feature-page">
+  <view class="feature-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="top-bar">
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
@@ -39,6 +39,7 @@ const SUCCESS_CODE = '00000'
 export default {
   data() {
     return {
+      statusBarHeight: 0,
       form: {
         message: '',
       },
@@ -47,6 +48,15 @@ export default {
   },
   onShow() {
     this.loadNotices()
+  },
+  computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   methods: {
     isSuccess(res) {
