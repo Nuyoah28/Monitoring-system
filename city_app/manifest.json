@@ -81,8 +81,7 @@
                         "appkey_android" : "b793c585623cb4d4901d36623652b730"
                     }
                 },
-                "ad" : {},
-                "push" : {}
+                "ad" : {}
             },
             "splashscreen" : {
                 "androidStyle" : "common",
