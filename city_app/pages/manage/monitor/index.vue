@@ -7,7 +7,7 @@
       <view class="back-btn" @tap="goBack">
         <u-icon name="arrow-left" color="#1a2a3a" size="34rpx"></u-icon>
       </view>
-      <text class="top-title">摄像头管理</text>
+      <text class="top-title">监控管理</text>
       <view class="top-placeholder"></view>
     </view>
 

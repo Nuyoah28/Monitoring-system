@@ -1,5 +1,5 @@
 <template>
-  <view class="environment-page">
+  <view class="environment-page" :style="{ paddingTop: pageTopPadding + 'px' }">
     <view class="bg-orb bg-orb--one"></view>
     <view class="bg-orb bg-orb--two"></view>
 
@@ -158,6 +158,7 @@ const FALLBACK_MONITORS = [
 export default {
   data() {
     return {
+      statusBarHeight: 0,
       monitors: [],
       currentIndex: 0,
       realtimeData: null,
@@ -166,6 +167,9 @@ export default {
     };
   },
   computed: {
+    pageTopPadding() {
+      return this.statusBarHeight + 14;
+    },
     monitorNames() {
       return this.monitors.map(item => item.name || item.department || `区域${item.id}`);
     },
@@ -209,6 +213,10 @@ export default {
   },
   onShow() {
     this.initPage();
+  },
+  onLoad() {
+    const info = uni.getWindowInfo();
+    this.statusBarHeight = info.statusBarHeight || 20;
   },
   methods: {
     isSuccess(res) {

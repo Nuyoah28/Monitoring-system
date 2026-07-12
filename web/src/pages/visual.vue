@@ -513,11 +513,11 @@
         </section>
 
         <section v-if="activeTab === 'env'" class="panel env-panel">
-          <article class="card env-overview-card">
-            <div class="panel-headline env-overview-head">
-              <div>
-                <h3>环境车位总览</h3>
-                <p>重点关注环境异常、车位余量和高占用区域。</p>
+          <article class="card env-kpi-strip">
+            <div class="kpi-strip-head">
+              <div class="kpi-title-group">
+                <h3>环境 · 车位总览</h3>
+                <span>{{ envPriorityState.desc }}</span>
               </div>
               <div class="analysis-range-tabs">
                 <button
@@ -532,35 +532,99 @@
                 </button>
               </div>
             </div>
-            <div class="env-overview-body">
-              <div class="env-priority-card" :class="envPriorityState.tone">
-                <span>当前重点</span>
-                <strong>{{ envPriorityState.title }}</strong>
-                <p>{{ envPriorityState.desc }}</p>
-              </div>
-              <div class="env-kpi-grid">
-                <div v-for="item in envOverviewKpis" :key="item.name" class="env-kpi" :class="item.tone">
-                  <span>{{ item.name }}</span>
-                  <strong>{{ item.value }}</strong>
-                  <em>{{ item.desc }}</em>
-                </div>
+            <div class="kpi-strip-row">
+              <div v-for="item in envOverviewKpis" :key="item.name" class="kpi-strip-item" :class="item.tone">
+                <span>{{ item.name }}</span>
+                <strong>{{ item.value }}</strong>
+                <em>{{ item.desc }}</em>
               </div>
             </div>
           </article>
 
-          <article class="card env-status-card">
+          <article class="card env-parking-card">
             <div class="panel-headline small">
-              <h3>环境实时状态</h3>
-              <span>{{ envParkingDataModeLabel }} · {{ envParkingRefreshSeconds }}s 刷新</span>
+              <h3>车位管理</h3>
+              <div class="parking-head-right">
+                <span>总车位 {{ parkingTotal }} · {{ parkingPressureLabel }}</span>
+              </div>
             </div>
-            <div class="env-status-grid">
-              <div v-for="item in envStatusCards" :key="item.key" class="env-status-item" :class="item.tone">
-                <div class="env-status-top">
-                  <span>{{ item.label }}</span>
-                  <em>{{ item.status }}</em>
+            <div class="parking-stage">
+              <div class="parking-donut" :class="parkingPressureTone">
+                <div class="parking-donut-ring">
+                  <svg class="parking-donut-svg" viewBox="0 0 160 160">
+                    <circle class="parking-donut-track" cx="80" cy="80" r="64" fill="none" stroke="rgba(126,197,255,0.12)" stroke-width="14" />
+                    <circle
+                      class="parking-donut-value"
+                      cx="80" cy="80" r="64" fill="none"
+                      :stroke="parkingOccupancy >= 85 ? '#ff8d8d' : parkingOccupancy >= 65 ? '#f8cb71' : '#6ce2b2'"
+                      stroke-width="14"
+                      stroke-linecap="round"
+                      :stroke-dasharray="`${(parkingOccupancy / 100) * 402.12} 402.12`"
+                      transform="rotate(-90 80 80)"
+                    />
+                  </svg>
+                  <div class="parking-donut-center">
+                    <strong>{{ parkingOccupancy }}%</strong>
+                    <span>{{ parkingPressureLabel }}</span>
+                  </div>
                 </div>
-                <strong>{{ item.value }}<small>{{ item.unit }}</small></strong>
-                <div class="env-status-bar"><i :style="{ width: `${item.percent}%`, background: item.color }"></i></div>
+                <div class="parking-donut-stats">
+                  <div class="donut-stat used"><span>已用</span><strong>{{ parkingUsed }}</strong></div>
+                  <div class="donut-stat free"><span>空闲</span><strong>{{ parkingFree }}</strong></div>
+                </div>
+                <div class="parking-flow-card">
+                  <div class="flow-title">
+                    <span>今日通行</span>
+                    <strong>{{ trafficFlowReserve.today }}</strong>
+                  </div>
+                  <div class="flow-bars">
+                    <div
+                      v-for="bar in parkingFlowBars"
+                      :key="bar.name"
+                      class="flow-bar"
+                      :class="bar.tone"
+                    >
+                      <span>{{ bar.name }}</span>
+                      <i :style="{ width: `${bar.percent}%` }"></i>
+                      <strong>{{ bar.value }}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="parking-zones-visual">
+                <div v-for="zone in parkingZoneCards" :key="zone.name" class="parking-zone-grid" :class="zone.tone">
+                  <div class="parking-zone-head">
+                    <div class="parking-zone-title">
+                      <span>{{ zone.name }}</span>
+                      <small>{{ zone.statusLabel }} · 余 {{ zone.free }}</small>
+                    </div>
+                    <strong>{{ zone.percent }}%</strong>
+                  </div>
+                  <div class="parking-zone-meter">
+                    <i :style="{ width: `${zone.percent}%` }"></i>
+                  </div>
+                  <div class="parking-lane-map">
+                    <div v-for="lane in zone.slotRows" :key="lane.label" class="parking-lane-row">
+                      <span class="parking-lane-label">{{ lane.label }}</span>
+                      <div class="parking-slot-line">
+                        <i
+                          v-for="slot in lane.slots"
+                          :key="slot.key"
+                          class="parking-slot"
+                          :class="slot.state"
+                        ></i>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="parking-zone-foot"><span>已用 {{ zone.used }} / {{ zone.capacity }}</span><em>余 {{ zone.free }}</em></div>
+                </div>
+              </div>
+            </div>
+            <div class="parking-brief-grid">
+              <div v-for="item in parkingBriefCards" :key="item.label" class="parking-brief-card" :class="item.tone">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+                <em>{{ item.desc }}</em>
               </div>
             </div>
           </article>
@@ -568,161 +632,59 @@
           <article class="card env-trend-card">
             <div class="panel-headline small env-trend-head">
               <div>
-                <h3>环境趋势</h3>
-                <span>{{ envTrendMetricConfig.desc }} · {{ envRangeLabel }}</span>
+                <h3>环境动态</h3>
+                <span>{{ envRangeLabel }} · {{ envParkingRefreshSeconds }}s 刷新</span>
               </div>
-              <div class="env-trend-switch">
-                <button
-                  v-for="metric in envTrendMetrics"
-                  :key="metric.key"
-                  class="env-trend-switch-btn"
-                  :class="{ active: envTrendMetricKey === metric.key }"
-                  type="button"
-                  @click="envTrendMetricKey = metric.key"
-                >
-                  {{ metric.label }}
-                </button>
+              <div class="env-trend-mode">
+                <span>当前重点</span>
+                <strong>{{ envTrendMetricConfig.label }}</strong>
               </div>
             </div>
-            <div class="env-inline-insight" :class="envPriorityState.tone">
-              <span>运行研判</span>
-              <strong>{{ comfortLabel }}</strong>
-              <p>{{ envParkingSummary }}</p>
-            </div>
-            <div class="env-trend-main">
-              <svg class="env-trend-svg single" viewBox="0 0 360 168" preserveAspectRatio="xMidYMid meet" :aria-label="`${envTrendMetricConfig.label} 趋势图`">
-                <line x1="40" y1="136" x2="344" y2="136" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
-                <line x1="40" y1="10" x2="40" y2="136" stroke="rgba(168,198,232,0.62)" stroke-width="1" />
-                <line
-                  v-for="tick in envTrendSelectedRender.yTicks"
-                  :key="`${envTrendMetricKey}-y-${tick.value}`"
-                  x1="40"
-                  :y1="tick.y"
-                  x2="344"
-                  :y2="tick.y"
-                  stroke="rgba(168,198,232,0.16)"
-                  stroke-width="1"
-                />
-                <text
-                  v-for="tick in envTrendSelectedRender.yTicks"
-                  :key="`${envTrendMetricKey}-yl-${tick.value}`"
-                  x="34"
-                  :y="tick.y + 4"
-                  text-anchor="end"
-                  fill="rgba(214, 230, 255, 0.86)"
-                  font-size="10"
-                >
-                  {{ tick.value }}
-                </text>
-                <text
-                  v-for="tick in envTrendSelectedRender.xTicks"
-                  :key="`${envTrendMetricKey}-x-${tick.label}`"
-                  :x="tick.x"
-                  y="156"
-                  text-anchor="middle"
-                  fill="rgba(214, 230, 255, 0.78)"
-                  font-size="10"
-                >
-                  {{ tick.label }}
-                </text>
-                <path :d="envTrendSelectedRender.areaPath" :fill="envTrendMetricConfig.areaColor" />
-                <polyline
-                  :points="envTrendSelectedRender.points"
-                  fill="none"
-                  :stroke="envTrendMetricConfig.color"
-                  stroke-width="2.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <circle
-                  v-for="(dot, idx) in envTrendSelectedRender.dots"
-                  :key="`${envTrendMetricKey}-dot-${idx}`"
-                  :cx="dot.x"
-                  :cy="dot.y"
-                  r="2.6"
-                  :fill="envTrendMetricConfig.color"
-                  stroke="rgba(255,255,255,0.82)"
-                  stroke-width="0.8"
-                />
-              </svg>
-              <div class="env-trend-footer">
-                <div class="env-trend-mini">
-                  <span>当前</span>
-                  <strong>{{ envTrendSelectedValue }}</strong>
-                  <em>{{ envTrendMetricConfig.label }}</em>
+            <div class="env-spark-grid">
+              <div
+                v-for="metric in envTrendMetrics"
+                :key="metric.key"
+                class="env-spark-card"
+                :class="[envTrendMetricTone(metric.key), { active: envTrendMetricKey === metric.key }]"
+                @click="envTrendMetricKey = metric.key"
+              >
+                <div class="env-spark-head">
+                  <div>
+                    <span>{{ envTrendMetricCard(metric.key).label }}</span>
+                    <em>{{ envTrendMetricCard(metric.key).status }}</em>
+                  </div>
+                  <strong>{{ envTrendMetricCard(metric.key).value }}<small>{{ metric.unit }}</small></strong>
                 </div>
-                <div class="env-trend-mini">
-                  <span>峰值</span>
-                  <strong>{{ envTrendSelectedPeak }}</strong>
-                  <em>本周期最高</em>
+                <div class="env-gauge-row">
+                  <div class="env-radial-gauge">
+                    <svg viewBox="0 0 72 72">
+                      <circle cx="36" cy="36" r="28" class="env-gauge-track" />
+                      <circle
+                        cx="36"
+                        cy="36"
+                        r="28"
+                        class="env-gauge-value"
+                        :stroke="metric.color"
+                        :stroke-dasharray="envGaugeStrokeDash(metric.key)"
+                      />
+                    </svg>
+                    <span>{{ envTrendMetricPercent(metric.key) }}%</span>
+                  </div>
+                  <svg class="env-spark-svg" viewBox="0 0 360 168" preserveAspectRatio="none">
+                    <path :d="envTrendCharts[metric.key].areaPath" :fill="metric.areaColor" stroke="none" />
+                    <polyline :points="envTrendCharts[metric.key].points" fill="none" :stroke="metric.color" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
                 </div>
-                <div class="env-trend-mini">
-                  <span>变化</span>
-                  <strong :class="envTrendSelectedDeltaTone">{{ envTrendSelectedDeltaText }}</strong>
-                  <em>{{ envTrendSelectedDeltaDesc }}</em>
+                <div class="env-spark-foot">
+                  <em :class="envTrendMetricTone(metric.key)">{{ envTrendMetricDelta(metric.key) }}</em>
+                  <span>{{ envTrendMetricLimitText(metric.key) }} · 峰值 {{ envTrendMetricPeak(metric.key) }}</span>
                 </div>
               </div>
             </div>
-          </article>
-
-          <article class="card env-parking-card">
-            <div class="panel-headline small">
-              <h3>车位占用与高压区</h3>
-              <div class="parking-head-right">
-                <div class="traffic-flow-inline">
-                  <span>车流量检测</span>
-                  <em>{{ trafficFlowReserve.status }}</em>
-                  <strong>今日 {{ trafficFlowReserve.today }}</strong>
-                  <strong>入口 {{ trafficFlowReserve.inCount }}</strong>
-                  <strong>出口 {{ trafficFlowReserve.outCount }}</strong>
-                </div>
-                <span>总车位 {{ parkingTotal }} · {{ parkingPressureLabel }}</span>
-              </div>
-            </div>
-            <div class="parking-pressure-card" :class="parkingPressureTone">
-              <div class="parking-pressure-main">
-                <span>{{ parkingPressureLabel }}</span>
-                <strong>{{ parkingOccupancy }}<small>%</small></strong>
-                <em>{{ parkingPressureDesc }}</em>
-              </div>
-              <div class="parking-pressure-track">
-                <div class="parking-pressure-meter" :style="{ '--parking-percent': `${parkingOccupancy}%` }">
-                  <i></i>
-                  <b></b>
-                </div>
-                <div class="parking-pressure-scale">
-                  <span>宽松</span>
-                  <span>繁忙</span>
-                  <span>紧张</span>
-                </div>
-              </div>
-              <div class="parking-pressure-stats">
-                <div>
-                  <span>已用</span>
-                  <strong>{{ parkingUsed }}</strong>
-                </div>
-                <div>
-                  <span>空闲</span>
-                  <strong>{{ parkingFree }}</strong>
-                </div>
-                <div class="hot">
-                  <span>高压区</span>
-                  <strong>{{ parkingTopZone?.name || '暂无' }}</strong>
-                  <em>{{ parkingTopZone?.percent || 0 }}%</em>
-                </div>
-              </div>
-            </div>
-            <div class="parking-zone-list compact">
-              <div v-for="zone in parkingZoneCards" :key="zone.name" class="parking-zone-row" :class="zone.tone">
-                <div class="parking-zone-name">
-                  <span>{{ zone.name }}</span>
-                  <em>{{ zone.used }}/{{ zone.capacity }} 已用</em>
-                </div>
-                <div class="parking-zone-bar"><i :style="{ width: `${zone.percent}%` }"></i></div>
-                <div class="parking-zone-count">
-                  <strong>{{ zone.percent }}%</strong>
-                  <em>余 {{ zone.free }}</em>
-                </div>
+            <div class="env-ops-strip">
+              <div v-for="item in envOpsHighlights" :key="item.label" class="env-ops-item" :class="item.tone">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
               </div>
             </div>
           </article>
@@ -1155,6 +1117,7 @@ const tileVideoRefs = new Map<string, HTMLVideoElement>()
 const tileVideoHostRefs = new Map<string, HTMLElement>()
 const tileFlvPlayers = new Map<string, flvjs.Player>()
 const tileRtcPlayers = new Map<string, SrsWebRtcPlayer>()
+const tileFlvLoopHandlers = new Map<string, () => void>()
 let stopFocusLatencyGuard: (() => void) | null = null
 const tileLatencyGuards = new Map<string, () => void>()
 let primaryStallWatchdog: number | null = null
@@ -1166,8 +1129,11 @@ const monitors = ref<MonitorStreamItem[]>([])
 
 const cameraTiles = ref<MonitorStreamItem[]>([
   { name: '1号机位 - 北门实时画面', streamUrl: rtmpAddressList[0] },
-  { name: '2号机位 - 车库入口实时画面', streamUrl: rtmpAddressList[2] },
-  { name: '3号机位 - 东侧步道实时画面', streamUrl: rtmpAddressList[3] },
+  { name: '2号机位 - 车库入口实时画面', streamUrl: rtmpAddressList[1] },
+  { name: '3号机位 - 东侧步道实时画面', streamUrl: rtmpAddressList[2] },
+  { name: '4号机位 - 中庭实时画面', streamUrl: rtmpAddressList[3] },
+  { name: '5号机位 - 南门实时画面', streamUrl: rtmpAddressList[4] },
+  { name: '6号机位 - 西侧步道实时画面', streamUrl: rtmpAddressList[5] },
 ])
 const selectedMonitorName = ref(cameraTiles.value[0]?.name || '')
 const focusSelectedAlarmKey = ref('')
@@ -2490,6 +2456,124 @@ const randDelta = (min: number, max: number) => Math.floor(Math.random() * (max 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const toHmLabel = (date: Date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 
+// ====== 自然曲线辅助：以昼夜节律作为期望，mock 漂移收敛其上 ======
+const gaussian = (x: number, center: number, width: number, amplitude: number) =>
+  amplitude * Math.exp(-Math.pow(x - center, 2) / (2 * width * width))
+
+// 环境各指标按小时的期望值（复现昼夜变化）
+const expectAqi = (h: number) => clamp(Math.round(58 + gaussian(h, 8, 1.8, 45) + gaussian(h, 18, 2.0, 50)), 40, 140)
+const expectHumidity = (h: number) => clamp(Math.round(72 + gaussian(h, 14, 3.6, -26)), 30, 85)
+const expectPm25 = (h: number) => clamp(Math.round(34 + gaussian(h, 8, 1.7, 36) + gaussian(h, 18, 1.9, 44)), 16, 95)
+const expectGas = (h: number) => clamp(Math.round(6 + gaussian(h, 7, 1.0, 11) + gaussian(h, 12, 1.1, 15) + gaussian(h, 18, 1.2, 18)), 4, 38)
+
+// 车位占用率按小时（居住区规律：夜间高位，白天低位）
+const expectParkingPercent = (h: number) => clamp(Math.round(82 + gaussian(h, 11.5, 3.5, -38)), 42, 93)
+
+// 各分区相对总占用率的微调：地库更紧、地面白天多外来车辆
+const zoneOccupancyAdjust = (name: string, base: number, h: number): number => {
+  switch (name) {
+    case '地库A区': return clamp(base + 3, 0, 100)
+    case '地库B区': return clamp(base + 6, 0, 100)
+    case '地面东侧': return clamp(Math.max(base - 8, 28) + (h >= 9 && h <= 17 ? 6 : 0), 0, 100)
+    case '地面西侧': return clamp(Math.max(base - 10, 24) + (h >= 9 && h <= 17 ? 4 : 0), 0, 100)
+    default: return base
+  }
+}
+
+// 一天累计车流（入=归家傍晚峰，出=出门早高峰）
+const expectTodayTraffic = (hourFloat: number) => {
+  const inRate = (h: number) => Math.max(1, Math.round(2 + gaussian(h, 18, 2.0, 24) + gaussian(h, 12, 2.5, 9)))
+  const outRate = (h: number) => Math.max(1, Math.round(2 + gaussian(h, 8, 2.0, 22) + gaussian(h, 12, 2.5, 9)))
+  let totalIn = 2
+  let totalOut = 1
+  for (let h = 0; h < hourFloat; h++) {
+    totalIn += inRate(h)
+    totalOut += outRate(h)
+  }
+  return { totalIn, totalOut, inRate, outRate }
+}
+
+// 生成日环境序列（00:00 ~ 当前小时）
+const generateEnvDaySeries = (): EnvPoint[] => {
+  const currentHour = new Date().getHours()
+  return Array.from({ length: currentHour + 1 }, (_, h) => ({
+    label: `${pad2(h)}:00`,
+    aqi: expectAqi(h) + randDelta(-3, 3),
+    humidity: expectHumidity(h) + randDelta(-2, 2),
+    pm25: expectPm25(h) + randDelta(-3, 3),
+    combustibleGas: expectGas(h) + randDelta(-2, 2),
+  }))
+}
+
+// 生成周/月环境序列（日均值）
+const generateEnvAggregateSeries = (count: number, labelFmt: (offset: number) => string): EnvPoint[] => {
+  const seedHours = [0, 8, 12, 18, 23]
+  return Array.from({ length: count }, (_, i) => {
+    const offset = count - 1 - i
+    const aqi = Math.round(seedHours.reduce((s, h) => s + expectAqi(h), 0) / seedHours.length) + randDelta(-4, 4)
+    const humidity = Math.round(seedHours.reduce((s, h) => s + expectHumidity(h), 0) / seedHours.length) + randDelta(-3, 3)
+    const pm25 = Math.round(seedHours.reduce((s, h) => s + expectPm25(h), 0) / seedHours.length) + randDelta(-4, 4)
+    const gas = Math.round(seedHours.reduce((s, h) => s + expectGas(h), 0) / seedHours.length) + randDelta(-2, 2)
+    return {
+      label: labelFmt(offset),
+      aqi: clamp(aqi, 16, 140),
+      humidity: clamp(humidity, 30, 85),
+      pm25: clamp(pm25, 16, 95),
+      combustibleGas: clamp(gas, 4, 38),
+    }
+  })
+}
+
+// 生成车位日趋势（00:00 ~ 当前小时）
+const generateParkingDayTrend = (zones: ParkingZone[]): ParkingDayPoint[] => {
+  const total = zones.reduce((s, z) => s + z.capacity, 0)
+  const currentHour = new Date().getHours()
+  return Array.from({ length: currentHour + 1 }, (_, h) => {
+    const used = zones.reduce((sum, zone) => {
+      const pct = zoneOccupancyAdjust(zone.name, expectParkingPercent(h), h)
+      return sum + Math.round((pct / 100) * zone.capacity)
+    }, 0)
+    const occupancy = total > 0 ? Math.round((used / total) * 100) : 0
+    return { label: `${pad2(h)}:00`, occupancy, used }
+  })
+}
+
+// 按当前小时生成车位初始状态
+const generateParkingZones = (): ParkingZone[] => {
+  const hour = new Date().getHours()
+  const basePercent = expectParkingPercent(hour)
+  const specs = [
+    { name: '地库A区', capacity: 62 },
+    { name: '地库B区', capacity: 44 },
+    { name: '地面东侧', capacity: 30 },
+    { name: '地面西侧', capacity: 24 },
+  ]
+  return specs.map(spec => ({
+    name: spec.name,
+    capacity: spec.capacity,
+    used: Math.round((zoneOccupancyAdjust(spec.name, basePercent, hour) / 100) * spec.capacity),
+  }))
+}
+
+// 生成按当前时刻的车流初值
+const generateTrafficFlowState = (): ParkingTrafficSummaryApi => {
+  const now = new Date()
+  const hourFloat = now.getHours() + now.getMinutes() / 60
+  const { totalIn, totalOut, inRate, outRate } = expectTodayTraffic(hourFloat)
+  const h = now.getHours()
+  return {
+    source: 'mock',
+    todayInCount: totalIn,
+    todayOutCount: totalOut,
+    todayNetFlow: totalIn - totalOut,
+    todayTotalFlow: totalIn + totalOut,
+    latestInCount: inRate(h),
+    latestOutCount: outRate(h),
+    latestNetFlow: inRate(h) - outRate(h),
+    latestTotalFlow: inRate(h) + outRate(h),
+  }
+}
+
 const ensureMonitorId = async (): Promise<number> => {
   if (appStore.getMonitorId && appStore.getMonitorId !== 0) return appStore.getMonitorId
   const { data } = await axios.get('/monitor')
@@ -2572,33 +2656,17 @@ interface ParkingTrafficSummaryApi {
 }
 
 const envTrendDataState = ref<Record<'day' | 'week' | 'month', EnvPoint[]>>({
-  day: [
-    { label: '00:00', aqi: 72, humidity: 63, pm25: 42, combustibleGas: 11 },
-    { label: '04:00', aqi: 76, humidity: 64, pm25: 46, combustibleGas: 10 },
-    { label: '08:00', aqi: 79, humidity: 58, pm25: 48, combustibleGas: 14 },
-    { label: '12:00', aqi: 84, humidity: 54, pm25: 55, combustibleGas: 16 },
-    { label: '16:00', aqi: 87, humidity: 52, pm25: 59, combustibleGas: 13 },
-    { label: '20:00', aqi: 80, humidity: 57, pm25: 50, combustibleGas: 12 },
-    { label: '24:00', aqi: 75, humidity: 61, pm25: 45, combustibleGas: 9 },
-  ],
-  week: [
-    { label: '周一', aqi: 76, humidity: 62, pm25: 47, combustibleGas: 12 },
-    { label: '周二', aqi: 82, humidity: 59, pm25: 52, combustibleGas: 14 },
-    { label: '周三', aqi: 78, humidity: 57, pm25: 49, combustibleGas: 13 },
-    { label: '周四', aqi: 86, humidity: 55, pm25: 56, combustibleGas: 17 },
-    { label: '周五', aqi: 81, humidity: 58, pm25: 51, combustibleGas: 15 },
-    { label: '周六', aqi: 74, humidity: 63, pm25: 45, combustibleGas: 11 },
-    { label: '周日', aqi: 72, humidity: 64, pm25: 43, combustibleGas: 10 },
-  ],
-  month: [
-    { label: '4/01', aqi: 79, humidity: 60, pm25: 51, combustibleGas: 14 },
-    { label: '4/05', aqi: 75, humidity: 62, pm25: 47, combustibleGas: 12 },
-    { label: '4/10', aqi: 83, humidity: 58, pm25: 55, combustibleGas: 16 },
-    { label: '4/15', aqi: 88, humidity: 54, pm25: 60, combustibleGas: 18 },
-    { label: '4/20', aqi: 80, humidity: 57, pm25: 52, combustibleGas: 15 },
-    { label: '4/25', aqi: 73, humidity: 63, pm25: 44, combustibleGas: 11 },
-    { label: '4/30', aqi: 77, humidity: 61, pm25: 48, combustibleGas: 13 },
-  ],
+  day: generateEnvDaySeries(),
+  week: generateEnvAggregateSeries(7, (offset) => {
+    const date = new Date()
+    date.setDate(date.getDate() - offset)
+    return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
+  }),
+  month: generateEnvAggregateSeries(7, (offset) => {
+    const date = new Date()
+    date.setDate(date.getDate() - offset * 5)
+    return `${date.getMonth() + 1}/${pad2(date.getDate())}`
+  }),
 })
 
 const envTrendSeries = computed(() => envTrendDataState.value[envTrendRange.value])
@@ -2704,33 +2772,72 @@ const envTrendSelectedDeltaDesc = computed(() => {
   return '较上一时刻持平'
 })
 
+
+const envTrendMetricCard = (key: EnvMetricKey) => {
+  const series = envTrendSeries.value
+  const config = envTrendMetrics.find(item => item.key === key) || envTrendMetrics[0]
+  const value = series.at(-1)?.[key] ?? 0
+  const status = (() => {
+    if (key === 'aqi') return value <= 80 ? '正常' : '偏高'
+    if (key === 'humidity') return (value >= 40 && value <= 70) ? '正常' : '需复核'
+    if (key === 'pm25') return value <= 55 ? '正常' : '偏高'
+    return value <= 20 ? '正常' : '需复核'
+  })()
+  return { label: config.label, value, status }
+}
+
+const envTrendMetricTone = (key: EnvMetricKey): string => {
+  const card = envTrendMetricCard(key)
+  if (key === 'combustibleGas' && card.value > 20) return 'danger'
+  return card.status === '正常' ? 'ok' : 'warn'
+}
+
+const envTrendMetricPeak = (key: EnvMetricKey): string => {
+  const peak = Math.max(...envTrendSeries.value.map(item => item[key]), 0)
+  return `${peak}`
+}
+
+const envMetricLimitMap: Record<EnvMetricKey, { limit: number; label: string }> = {
+  aqi: { limit: 150, label: '管控线 80' },
+  humidity: { limit: 100, label: '舒适 40-70%' },
+  pm25: { limit: 100, label: '管控线 55' },
+  combustibleGas: { limit: 40, label: '管控线 20' },
+}
+
+const envTrendMetricPercent = (key: EnvMetricKey): number => {
+  const value = Number(envTrendMetricCard(key).value || 0)
+  const limit = envMetricLimitMap[key].limit || 100
+  return clamp(Math.round((value / limit) * 100), 3, 100)
+}
+
+const envGaugeStrokeDash = (key: EnvMetricKey): string => {
+  const circumference = 175.93
+  const value = Number(((envTrendMetricPercent(key) / 100) * circumference).toFixed(2))
+  return `${value} ${circumference}`
+}
+
+const envTrendMetricLimitText = (key: EnvMetricKey): string => envMetricLimitMap[key].label
+
+const envTrendMetricDelta = (key: EnvMetricKey): string => {
+  const series = envTrendSeries.value
+  if (series.length < 2) return '较上次持平'
+  const current = Number(series.at(-1)?.[key] || 0)
+  const previous = Number(series.at(-2)?.[key] || 0)
+  const delta = current - previous
+  if (delta > 0) return `较上次 +${delta}`
+  if (delta < 0) return `较上次 ${delta}`
+  return '较上次持平'
+}
 const parkingZoneState = ref<ParkingZone[]>([
-  { name: '地库A区', capacity: 62, used: 38 },
-  { name: '地库B区', capacity: 44, used: 23 },
-  { name: '地面东侧', capacity: 30, used: 16 },
-  { name: '地面西侧', capacity: 24, used: 11 },
+  ...generateParkingZones(),
 ])
 
 const parkingDayTrend = ref<ParkingDayPoint[]>([
-  { label: '00:00', occupancy: 41, used: 66 },
-  { label: '04:00', occupancy: 37, used: 59 },
-  { label: '08:00', occupancy: 55, used: 88 },
-  { label: '12:00', occupancy: 67, used: 107 },
-  { label: '16:00', occupancy: 73, used: 117 },
-  { label: '20:00', occupancy: 61, used: 98 },
-  { label: '24:00', occupancy: 48, used: 77 },
+  ...generateParkingDayTrend(generateParkingZones()),
 ])
 
 const trafficFlowState = ref<ParkingTrafficSummaryApi>({
-  source: 'mock',
-  todayInCount: 186,
-  todayOutCount: 163,
-  todayNetFlow: 23,
-  todayTotalFlow: 349,
-  latestInCount: 12,
-  latestOutCount: 9,
-  latestNetFlow: 3,
-  latestTotalFlow: 21,
+  ...generateTrafficFlowState(),
 })
 
 const syncEnvParkingFromApi = async (): Promise<boolean> => {
@@ -2804,49 +2911,72 @@ const syncEnvParkingFromApi = async (): Promise<boolean> => {
 
 const stepMockEnvParking = () => {
   const now = new Date()
-  const daySeries = envTrendDataState.value.day
-  const last = daySeries[daySeries.length - 1] || { label: '00:00', aqi: 72, humidity: 62, pm25: 44, combustibleGas: 10 }
-  const nextPoint: EnvPoint = {
-    label: toHmLabel(now),
-    aqi: clamp(last.aqi + randDelta(-4, 5), 45, 135),
-    humidity: clamp(last.humidity + randDelta(-3, 3), 35, 82),
-    pm25: clamp(last.pm25 + randDelta(-4, 4), 18, 96),
-    combustibleGas: clamp(last.combustibleGas + randDelta(-2, 3), 4, 40),
-  }
-  daySeries.push(nextPoint)
-  if (daySeries.length > 24) daySeries.shift()
+  const hour = now.getHours()
+  const hourLabel = `${pad2(hour)}:00`
 
+  // ----- 日序列：漂移当前小时点，跨小时才推进 -----
+  const daySeries = envTrendDataState.value.day
+  const lastDay = daySeries[daySeries.length - 1]
+  if (lastDay && lastDay.label === hourLabel) {
+    lastDay.aqi = clamp(lastDay.aqi + randDelta(-1, 1), expectAqi(hour) - 5, expectAqi(hour) + 5)
+    lastDay.humidity = clamp(lastDay.humidity + randDelta(-1, 1), expectHumidity(hour) - 4, expectHumidity(hour) + 4)
+    lastDay.pm25 = clamp(lastDay.pm25 + randDelta(-1, 1), expectPm25(hour) - 5, expectPm25(hour) + 5)
+    lastDay.combustibleGas = clamp(lastDay.combustibleGas + randDelta(-1, 1), expectGas(hour) - 3, expectGas(hour) + 3)
+  } else if (!lastDay || hourLabel > lastDay.label) {
+    daySeries.push({
+      label: hourLabel,
+      aqi: expectAqi(hour) + randDelta(-2, 2),
+      humidity: expectHumidity(hour) + randDelta(-1, 1),
+      pm25: expectPm25(hour) + randDelta(-2, 2),
+      combustibleGas: expectGas(hour) + randDelta(-1, 1),
+    })
+    if (daySeries.length > 24) daySeries.shift()
+  }
+
+  // ----- 周/月：仅微幅漂移最后一天，保持总量级稳定 -----
   ;(['week', 'month'] as const).forEach((range) => {
     const scoped = envTrendDataState.value[range]
     if (!scoped.length) return
-    const idx = scoped.length - 1
-    const prev = scoped[idx]
-    scoped[idx] = {
-      ...prev,
-      aqi: clamp(Math.round((prev.aqi * 4 + nextPoint.aqi) / 5 + randDelta(-1, 1)), 45, 135),
-      humidity: clamp(Math.round((prev.humidity * 4 + nextPoint.humidity) / 5 + randDelta(-1, 1)), 35, 82),
-      pm25: clamp(Math.round((prev.pm25 * 4 + nextPoint.pm25) / 5 + randDelta(-1, 1)), 18, 96),
-      combustibleGas: clamp(Math.round((prev.combustibleGas * 4 + nextPoint.combustibleGas) / 5 + randDelta(-1, 1)), 4, 40),
-    }
+    const last = scoped[scoped.length - 1]
+    last.aqi = clamp(last.aqi + randDelta(-1, 1), expectAqi(hour) - 8, expectAqi(hour) + 8)
+    last.humidity = clamp(last.humidity + randDelta(-1, 1), expectHumidity(hour) - 5, expectHumidity(hour) + 5)
+    last.pm25 = clamp(last.pm25 + randDelta(-1, 1), expectPm25(hour) - 6, expectPm25(hour) + 6)
+    last.combustibleGas = clamp(last.combustibleGas + randDelta(-1, 0), expectGas(hour) - 4, expectGas(hour) + 4)
   })
 
-  const hour = now.getHours()
-  const trafficBias = (hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 21) ? 1 : -1
+  // ----- 车位分区：平滑趋近昼夜目标，不再随机游走越界 -----
+  const basePercent = expectParkingPercent(hour)
+  const sameHour = (hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 20)
+  const driftBias = sameHour ? 1 : -0.5
   parkingZoneState.value = parkingZoneState.value.map((zone) => {
-    const nextUsed = clamp(zone.used + randDelta(-2, 2) + trafficBias, 4, zone.capacity - 1)
+    const targetUsed = Math.round((zoneOccupancyAdjust(zone.name, basePercent, hour) / 100) * zone.capacity)
+    const direction = Math.sign(targetUsed - zone.used)
+    const step = clamp(direction * (1 + Math.abs(driftBias)) + randDelta(-1, 1), -3, 3)
+    const nextUsed = clamp(zone.used + step, 2, zone.capacity - 1)
     return { ...zone, used: nextUsed }
   })
 
+  // ----- 车位日趋势：跟随实际占用，跨小时才推进 -----
   const total = parkingZoneState.value.reduce((sum, zone) => sum + zone.capacity, 0)
   const used = parkingZoneState.value.reduce((sum, zone) => sum + zone.used, 0)
   const occupancy = total > 0 ? Math.round((used / total) * 100) : 0
-  parkingDayTrend.value.push({ label: toHmLabel(now), occupancy, used })
-  if (parkingDayTrend.value.length > 24) parkingDayTrend.value.shift()
+  const lastTrend = parkingDayTrend.value[parkingDayTrend.value.length - 1]
+  if (lastTrend && lastTrend.label === hourLabel) {
+    lastTrend.occupancy = occupancy
+    lastTrend.used = used
+  } else if (!lastTrend || hourLabel > lastTrend.label) {
+    parkingDayTrend.value.push({ label: hourLabel, occupancy, used })
+    if (parkingDayTrend.value.length > 24) parkingDayTrend.value.shift()
+  }
 
-  const latestInCount = Math.max(3, Math.round(8 + Math.sin(now.getTime() / 180000) * 5))
-  const latestOutCount = Math.max(2, Math.round(7 + Math.cos(now.getTime() / 210000) * 4))
-  const todayInCount = trafficFlowState.value.todayInCount + Math.max(0, latestInCount - 4)
-  const todayOutCount = trafficFlowState.value.todayOutCount + Math.max(0, latestOutCount - 4)
+  // ----- 车流：today 随昼夜累计速率增量推进，latest 取当前小时速率 -----
+  const { inRate, outRate } = expectTodayTraffic(now.getHours() + now.getMinutes() / 60)
+  const latestInCount = inRate(hour)
+  const latestOutCount = outRate(hour)
+  const marginalIn = Math.max(0, Math.round(latestInCount * 0.08)) // 单位步内增加的微观增量
+  const marginalOut = Math.max(0, Math.round(latestOutCount * 0.08))
+  const todayInCount = trafficFlowState.value.todayInCount + marginalIn
+  const todayOutCount = trafficFlowState.value.todayOutCount + marginalOut
   trafficFlowState.value = {
     source: 'mock',
     todayInCount,
@@ -3208,13 +3338,41 @@ const envCurrentValues = computed(() => {
   }
 })
 
+const parkingLaneLabels = (name: string) => {
+  if (name.includes('地库')) return ['入口侧', '电梯侧']
+  return ['主路侧', '楼栋侧']
+}
+
+const parkingSlotRows = (zone: ParkingZone, percent: number) => {
+  const slotsPerRow = 10
+  const rowCount = 2
+  const visualSlots = slotsPerRow * rowCount
+  const occupiedSlots = clamp(Math.round((zone.used / Math.max(zone.capacity, 1)) * visualSlots), 0, visualSlots)
+  const labels = parkingLaneLabels(zone.name)
+
+  return labels.map((label, rowIndex) => ({
+    label,
+    slots: Array.from({ length: slotsPerRow }, (_, slotIndex) => {
+      const absoluteIndex = rowIndex * slotsPerRow + slotIndex
+      const isOccupied = absoluteIndex < occupiedSlots
+      return {
+        key: `${rowIndex}-${slotIndex}`,
+        state: !isOccupied ? 'free' : percent >= 85 ? 'hot' : percent >= 65 ? 'busy' : 'used',
+      }
+    }),
+  }))
+}
+
 const parkingZoneCards = computed(() => parkingZoneState.value.map((zone) => {
   const percent = Math.round((zone.used / Math.max(zone.capacity, 1)) * 100)
+  const tone = percent >= 85 ? 'danger' : percent >= 65 ? 'warn' : 'ok'
   return {
     ...zone,
     free: Math.max(zone.capacity - zone.used, 0),
     percent,
-    tone: percent >= 85 ? 'danger' : percent >= 65 ? 'warn' : 'ok',
+    tone,
+    statusLabel: tone === 'danger' ? '紧张' : tone === 'warn' ? '繁忙' : '充足',
+    slotRows: parkingSlotRows(zone, percent),
   }
 }))
 
@@ -3283,10 +3441,12 @@ const envPriorityState = computed(() => {
 })
 
 const envOverviewKpis = computed(() => [
+  { name: '环境异常', value: envWarningCount.value, desc: envWarningCount.value ? '需要关注' : '全部正常', tone: envWarningCount.value ? 'warn' : 'ok' },
   { name: '舒适度', value: comfortScore.value, desc: comfortLabel.value, tone: comfortScore.value >= 80 ? 'ok' : comfortScore.value >= 60 ? 'warn' : 'danger' },
-  { name: '异常指标', value: envWarningCount.value, desc: envWarningCount.value ? '需要关注' : '全部正常', tone: envWarningCount.value ? 'warn' : 'ok' },
+  { name: '车位占用', value: `${parkingOccupancy.value}%`, desc: parkingPressureLabel.value, tone: parkingPressureTone.value },
   { name: '空闲车位', value: parkingFree.value, desc: `总车位 ${parkingTotal.value}`, tone: parkingFree.value < 20 ? 'danger' : 'ok' },
-  { name: '占用率', value: `${parkingOccupancy.value}%`, desc: parkingOccupancy.value >= 85 ? '车位紧张' : '余量可用', tone: parkingOccupancy.value >= 85 ? 'danger' : parkingOccupancy.value >= 65 ? 'warn' : 'ok' },
+  { name: '今日车流', value: trafficFlowReserve.value.today, desc: `入 ${trafficFlowReserve.value.inCount} / 出 ${trafficFlowReserve.value.outCount}`, tone: 'info' },
+  { name: '当前研判', value: envPriorityState.value.title, desc: envPriorityState.value.tone === 'ok' ? '可保持巡检' : '建议优先处置', tone: envPriorityState.value.tone },
 ])
 
 const envParkingSummary = computed(() => {
@@ -3341,6 +3501,63 @@ const comfortLabel = computed(() => {
   if (s >= 60) return '一般'
   return '较差'
 })
+
+const parkingFlowBars = computed(() => {
+  const total = Math.max(trafficFlowReserve.value.inCount, trafficFlowReserve.value.outCount, 1)
+  return [
+    {
+      name: '入场',
+      value: trafficFlowReserve.value.inCount,
+      percent: Math.max(Math.round((trafficFlowReserve.value.inCount / total) * 100), 8),
+      tone: 'in',
+    },
+    {
+      name: '出场',
+      value: trafficFlowReserve.value.outCount,
+      percent: Math.max(Math.round((trafficFlowReserve.value.outCount / total) * 100), 8),
+      tone: 'out',
+    },
+  ]
+})
+
+const parkingBriefCards = computed(() => [
+  {
+    label: '压力区域',
+    value: parkingTopZone.value?.name || '暂无',
+    desc: parkingPressureDesc.value,
+    tone: parkingPressureTone.value,
+  },
+  {
+    label: '高压区域',
+    value: `${parkingTenseZones.value} 处`,
+    desc: parkingTenseZones.value ? '需要引导分流' : '暂无拥堵区',
+    tone: parkingTenseZones.value ? 'warn' : 'ok',
+  },
+  {
+    label: '最近车流',
+    value: `${trafficFlowReserve.value.peak} 辆`,
+    desc: trafficFlowReserve.value.status,
+    tone: trafficFlowReserve.value.peak > 18 ? 'warn' : 'ok',
+  },
+])
+
+const envOpsHighlights = computed(() => [
+  {
+    label: '优先复核',
+    value: envWarningCount.value ? envStatusCards.value.filter(item => item.tone !== 'ok').map(item => item.label).join('、') : '暂无异常',
+    tone: envWarningCount.value ? 'warn' : 'ok',
+  },
+  {
+    label: '停车建议',
+    value: parkingOccupancy.value >= 85 ? '启动分流' : parkingOccupancy.value >= 65 ? '观察高峰' : '余量充足',
+    tone: parkingPressureTone.value,
+  },
+  {
+    label: '联动建议',
+    value: envParkingAdviceList.value[0] || '保持常规巡检',
+    tone: envPriorityState.value.tone,
+  },
+])
 
 type SummaryRange = 'week' | 'month'
 interface SummaryRow {
@@ -3859,6 +4076,8 @@ const destroyTilePlayers = () => {
   tileRtcPlayers.clear()
   tileLatencyGuards.forEach(stop => stop())
   tileLatencyGuards.clear()
+  tileFlvLoopHandlers.forEach(cleanup => cleanup())
+  tileFlvLoopHandlers.clear()
   tileVideoRefs.forEach(videoEl => {
     videoEl.pause()
     videoEl.srcObject = null
@@ -3870,6 +4089,8 @@ const destroyTilePlayers = () => {
 const destroyTilePlayer = (name: string) => {
   const primaryTile = getPrimaryTile()
   if (primaryTile?.name === name) stopPrimaryStallWatchdog()
+  const loopCleanup = tileFlvLoopHandlers.get(name)
+  if (loopCleanup) { loopCleanup(); tileFlvLoopHandlers.delete(name) }
   const player = tileFlvPlayers.get(name)
   if (player) {
     player.unload()
@@ -3920,42 +4141,55 @@ const initTilePlayer = (tile: MonitorStreamItem) => {
     return
   }
 
-  const playUrl = withNoCache(url)
-  if (flvjs.isSupported() && url.includes('.flv')) {
-    const player = flvjs.createPlayer(
-      { type: 'flv', url: playUrl, isLive: true },
-      {
-          enableWorker: false,
-          enableStashBuffer: true,
-          stashInitialSize: FLV_STASH_INITIAL_SIZE,
-        lazyLoad: false,
-        deferLoadAfterSourceOpen: false,
-        autoCleanupSourceBuffer: true,
-      } as any,
-    )
-    player.attachMediaElement(videoEl)
-    player.load()
+const playUrl = withNoCache(url)
+if (flvjs.isSupported() && url.includes('.flv')) {
+  const isLocalFile = !url.includes('://')
+  const player = flvjs.createPlayer(
+    { type: 'flv', url: playUrl, isLive: !isLocalFile },
+    {
+        enableWorker: false,
+        enableStashBuffer: true,
+        stashInitialSize: FLV_STASH_INITIAL_SIZE,
+      lazyLoad: false,
+      deferLoadAfterSourceOpen: false,
+      autoCleanupSourceBuffer: true,
+    } as any,
+  )
+  player.attachMediaElement(videoEl)
+  player.load()
+  if (isLocalFile) {
+    // 本地 flv 文件：播完自动重新 seek 到头部，实现循环
+    const loopHandler = () => {
+      try { player.seek(0); player.play().catch(() => {}) } catch { void 0 }
+    }
+    videoEl.addEventListener('ended', loopHandler)
+    tileFlvLoopHandlers.set(tile.name, () => videoEl.removeEventListener('ended', loopHandler))
+  } else {
     tileLatencyGuards.set(
       tile.name,
       createLiveLatencyGuard(videoEl, () => recoverBufferedPlayback(videoEl)),
     )
-    player.on(flvjs.Events.ERROR, () => {
-      destroyTilePlayer(tile.name)
-      window.setTimeout(() => initTilePlayer(tile), 800)
-    })
-    player.play().catch(() => {})
-    tileFlvPlayers.set(tile.name, player)
-    return
   }
+  player.on(flvjs.Events.ERROR, () => {
+    destroyTilePlayer(tile.name)
+    window.setTimeout(() => initTilePlayer(tile), 800)
+  })
+  player.play().catch(() => {})
+  tileFlvPlayers.set(tile.name, player)
+  return
+}
 
-  videoEl.src = playUrl
-  videoEl.play().catch(() => {})
+// mp4 或其它直链：本地 mp4 自动循环
+if (url.includes('.mp4') && !url.includes('://')) videoEl.loop = true
+videoEl.src = playUrl
+videoEl.play().catch(() => {})
 }
 
 const initTilePlayers = () => {
   destroyTilePlayers()
-  const firstTile = cameraTiles.value[0]
-  if (firstTile) initTilePlayer(firstTile)
+  cameraTiles.value.forEach((tile) => {
+    initTilePlayer(tile)
+  })
 }
 
 const initFocusPlayer = (url: string) => {
@@ -4791,7 +5025,7 @@ watch(activeTab, (tab, previousTab) => {
 }
 
 .alarm-eyebrow {
-  grid-column: 1 / -1;
+  /* grid-column: 1 / -1; */
   color: rgba(214, 230, 255, 0.58);
   font-size: 11px;
 }
@@ -4809,7 +5043,7 @@ watch(activeTab, (tab, previousTab) => {
 .selected-alarm-grid {
   margin-top: 9px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
 
@@ -5232,7 +5466,7 @@ watch(activeTab, (tab, previousTab) => {
 }
 
 .analysis-hero-card {
-  grid-column: 1 / -1;
+  /* grid-column: 1 / -1; */
   display: grid;
   grid-template-columns: minmax(300px, 0.46fr) minmax(0, 1.54fr);
   gap: 10px;
@@ -6220,255 +6454,546 @@ watch(activeTab, (tab, previousTab) => {
 
 .env-panel {
   display: grid;
-  grid-template-columns: minmax(0, 0.55fr) minmax(0, 0.45fr);
-  grid-template-rows: auto minmax(124px, 0.3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 0.62fr) minmax(410px, 0.38fr);
+  grid-template-rows: minmax(92px, auto) minmax(0, 1fr);
   grid-template-areas:
-    "overview overview"
-    "status trend"
+    "kpi kpi"
     "parking trend";
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
   height: 100%;
   overflow: hidden;
 }
 
-.env-overview-card {
-  grid-area: overview;
+.env-kpi-strip {
+  grid-area: kpi;
   grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
-  gap: 12px;
-  align-items: stretch;
-  min-height: 0;
-}
-
-.env-overview-head {
-  margin-bottom: 0;
-  align-items: center;
-}
-
-.env-overview-head h3 {
-  margin: 0;
-  color: #eef8ff;
-  font-size: 17px;
-}
-
-.env-overview-head p {
-  margin: 5px 0 0;
-  color: rgba(214, 230, 255, 0.62);
-  font-size: 12px;
-}
-
-.env-overview-body {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.68fr) minmax(0, 1.32fr);
-  gap: 10px;
-  min-height: 0;
-}
-
-.env-priority-card {
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(17, 47, 75, 0.52), rgba(10, 30, 52, 0.66));
-  padding: 12px 14px;
-  min-height: 0;
-}
-
-.env-priority-card span,
-.env-priority-card p {
-  display: block;
-}
-
-.env-priority-card span {
-  color: rgba(214, 230, 255, 0.58);
-  font-size: 11px;
-}
-
-.env-priority-card strong {
-  display: block;
-  margin-top: 6px;
-  color: #eef8ff;
-  font-size: 18px;
-}
-
-.env-priority-card p {
-  margin: 8px 0 0;
-  color: rgba(233, 246, 255, 0.78);
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.env-priority-card.ok strong {
-  color: #6ce2b2;
-}
-
-.env-priority-card.warn strong {
-  color: #f8cb71;
-}
-
-.env-priority-card.danger strong {
-  color: #ff8d8d;
-}
-
-.env-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.env-kpi {
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 12px;
-  background: rgba(17, 47, 75, 0.48);
-  padding: 10px;
-  min-width: 0;
-}
-
-.env-kpi span,
-.env-kpi em {
-  display: block;
-  color: rgba(214, 230, 255, 0.58);
-  font-size: 11px;
-  font-style: normal;
-}
-
-.env-kpi strong {
-  display: block;
-  margin: 5px 0 4px;
-  color: #eef8ff;
-  font-size: 19px;
-  line-height: 1.1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.env-kpi.ok strong {
-  color: #6ce2b2;
-}
-
-.env-kpi.warn strong {
-  color: #f8cb71;
-}
-
-.env-kpi.danger strong {
-  color: #ff8d8d;
-}
-
-.env-status-card,
-.env-trend-card,
-.env-parking-card {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.env-status-card {
-  grid-area: status;
-  min-height: 0;
-  overflow: visible;
-}
-
-.env-trend-card {
-  grid-area: trend;
-  min-height: 0;
-}
-
-.env-parking-card {
-  grid-area: parking;
-  min-height: 0;
-}
-
-.env-status-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
-  align-items: stretch;
+  min-height: 0;
+  padding: 8px 12px;
 }
 
-.env-status-item {
-  border: 1px solid rgba(126, 197, 255, 0.14);
-  border-radius: 10px;
-  background: rgba(17, 47, 75, 0.42);
-  padding: 7px 8px;
-  min-width: 0;
-  min-height: 64px;
-  display: grid;
-  grid-template-rows: auto auto auto;
-  gap: 5px;
-}
-
-.env-status-item.warn {
-  border-color: rgba(248, 203, 113, 0.3);
-  background: rgba(80, 58, 24, 0.28);
-}
-
-.env-status-top {
+.kpi-strip-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 10px;
 }
 
-.env-status-top span {
+.kpi-title-group {
   min-width: 0;
-  color: rgba(214, 230, 255, 0.66);
+  display: grid;
+  gap: 2px;
+}
+
+.kpi-strip-head h3 {
+  margin: 0;
+  color: #eef8ff;
+  font-size: 16px;
+  line-height: 1.18;
+}
+
+.kpi-title-group span {
+  color: rgba(214, 230, 255, 0.58);
   font-size: 11px;
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.env-status-top em {
-  flex: 0 0 auto;
-  color: #6ce2b2;
+.kpi-strip-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.kpi-strip-item {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(17, 47, 75, 0.42);
+  padding: 7px 9px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 55px;
+}
+
+.kpi-strip-item span {
+  color: rgba(214, 230, 255, 0.62);
   font-size: 10px;
-  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.env-status-item.warn .env-status-top em {
-  color: #f8cb71;
-}
-
-.env-status-item strong {
-  display: block;
-  margin: 0;
+.kpi-strip-item strong {
   color: #eef8ff;
-  font-size: 17px;
-  line-height: 1;
+  font-size: 20px;
+  line-height: 1.05;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.env-status-item small {
-  margin-left: 4px;
-  color: rgba(214, 230, 255, 0.5);
-  font-size: 11px;
-  font-weight: 500;
+.kpi-strip-item em {
+  font-style: normal;
+  color: rgba(168, 198, 232, 0.86);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.env-status-bar {
-  height: 3px;
-  border-radius: 999px;
-  background: rgba(126, 197, 255, 0.1);
+.kpi-strip-item.ok strong { color: #6ce2b2; }
+.kpi-strip-item.warn strong { color: #f8cb71; }
+.kpi-strip-item.danger strong { color: #ff8d8d; }
+.kpi-strip-item.info strong { color: #7ee8ff; }
+
+.env-parking-card {
+  grid-area: parking;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
   overflow: hidden;
 }
 
-.env-status-bar i {
+.parking-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: rgba(214, 230, 255, 0.72);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.parking-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(190px, 0.42fr) minmax(0, 0.58fr);
+  gap: 12px;
+  align-items: stretch;
+  padding-top: 2px;
+}
+
+.parking-donut {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  min-height: 0;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(126, 232, 255, 0.1), transparent 38%),
+    rgba(8, 30, 54, 0.28);
+  padding: 10px;
+}
+
+.parking-donut-svg {
+  width: 100%;
+  max-width: none;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  display: block;
+}
+
+.parking-donut-ring {
+  position: relative;
+  width: min(166px, 100%);
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.parking-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding-top: 2px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.parking-donut-center strong {
+  color: #eef8ff;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.parking-donut-center span {
+  color: rgba(168, 198, 232, 0.82);
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.parking-donut-stats {
+  display: flex;
+  gap: 18px;
+  flex: 0 0 auto;
+}
+
+.donut-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.donut-stat span {
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 11px;
+}
+
+.donut-stat strong {
+  color: #eef8ff;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.donut-stat.used strong { color: #ff8d8d; }
+.donut-stat.free strong { color: #6ce2b2; }
+
+.parking-flow-card {
+  width: 100%;
+  border: 1px solid rgba(126, 197, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(17, 47, 75, 0.38);
+  padding: 7px;
+  display: grid;
+  gap: 6px;
+}
+
+.flow-title,
+.flow-bar {
+  display: grid;
+  align-items: center;
+}
+
+.flow-title {
+  grid-template-columns: minmax(0, 1fr) auto;
+  color: rgba(214, 230, 255, 0.66);
+  font-size: 11px;
+}
+
+.flow-title strong {
+  color: #eef8ff;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-bars {
+  display: grid;
+  gap: 5px;
+}
+
+.flow-bar {
+  grid-template-columns: 2.4rem minmax(0, 1fr) 2.8rem;
+  gap: 7px;
+  color: rgba(214, 230, 255, 0.62);
+  font-size: 10px;
+}
+
+.flow-bar i {
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(126, 232, 255, 0.86), rgba(108, 226, 178, 0.86));
+  box-shadow: 0 0 10px rgba(126, 232, 255, 0.18);
+}
+
+.flow-bar.out i {
+  background: linear-gradient(90deg, rgba(248, 203, 113, 0.88), rgba(255, 141, 141, 0.72));
+}
+
+.flow-bar strong {
+  color: #eaf6ff;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.parking-zones-visual {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 8px;
+  overflow: hidden;
+  padding-right: 0;
+}
+
+.parking-zone-grid {
+  position: relative;
+  min-height: 0;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(126, 232, 255, 0.08), transparent 46%),
+    rgba(17, 47, 75, 0.42);
+  padding: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.015);
+}
+
+.parking-zone-grid::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(108, 226, 178, 0.86), rgba(126, 232, 255, 0.18));
+}
+
+.parking-zone-grid.warn {
+  border-color: rgba(248, 203, 113, 0.3);
+}
+
+.parking-zone-grid.warn::before {
+  background: linear-gradient(90deg, rgba(248, 203, 113, 0.9), rgba(126, 232, 255, 0.18));
+}
+
+.parking-zone-grid.danger {
+  border-color: rgba(255, 141, 141, 0.32);
+}
+
+.parking-zone-grid.danger::before {
+  background: linear-gradient(90deg, rgba(255, 141, 141, 0.94), rgba(248, 203, 113, 0.2));
+}
+
+.parking-zone-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.parking-zone-title {
+  min-width: 0;
+}
+
+.parking-zone-title span {
+  display: block;
+  color: #eef8ff;
+  font-size: 12px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parking-zone-title small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(168, 198, 232, 0.7);
+  font-size: 10px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parking-zone-head strong {
+  color: #6ce2b2;
+  font-size: 17px;
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.parking-zone-grid.warn .parking-zone-head strong { color: #f8cb71; }
+.parking-zone-grid.danger .parking-zone-head strong { color: #ff8d8d; }
+
+.parking-zone-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(126, 197, 255, 0.12);
+  overflow: hidden;
+}
+
+.parking-zone-meter i {
   display: block;
   height: 100%;
   border-radius: inherit;
+  background: linear-gradient(90deg, rgba(108, 226, 178, 0.92), rgba(126, 232, 255, 0.72));
+  box-shadow: 0 0 12px rgba(108, 226, 178, 0.18);
+}
+
+.parking-zone-grid.warn .parking-zone-meter i {
+  background: linear-gradient(90deg, rgba(248, 203, 113, 0.95), rgba(126, 232, 255, 0.5));
+  box-shadow: 0 0 12px rgba(248, 203, 113, 0.18);
+}
+
+.parking-zone-grid.danger .parking-zone-meter i {
+  background: linear-gradient(90deg, rgba(255, 141, 141, 0.96), rgba(248, 203, 113, 0.58));
+  box-shadow: 0 0 12px rgba(255, 141, 141, 0.18);
+}
+
+.parking-lane-map {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(126, 197, 255, 0.1);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(4, 19, 36, 0.28), rgba(17, 47, 75, 0.2)),
+    repeating-linear-gradient(90deg, rgba(126, 197, 255, 0.04) 0 1px, transparent 1px 18px);
+  padding: 7px;
+}
+
+.parking-lane-row {
+  display: grid;
+  grid-template-columns: 2.8rem minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-height: 0;
+}
+
+.parking-lane-label {
+  color: rgba(214, 230, 255, 0.5);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.parking-slot-line {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.parking-slot {
+  position: relative;
+  height: 16px;
+  border: 1px solid rgba(126, 197, 255, 0.2);
+  border-radius: 3px;
+  background: rgba(126, 197, 255, 0.12);
+  overflow: hidden;
+  transform: skewX(-8deg);
+}
+
+.parking-slot::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 0.55;
+}
+
+.parking-slot.used {
+  border-color: rgba(126, 197, 255, 0.5);
+  background: linear-gradient(180deg, rgba(126, 232, 255, 0.58), rgba(80, 144, 203, 0.36));
+}
+
+.parking-slot.busy {
+  border-color: rgba(248, 203, 113, 0.58);
+  background: linear-gradient(180deg, rgba(248, 203, 113, 0.78), rgba(197, 128, 64, 0.42));
+}
+
+.parking-slot.hot {
+  border-color: rgba(255, 141, 141, 0.64);
+  background: linear-gradient(180deg, rgba(255, 141, 141, 0.8), rgba(190, 78, 95, 0.46));
+}
+
+.parking-slot.free {
+  border-color: rgba(108, 226, 178, 0.34);
+  background: rgba(108, 226, 178, 0.11);
+}
+
+.parking-slot.free::after {
+  background: rgba(108, 226, 178, 0.24);
+  opacity: 0.65;
+}
+
+.parking-zone-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+}
+
+.parking-zone-foot span { color: rgba(214, 230, 255, 0.62); }
+.parking-zone-foot em {
+  font-style: normal;
+  color: #6ce2b2;
+  font-variant-numeric: tabular-nums;
+}
+
+.parking-brief-grid {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.parking-brief-card {
+  min-width: 0;
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(126, 232, 255, 0.08), transparent 54%),
+    rgba(17, 47, 75, 0.36);
+  padding: 7px 9px;
+}
+
+.parking-brief-card span,
+.parking-brief-card em {
+  display: block;
+  color: rgba(214, 230, 255, 0.58);
+  font-size: 10px;
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parking-brief-card strong {
+  display: block;
+  margin: 4px 0 2px;
+  color: #eef8ff;
+  font-size: 14px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parking-brief-card.ok strong { color: #6ce2b2; }
+.parking-brief-card.warn strong { color: #f8cb71; }
+.parking-brief-card.danger strong { color: #ff8d8d; }
+
+.env-trend-card {
+  grid-area: trend;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .env-trend-head {
-  margin-bottom: 7px;
-}
-
-.env-trend-head > div {
-  min-width: 0;
+  margin-bottom: 0;
 }
 
 .env-trend-head h3 {
@@ -6478,443 +7003,220 @@ watch(activeTab, (tab, previousTab) => {
 }
 
 .env-trend-head span {
-  color: rgba(214, 230, 255, 0.58);
-  font-size: 11px;
-}
-
-.env-trend-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid rgba(126, 197, 255, 0.16);
-  border-radius: 999px;
-  background: rgba(8, 30, 54, 0.46);
-  padding: 4px;
-  flex-wrap: wrap;
-}
-
-.env-trend-switch-btn {
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: rgba(214, 230, 255, 0.7);
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.env-trend-switch-btn.active {
-  background: rgba(126, 197, 255, 0.18);
-  color: #eef8ff;
-}
-
-.env-inline-insight {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(126, 197, 255, 0.14);
-  border-radius: 12px;
-  background: rgba(17, 47, 75, 0.34);
-  padding: 7px 10px;
-  margin-bottom: 8px;
-  min-width: 0;
-}
-
-.env-inline-insight span {
   color: rgba(214, 230, 255, 0.6);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.env-inline-insight strong {
-  color: #6ce2b2;
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.env-inline-insight.warn strong {
-  color: #f8cb71;
-}
-
-.env-inline-insight.danger strong {
-  color: #ff8d8d;
-}
-
-.env-inline-insight p {
-  margin: 0;
-  min-width: 0;
-  color: rgba(233, 246, 255, 0.74);
   font-size: 12px;
-  line-height: 1.35;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.env-trend-main {
+.env-trend-mode {
+  flex: 0 0 auto;
+  border: 1px solid rgba(126, 197, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(8, 30, 54, 0.52);
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.env-trend-mode span {
+  font-size: 10px;
+  color: rgba(214, 230, 255, 0.52);
+}
+
+.env-trend-mode strong {
+  color: #7ee8ff;
+  font-size: 12px;
+}
+
+.env-spark-grid {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 10px;
-  overflow: hidden;
-}
-
-.env-trend-svg.single {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  max-height: 100%;
-}
-
-.env-trend-footer {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.env-trend-mini {
-  border: 1px solid rgba(126, 197, 255, 0.14);
-  border-radius: 12px;
-  background: rgba(17, 47, 75, 0.34);
-  padding: 8px 10px;
-  min-width: 0;
-}
-
-.env-trend-mini span,
-.env-trend-mini em {
-  display: block;
-  color: rgba(214, 230, 255, 0.58);
-  font-size: 11px;
-  font-style: normal;
-}
-
-.env-trend-mini strong {
-  display: block;
-  margin: 3px 0 1px;
-  color: #eef8ff;
-  font-size: 18px;
-}
-
-.env-trend-mini strong.up {
-  color: #ff8d8d;
-}
-
-.env-trend-mini strong.down {
-  color: #6ce2b2;
-}
-
-.env-trend-mini strong.flat {
-  color: #7ee8ff;
-}
-
-.parking-head-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  min-width: 0;
-}
-
-.traffic-flow-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  border: 1px dashed rgba(126, 232, 255, 0.3);
-  border-radius: 999px;
-  background: rgba(126, 232, 255, 0.08);
-  padding: 4px 9px;
-}
-
-.traffic-flow-inline span {
-  color: rgba(214, 230, 255, 0.78);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.traffic-flow-inline em {
-  color: #7ee8ff;
-  font-size: 10px;
-  font-style: normal;
-  white-space: nowrap;
-}
-
-.traffic-flow-inline strong {
-  color: rgba(233, 246, 255, 0.82);
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.parking-pressure-card {
-  display: grid;
-  grid-template-columns: minmax(150px, 0.28fr) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 8px;
-  min-height: 0;
-  border: 1px solid rgba(126, 197, 255, 0.14);
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 8% 40%, rgba(126, 232, 255, 0.11), transparent 32%),
-    rgba(17, 47, 75, 0.3);
-  padding: 9px 12px;
-}
-
-.parking-pressure-main,
-.parking-pressure-track,
-.parking-pressure-stats {
-  min-width: 0;
-}
-
-.parking-pressure-main {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-items: baseline;
-  column-gap: 7px;
-  row-gap: 2px;
-}
-
-.parking-pressure-main span {
-  color: rgba(214, 230, 255, 0.66);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.parking-pressure-main strong {
-  color: #eef8ff;
-  font-size: 34px;
-  line-height: 0.9;
-  font-variant-numeric: tabular-nums;
-}
-
-.parking-pressure-main small {
-  margin-left: 2px;
-  font-size: 17px;
-}
-
-.parking-pressure-main em {
-  grid-column: 1 / -1;
-  color: rgba(214, 230, 255, 0.58);
-  font-size: 11px;
-  font-style: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.parking-pressure-card.ok .parking-pressure-main strong {
-  color: #6ce2b2;
-}
-
-.parking-pressure-card.warn .parking-pressure-main strong {
-  color: #f8cb71;
-}
-
-.parking-pressure-card.danger .parking-pressure-main strong {
-  color: #ff8d8d;
-}
-
-.parking-pressure-track {
-  display: grid;
-  gap: 6px;
-}
-
-.parking-pressure-meter {
-  position: relative;
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(83, 213, 165, 0.78), rgba(248, 203, 113, 0.82) 62%, rgba(255, 141, 141, 0.88));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-.parking-pressure-meter::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: rgba(8, 25, 43, 0.48);
-  clip-path: inset(0 0 0 var(--parking-percent));
-}
-
-.parking-pressure-meter i {
-  position: absolute;
-  left: var(--parking-percent);
-  top: 50%;
-  z-index: 1;
-  width: 14px;
-  height: 14px;
-  border: 2px solid #eef8ff;
-  border-radius: 50%;
-  background: rgba(8, 25, 43, 0.92);
-  box-shadow: 0 0 12px rgba(126, 232, 255, 0.32);
-  transform: translate(-50%, -50%);
-}
-
-.parking-pressure-meter b {
-  position: absolute;
-  left: 65%;
-  top: -4px;
-  bottom: -4px;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.parking-pressure-scale {
-  display: flex;
-  justify-content: space-between;
-  color: rgba(214, 230, 255, 0.5);
-  font-size: 10px;
-}
-
-.parking-pressure-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(64px, auto));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.parking-pressure-stats div {
-  border-left: 1px solid rgba(126, 197, 255, 0.14);
-  padding-left: 10px;
-}
-
-.parking-pressure-stats span,
-.parking-pressure-stats em {
-  display: block;
-  color: rgba(214, 230, 255, 0.58);
-  font-size: 11px;
-  font-style: normal;
-  white-space: nowrap;
-}
-
-.parking-pressure-stats strong {
-  display: block;
-  margin-top: 3px;
-  color: #eef8ff;
-  font-size: 20px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.parking-pressure-stats .hot strong {
-  max-width: 92px;
-  color: #f8cb71;
-  font-size: 15px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.parking-zone-list {
+.env-spark-card {
+  border: 1px solid rgba(126, 197, 255, 0.14);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(126, 232, 255, 0.08), transparent 42%),
+    rgba(17, 47, 75, 0.42);
+  padding: 9px 10px;
   display: flex;
   flex-direction: column;
   gap: 7px;
   min-height: 0;
-  overflow-y: auto;
-  padding-right: 2px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.parking-zone-list.compact {
-  flex: 1;
-  gap: 6px;
+.env-spark-card:hover {
+  border-color: rgba(126, 197, 255, 0.32);
+  background: rgba(20, 56, 89, 0.55);
 }
 
-.parking-zone-list::-webkit-scrollbar {
-  width: 5px;
+.env-spark-card.active {
+  border-color: rgba(126, 232, 255, 0.5);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 232, 255, 0.08),
+    0 0 16px rgba(126, 232, 255, 0.08);
 }
 
-.parking-zone-list::-webkit-scrollbar-track {
-  background: rgba(126, 197, 255, 0.06);
-  border-radius: 999px;
+.env-spark-card.warn { border-color: rgba(248, 203, 113, 0.3); }
+.env-spark-card.danger { border-color: rgba(255, 141, 141, 0.3); }
+
+.env-spark-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.parking-zone-list::-webkit-scrollbar-thumb {
-  background: rgba(126, 197, 255, 0.34);
-  border-radius: 999px;
+.env-spark-head span {
+  display: block;
+  color: rgba(214, 230, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.2;
 }
 
-.parking-zone-row {
-  border: 1px solid rgba(126, 197, 255, 0.14);
-  border-radius: 10px;
-  background: rgba(17, 47, 75, 0.34);
-  padding: 7px 10px;
-  min-height: 46px;
-  display: grid;
-  grid-template-columns: minmax(92px, 0.22fr) minmax(0, 1fr) minmax(44px, auto);
-  align-items: center;
-  gap: 10px;
-}
-
-.parking-zone-name {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.parking-zone-name span {
-  min-width: 0;
-  color: #d9edff;
-  font-size: 14px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.parking-zone-name em {
+.env-spark-head em {
+  display: block;
+  margin-top: 3px;
   color: rgba(214, 230, 255, 0.52);
   font-size: 10px;
   font-style: normal;
-  white-space: nowrap;
 }
 
-.parking-zone-bar {
-  height: 7px;
-  border-radius: 999px;
-  background: rgba(126, 197, 255, 0.1);
-  overflow: hidden;
-}
-
-.parking-zone-bar i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-}
-
-.parking-zone-count {
-  display: grid;
-  justify-items: end;
-  gap: 2px;
-  min-width: 0;
-}
-
-.parking-zone-count strong {
-  color: #d9edff;
-  font-size: 14px;
+.env-spark-head strong {
+  color: #eef8ff;
+  font-size: 21px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-}
-
-.parking-zone-count em {
-  color: rgba(214, 230, 255, 0.52);
-  font-size: 10px;
-  font-style: normal;
   white-space: nowrap;
 }
 
-.parking-zone-row.ok .parking-zone-bar i {
-  background: linear-gradient(90deg, rgba(83, 213, 165, 0.88), rgba(126, 232, 255, 0.62));
+.env-spark-head small {
+  margin-left: 4px;
+  color: rgba(214, 230, 255, 0.5);
+  font-size: 11px;
 }
 
-.parking-zone-row.warn .parking-zone-bar i {
-  background: linear-gradient(90deg, rgba(248, 203, 113, 0.9), rgba(255, 190, 102, 0.68));
+.env-gauge-row {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
 }
 
-.parking-zone-row.danger .parking-zone-bar i {
-  background: linear-gradient(90deg, rgba(255, 141, 141, 0.92), rgba(255, 78, 102, 0.68));
+.env-radial-gauge {
+  position: relative;
+  width: 58px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 58px;
 }
+
+.env-radial-gauge svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.env-gauge-track,
+.env-gauge-value {
+  fill: none;
+  stroke-width: 8;
+}
+
+.env-gauge-track {
+  stroke: rgba(126, 197, 255, 0.12);
+}
+
+.env-gauge-value {
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(126, 232, 255, 0.16));
+}
+
+.env-radial-gauge span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  color: rgba(233, 246, 255, 0.86);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.env-spark-svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: visible;
+}
+
+.env-spark-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.env-spark-foot span { color: rgba(214, 230, 255, 0.62); }
+.env-spark-foot em.ok { color: #6ce2b2; font-style: normal; }
+.env-spark-foot em.warn { color: #f8cb71; font-style: normal; }
+.env-spark-foot em.danger { color: #ff8d8d; font-style: normal; }
+
+.env-ops-strip {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.env-ops-item {
+  min-width: 0;
+  border: 1px solid rgba(126, 197, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(8, 30, 54, 0.34);
+  padding: 7px 9px 6px;
+}
+
+.env-ops-item span {
+  display: block;
+  color: rgba(214, 230, 255, 0.56);
+  font-size: 10px;
+}
+
+.env-ops-item strong {
+  display: block;
+  margin-top: 3px;
+  color: #eaf6ff;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.env-ops-item.ok strong { color: #6ce2b2; }
+.env-ops-item.warn strong { color: #f8cb71; }
+.env-ops-item.danger strong { color: #ff8d8d; }
 
 /* ====== 1. 视频卡片状态边框 ====== */
 @keyframes tile-alert-pulse {
@@ -8412,33 +8714,13 @@ watch(activeTab, (tab, previousTab) => {
   }
 
   .env-panel {
-    grid-template-columns: minmax(0, 0.55fr) minmax(0, 0.45fr);
-    grid-template-rows: auto minmax(124px, 0.3fr) minmax(0, 1fr);
-    grid-template-areas:
-      "overview overview"
-      "status trend"
-      "parking trend";
-    gap: 10px;
-  }
-
-  .env-overview-card {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(24rem, auto) minmax(26rem, auto);
+    grid-template-areas:
+      "kpi"
+      "parking"
+      "trend";
   }
-
-  .env-overview-body {
-    grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.38fr);
-  }
-
-  .env-status-card,
-  .env-trend-card,
-  .env-parking-card {
-    min-height: 0;
-  }
-
-  .env-trend-svg.single {
-    min-height: 0;
-  }
-
   .main-col,
   .side-col {
     height: auto;
@@ -8485,70 +8767,34 @@ watch(activeTab, (tab, previousTab) => {
     grid-template-columns: 1fr;
     grid-template-rows: none;
     grid-template-areas: none;
-    grid-auto-rows: auto;
+    grid-auto-rows: minmax(220px, auto);
     align-content: start;
   }
 
-  .env-overview-card,
-  .env-status-card,
-  .env-parking-card {
-    min-height: 220px;
-  }
-
-  .env-trend-card {
-    min-height: 290px;
-  }
-
-  .env-overview-card {
-    grid-template-columns: 1fr;
-  }
-
-  .env-overview-body,
-  .env-kpi-grid,
-  .env-trend-footer {
-    grid-template-columns: 1fr;
-  }
-
-  .env-status-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .parking-pressure-card {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .parking-head-right {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-  }
-
-  .parking-pressure-stats {
+  .kpi-strip-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .parking-pressure-stats div {
-    border-left: 0;
-    padding-left: 0;
+  .parking-stage {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(160px, auto);
   }
 
-  .env-trend-head {
-    gap: 8px;
+  .parking-zones-visual {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(9rem, auto);
+    overflow: visible;
   }
 
-  .env-trend-switch {
-    flex-wrap: wrap;
+  .env-spark-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
   }
 
-  .env-inline-insight {
-    grid-template-columns: auto auto;
+  .parking-brief-grid,
+  .env-ops-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-
-  .env-inline-insight p {
-    grid-column: 1 / -1;
-    white-space: normal;
-  }
-
   .nav-current {
     font-size: 15px;
   }
@@ -8599,6 +8845,10 @@ watch(activeTab, (tab, previousTab) => {
   .alarm-kpi-strip,
   .alarm-type-list,
   .selected-alarm-grid,
+  .kpi-strip-row,
+  .parking-brief-grid,
+  .env-ops-strip,
+  .env-spark-grid,
   .analysis-kpi-grid,
   .analysis-type-grid,
   .analysis-trend-snapshot,
@@ -8609,6 +8859,10 @@ watch(activeTab, (tab, previousTab) => {
 
   .analysis-type-stage,
   .analysis-insight-body {
+    grid-template-columns: 1fr;
+  }
+
+  .parking-zones-visual {
     grid-template-columns: 1fr;
   }
 

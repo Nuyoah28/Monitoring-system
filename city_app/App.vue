@@ -29,7 +29,8 @@ export default {
   onLaunch: function () {
     // console.log("App Launch");
     // #ifdef APP-PLUS
-    if(typeof plus !== 'undefined') {
+    try {
+      if (typeof plus !== 'undefined') {
         let main = plus.android.runtimeMainActivity();
         let RingtoneManager = plus.android.importClass(
           "android.media.RingtoneManager"
@@ -42,44 +43,9 @@ export default {
         let player = MediaPlayer.create(main, uri);
         let check = 1;
 
-        uni.onPushMessage((res) => {
-          // console.log(res);
-          if (res.type === "click") {
-            const currentAppType = uni.getStorageSync("appType");
-            if (currentAppType === "owner") {
-              uni.reLaunch({
-                url: "/pages/owner/home/index",
-              });
-            } else {
-              uni.reLaunch({
-                url: "/pages/manage/controls/controls",
-              });
-            }
-          } else if (res.type === "receive") {
-            if (check === 0) {
-              check = 1;
-              return;
-            }
-            uni.createPushMessage({
-              title: res.data.title,
-              content: '您有一条新的报警信息，请及时处理',
-              sound: "system",
-            });
-            check = 0;
-            uni.vibrateLong({
-              success: () => {
-                console.log("success");
-              },
-              fail: (err) => {
-                console.log(err);
-              },
-            });
-            // player.setLooping(false);
-            // player.prepare();
-            player.start();
-            // player.stop();
-          }
-        });
+      }
+    } catch (e) {
+      console.warn('[App] 原生推送/铃声初始化失败，不影响启动流程:', e);
     }
     // #endif
 
@@ -93,6 +59,8 @@ export default {
 
     const launchTarget = resolveLaunchTarget();
     uni.setStorageSync("__launch_target__", launchTarget);
+
+
 
     // 启动动画页作为统一入口，动画结束后再跳转业务页
     uni.reLaunch({

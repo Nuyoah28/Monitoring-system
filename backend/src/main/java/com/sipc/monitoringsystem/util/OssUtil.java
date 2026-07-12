@@ -1,11 +1,16 @@
 package com.sipc.monitoringsystem.util;
 
+import com.qcloud.cos.COSClient;
+import com.qcloud.cos.model.ObjectMetadata;
 import com.sipc.monitoringsystem.config.OssConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.net.URI;
+import java.util.UUID;
 
 // AI辅助生成：GLM-5 智谱AI，新增 OssUtil 工具类，提供告警视频链接规范化和前端代理链接生成方法，统一处理 clipId 和对象 key，兼容演示标识 SIM_。
 @Component
@@ -63,5 +68,41 @@ public class OssUtil {
     private boolean isDemoClipId(String clipIdOrKey) {
         String value = clipIdOrKey.trim();
         return value.startsWith("SIM_");
+    }
+
+    /**
+     * 上传一张图片到 COS（社区上报随手拍使用），返回对象 key。
+     * 复用 OssConfig 已配置的凭证与 bucket，与告警片段同一套对象存储。
+     *
+     * @param file 前端上传的图片文件
+     * @return COS objectKey，形如 community-report/xxxx.jpg
+     */
+    public String uploadImage(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IOException("上传文件为空");
+        }
+        String original = file.getOriginalFilename();
+        String ext = "";
+        if (original != null && original.contains(".")) {
+            ext = original.substring(original.lastIndexOf('.'));
+        }
+        String objectKey = "community-report/" + UUID.randomUUID().toString().replace("-", "") + ext;
+        COSClient cosClient = ossConfig.cosClient();
+        try {
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentLength(file.getSize());
+            if (file.getContentType() != null) {
+                metadata.setContentType(file.getContentType());
+            }
+            cosClient.putObject(ossConfig.getBucketName(), objectKey, file.getInputStream(), metadata);
+        } finally {
+            cosClient.shutdown();
+        }
+        return objectKey;
+    }
+
+    /** 由对象 key 生成可公开访问的 COS 图片 URL */
+    public String buildImageUrl(String objectKey) {
+        return ossConfig.buildObjectUrl(objectKey);
     }
 }

@@ -109,6 +109,16 @@ export const defaultStreamList = [
   buildDemoVideoUrl(demoVideoFileMap.extraFlv01),
   buildDemoVideoUrl(demoVideoFileMap.extraFlv02),
 ]
+// ====== 本地演示流：6 路全部指向 public/video/ 下的静态文件 ======
+// 比赛时改回上方 defaultStreamList 或用 VUE_APP_MONITOR_STREAMS 环境变量传 webrtc:// 地址即可恢复推流
+const localDemoStreamList = [
+  buildDemoVideoUrl('cam1.mp4'),
+  buildDemoVideoUrl('cam2.mp4'),
+  buildDemoVideoUrl('cam3.mp4'),
+  buildDemoVideoUrl('cam4.mp4'),
+  buildDemoVideoUrl('cam5.mp4'),
+  buildDemoVideoUrl('cam6.mp4'),
+]
 
 export const rtmpAddressList = getEnvList('VUE_APP_MONITOR_STREAMS', defaultStreamList)
 export const rtmpAddress = rtmpAddressList[0] || ''

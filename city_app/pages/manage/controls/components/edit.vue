@@ -27,7 +27,40 @@
           </view>
 
           <view class="preview-box">
-            <!-- #ifdef APP-PLUS || MP-WEIXIN -->
+            <!-- #ifdef APP-PLUS -->
+            <video
+              v-if="liveStreamUrl && previewPlayerVisible"
+              :src="liveStreamUrl"
+              :autoplay="true"
+              :controls="false"
+              :show-fullscreen-btn="false"
+              :show-center-play-btn="false"
+              :muted="true"
+              object-fit="contain"
+              class="snapshot"
+              @play="onPreviewPlay"
+              @error="onPreviewError"
+            ></video>
+            <view v-else class="snapshot placeholder">
+              <text>实时流加载中…</text>
+            </view>
+            <cover-view
+              v-if="previewPlayerVisible && previewBorderVisible"
+              class="preview-layer"
+              :key="`preview-layer-${previewRenderKey}`"
+            >
+              <cover-view
+                class="border border--preview"
+                v-for="(box, index) in border"
+                :key="`preview-app-${previewRenderKey}-${index}`"
+                :style="boxStyle(box)"
+              ></cover-view>
+            </cover-view>
+            <cover-view v-if="previewError" class="preview-error">
+              实时预览加载失败
+            </cover-view>
+            <!-- #endif -->
+            <!-- #ifdef MP-WEIXIN -->
             <live-player
               v-if="liveStreamUrl"
               :src="liveStreamUrl"
@@ -42,7 +75,7 @@
             <cover-view
               class="border border--preview"
               v-for="(box, index) in border"
-              :key="`preview-${index}`"
+              :key="`preview-mp-${index}`"
               :style="boxStyle(box)"
             ></cover-view>
             <!-- #endif -->
@@ -184,6 +217,13 @@ export default {
         width: 328,
         height: 246,
       },
+      previewError: false,
+      previewRenderKey: 0,
+      previewBorderVisible: true,
+      previewPlayerVisible: true,
+      closeTimer: null,
+      measureTimer: null,
+      imageRequestSeq: 0,
     };
   },
   computed: {
@@ -210,11 +250,16 @@ export default {
     if (this.moveThrottle && this.moveThrottle.cancel) {
       this.moveThrottle.cancel();
     }
+    this.clearCloseTimer();
+    this.clearMeasureTimer();
+    this.clearTransientBorderState(false);
   },
   watch: {
     showEdit(val) {
       if (val) {
         this.initDialog();
+      } else {
+        this.prepareClosePreview();
       }
     },
   },
@@ -228,6 +273,9 @@ export default {
       };
       this.borData = {};
       this.img = "";
+      this.previewError = false;
+      this.previewPlayerVisible = true;
+      this.refreshPreviewLayer();
       this.sourceBorder = this.getInitialSourceBorder();
       this.border = this.sourceBorder ? [this.sourceBoxToDisplayBox(this.sourceBorder)] : [];
       this.resetAbilities();
@@ -237,8 +285,11 @@ export default {
       this.queryDrawRect();
     },
     queryDrawRect() {
+      this.clearMeasureTimer();
       this.$nextTick(() => {
-        setTimeout(() => {
+        this.measureTimer = setTimeout(() => {
+          this.measureTimer = null;
+          if (!this.showEdit) return;
           uni
             .createSelectorQuery()
             .in(this)
@@ -268,6 +319,14 @@ export default {
       if (!this.painting && this.sourceBorder) {
         this.border = [this.sourceBoxToDisplayBox(this.sourceBorder)].filter(Boolean);
       }
+    },
+    onPreviewPlay() {
+      this.previewError = false;
+    },
+    onPreviewError(error) {
+      if (!this.previewPlayerVisible) return;
+      this.previewError = true;
+      console.warn("[edit-area] 实时预览加载失败：", error);
     },
     updateImageRect() {
       const frameWidth = Number(this.drawRect.width) || 328;
@@ -347,10 +406,13 @@ export default {
     },
     async getImg() {
       if (!this.currentWarnData.id) return;
+      const requestSeq = ++this.imageRequestSeq;
       try {
         const { data } = await uni.$http.get(`/api/v1/monitor/image/${this.currentWarnData.id}`);
+        if (requestSeq !== this.imageRequestSeq || !this.showEdit) return;
         this.img = ("data:image/png;base64," + (data && data.message ? data.message : "")).replace(/[\r\n]/g, "");
       } catch (error) {
+        if (requestSeq !== this.imageRequestSeq || !this.showEdit) return;
         console.warn("[edit-area] 获取监控截图失败：", error);
         this.img = "";
       }
@@ -504,8 +566,64 @@ export default {
         rightY: convertY(normalized.rightY),
       });
     },
+    refreshPreviewLayer() {
+      this.previewBorderVisible = false;
+      this.previewRenderKey += 1;
+      this.$nextTick(() => {
+        this.previewBorderVisible = true;
+      });
+    },
+    clearTransientBorderState(refreshLayer = true) {
+      this.painting = false;
+      this.startPoint = {
+        x: null,
+        y: null,
+      };
+      this.borData = {};
+      this.border = [];
+      this.sourceBorder = null;
+      this.previewError = false;
+      if (refreshLayer && this.previewPlayerVisible) {
+        this.refreshPreviewLayer();
+      }
+    },
+    prepareClosePreview() {
+      this.clearCloseTimer();
+      this.clearMeasureTimer();
+      this.imageRequestSeq += 1;
+      this.painting = false;
+      this.startPoint = {
+        x: null,
+        y: null,
+      };
+      this.borData = {};
+      this.border = [];
+      this.sourceBorder = null;
+      this.previewError = false;
+      this.previewBorderVisible = false;
+      this.previewPlayerVisible = false;
+      this.previewRenderKey += 1;
+    },
     changeShow() {
-      this.$emit("change", false);
+      this.prepareClosePreview();
+      this.$nextTick(() => {
+        this.closeTimer = setTimeout(() => {
+          this.closeTimer = null;
+          this.$emit("change", false);
+        }, 80);
+      });
+    },
+    clearCloseTimer() {
+      if (this.closeTimer) {
+        clearTimeout(this.closeTimer);
+        this.closeTimer = null;
+      }
+    },
+    clearMeasureTimer() {
+      if (this.measureTimer) {
+        clearTimeout(this.measureTimer);
+        this.measureTimer = null;
+      }
     },
     resetAbilities() {
       this.ability = [
@@ -589,8 +707,13 @@ export default {
       this.border = [];
       this.sourceBorder = null;
       this.painting = false;
+      this.startPoint = {
+        x: null,
+        y: null,
+      };
       this.borData = {};
       this.setAbilityChecked(1, false);
+      this.refreshPreviewLayer();
     },
     hasValidBorder() {
       return !!this.normalizeBox(this.border && this.border[0]);
@@ -651,6 +774,7 @@ export default {
             const { data } = await uni.$http.post("/api/v1/monitor/update", payload);
             if (data && data.code === "00000") {
               uni.showToast({ title: "保存成功", icon: "success" });
+              this.prepareClosePreview();
               this.$emit("change", true);
             } else {
               uni.showToast({ title: (data && data.message) || "保存失败", icon: "none" });
@@ -783,6 +907,31 @@ export default {
     z-index: 6;
     border-color: rgba(220, 38, 38, 0.8);
     background-color: rgba(220, 38, 38, 0.14);
+  }
+
+  .preview-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 6;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .preview-error {
+    position: absolute;
+    left: 28rpx;
+    right: 28rpx;
+    top: 96rpx;
+    z-index: 7;
+    padding: 8rpx 14rpx;
+    border-radius: 999rpx;
+    color: #fee2e2;
+    font-size: 20rpx;
+    font-weight: 700;
+    text-align: center;
+    background: rgba(127, 29, 29, 0.82);
   }
 
   .editor-frame {

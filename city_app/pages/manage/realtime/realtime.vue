@@ -192,6 +192,7 @@ export default {
       quickDealTexts: ["已到现场核实，风险已解除", "已通知负责人跟进", "误报，现场无异常"],
       dataFetchInterval: null, // 定时器ID
       isRefreshing: false, // 正在刷新状态
+      detailNavigating: false,
     };
   },
   computed: {
@@ -228,6 +229,7 @@ export default {
   },
   onShow() {
     // console.log("realShow");
+    this.detailNavigating = false;
     this.choosen = 0;
     this.caseType = null;
     this.filterIndex = null;
@@ -495,8 +497,22 @@ export default {
         uni.$showMsg("报警ID缺失，无法查看详情");
         return;
       }
-      uni.navigateTo({
-        url: `/pages/manage/realtime/detail?id=${item.id}`,
+      if (this.detailNavigating) return;
+      this.detailNavigating = true;
+      const url = `/pages/manage/realtime/detail?id=${item.id}`;
+      const pages = getCurrentPages();
+      const navigate = pages.length >= 9 ? uni.redirectTo : uni.navigateTo;
+      navigate({
+        url,
+        fail: () => {
+          this.detailNavigating = false;
+          uni.$showMsg("详情页打开失败，请稍后再试");
+        },
+        complete: () => {
+          setTimeout(() => {
+            this.detailNavigating = false;
+          }, 800);
+        },
       });
     },
     deal(index) {
